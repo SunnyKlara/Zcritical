@@ -1,0 +1,37 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "drivers/drv_lcd.c"
+        "drivers/drv_led.c"
+        "drivers/drv_encoder.c"
+        "drivers/drv_pwm.c"
+        "drivers/drv_gpio.c"
+        "drivers/drv_audio.c"
+        "services/ble_service.c"
+        "services/a2dp_service.c"
+        "services/protocol.c"
+        "services/storage.c"
+        "services/audio_engine.c"
+        "ui/ui_manager.c"
+        "ui/ui_menu.c"
+        "ui/ui_speed.c"
+        "ui/ui_preset.c"
+        "ui/ui_rgb.c"
+        "ui/ui_bright.c"
+        "ui/ui_logo.c"
+        "ui/ui_volume.c"
+        "ui/ui_common.c"
+        "app/app_state.c"
+        "app/led_effects.c"
+        "app/encoder_handler.c"
+    INCLUDE_DIRS
+        "."
+        "config"
+        "drivers"
+        "services"
+        "ui"
+        "app"
+        "resources"
+    REQUIRES
+        bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s
+)
