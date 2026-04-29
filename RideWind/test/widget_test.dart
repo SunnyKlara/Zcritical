@@ -10,11 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridewind/main.dart';
 
 void main() {
-  testWidgets('RideWind app smoke test', (WidgetTester tester) async {
+  testWidgets('Critical app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const RideWindApp(isFirstLaunch: true));
+    await tester.pumpWidget(const CriticalApp(isFirstLaunch: true));
 
     // Verify that the app launches and shows the splash screen
-    expect(find.text('RideWind'), findsOneWidget);
+    expect(find.text('Critical'), findsOneWidget);
   });
 }

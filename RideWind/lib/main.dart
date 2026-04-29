@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/no_device_screen.dart';
 import 'providers/bluetooth_provider.dart';
-import 'providers/device_provider.dart';
+import 'core/service_locator.dart';
 import 'services/engine_audio_manager.dart';
 import 'services/first_launch_manager.dart';
 import 'widgets/app_update_dialog.dart';
@@ -42,27 +42,30 @@ void main() async {
       debugPrint('⚠️ 引擎音效初始化失败（非致命）: $e');
     }
     
+    // 🔧 初始化依赖注入
+    setupServiceLocator();
+    
     // 检查是否为首次启动，决定入口页面
     final firstLaunchManager = FirstLaunchManager();
     final isFirstLaunch = await firstLaunchManager.isFirstLaunch();
     
-    runApp(RideWindApp(isFirstLaunch: isFirstLaunch));
+    runApp(CriticalApp(isFirstLaunch: isFirstLaunch));
   }, (error, stackTrace) {
     debugPrint('❌ 未捕获异常: $error');
     debugPrint('📍 堆栈: $stackTrace');
   });
 }
 
-class RideWindApp extends StatefulWidget {
+class CriticalApp extends StatefulWidget {
   final bool isFirstLaunch;
   
-  const RideWindApp({super.key, required this.isFirstLaunch});
+  const CriticalApp({super.key, required this.isFirstLaunch});
 
   @override
-  State<RideWindApp> createState() => _RideWindAppState();
+  State<CriticalApp> createState() => _CriticalAppState();
 }
 
-class _RideWindAppState extends State<RideWindApp> {
+class _CriticalAppState extends State<CriticalApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
@@ -83,12 +86,11 @@ class _RideWindAppState extends State<RideWindApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
-        ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider.value(value: sl<BluetoothProvider>()),
       ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
-        title: 'RideWind',
+        title: 'Critical',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,

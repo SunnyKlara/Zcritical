@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'device_scan_screen.dart';
@@ -288,7 +289,8 @@ class NoDeviceScreen extends StatelessWidget {
               ),
             ),
 
-            // 🔧 开发者模式按钮（左下角）
+            // 🔧 开发者模式按钮（左下角）— 仅 debug 模式可见
+            if (kDebugMode)
             Positioned(
               bottom: devButtonBottom,
               left: 20,

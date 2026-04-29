@@ -67,28 +67,79 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         if (strcmp(param, "ALL") == 0)         { out->type = CMD_GET_ALL; return true; }
         if (strcmp(param, "UI") == 0)          { out->type = CMD_GET_UI; return true; }
         if (strcmp(param, "LOGO") == 0)        { out->type = CMD_GET_LOGO; return true; }
+        if (strcmp(param, "LOGO_SLOTS") == 0) { out->type = CMD_GET_LOGO; return true; }
         if (strcmp(param, "VOL") == 0)         { out->type = CMD_GET_VOLUME; return true; }
         return false;  /* unknown GET */
     }
 
     /* ── LOGO commands ── */
-    if (strncmp(buf, "LOGO_START:", 11) == 0) {
-        /* LOGO_START:slot:size */
-        p = buf + 11;
-        int slot;
-        if (!parse_int(p, &slot)) return false;
-        p = next_field(p);
-        if (!p) return false;
-        int size;
-        if (!parse_int(p, &size)) return false;
-        if (slot < 0 || slot > 2 || size <= 0) return false;
+    if (strncmp(buf, "LOGO_START_BIN:", 15) == 0) {
+        /* Binary mode: LOGO_START_BIN:size:crc32 or LOGO_START_BIN:slot:size:crc32
+         * Same parsing as LOGO_START but sets binary_mode flag */
+        p = buf + 15;
+        char *end;
+        unsigned long nums[3] = {0};
+        int num_count = 0;
+
+        for (int i = 0; i < 3 && p && *p; i++) {
+            nums[i] = strtoul(p, &end, 10);
+            if (end == p) break;
+            num_count++;
+            p = (*end == ':') ? end + 1 : NULL;
+        }
+
         out->type = CMD_LOGO_START;
-        out->param.logo_start.slot = (uint8_t)slot;
-        out->param.logo_start.size = (uint32_t)size;
+        /* Use bit 7 of slot to signal binary mode to dispatch handler */
+        if (num_count == 3) {
+            out->param.logo_start.slot = (uint8_t)(nums[0] | 0x80);
+            out->param.logo_start.size = (uint32_t)nums[1];
+            out->param.logo_start.crc32 = (uint32_t)nums[2];
+        } else if (num_count == 2) {
+            out->param.logo_start.slot = 0xFF;  /* 0xFF already has bit 7 set = auto + binary */
+            out->param.logo_start.size = (uint32_t)nums[0];
+            out->param.logo_start.crc32 = (uint32_t)nums[1];
+        } else {
+            return false;
+        }
+        if (out->param.logo_start.size == 0) return false;
+        return true;
+    }
+    if (strncmp(buf, "LOGO_START:", 11) == 0) {
+        /* Support both formats:
+         *   LOGO_START:size:crc32          (2 params, auto-slot)
+         *   LOGO_START:slot:size:crc32     (3 params, explicit slot)
+         * CRC32 can exceed INT_MAX, so parse with strtoul */
+        p = buf + 11;
+        char *end;
+        unsigned long nums[3] = {0};
+        int num_count = 0;
+
+        for (int i = 0; i < 3 && p && *p; i++) {
+            nums[i] = strtoul(p, &end, 10);
+            if (end == p) break;  /* no digits */
+            num_count++;
+            p = (*end == ':') ? end + 1 : NULL;
+        }
+
+        out->type = CMD_LOGO_START;
+        if (num_count == 3) {
+            /* LOGO_START:slot:size:crc32 */
+            out->param.logo_start.slot = (uint8_t)nums[0];
+            out->param.logo_start.size = (uint32_t)nums[1];
+            out->param.logo_start.crc32 = (uint32_t)nums[2];
+        } else if (num_count == 2) {
+            /* LOGO_START:size:crc32 */
+            out->param.logo_start.slot = 0xFF;  /* 0xFF = auto-assign */
+            out->param.logo_start.size = (uint32_t)nums[0];
+            out->param.logo_start.crc32 = (uint32_t)nums[1];
+        } else {
+            return false;
+        }
+        if (out->param.logo_start.size == 0) return false;
         return true;
     }
     if (strncmp(buf, "LOGO_DATA:", 10) == 0) {
-        /* LOGO_DATA:hex — store pointer to hex data (caller owns buffer) */
+        /* LOGO_DATA:seq:hex — store pointer to hex data (caller owns buffer) */
         out->type = CMD_LOGO_DATA;
         /* For queue-based dispatch, we'll handle hex data in the BLE layer */
         return true;
@@ -213,6 +264,30 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
             out->param.u8_val = (uint8_t)val;
             return true;
         }
+    }
+
+    /* ── WIFI_SCAN ── */
+    if (strcmp(buf, "WIFI_SCAN") == 0) {
+        out->type = CMD_WIFI_SCAN;
+        return true;
+    }
+
+    /* ── WIFI:ssid:password ── */
+    if (strncmp(buf, "WIFI:", 5) == 0) {
+        const char *ssid_start = buf + 5;
+        const char *colon = strchr(ssid_start, ':');
+        if (!colon || colon == ssid_start) return false;
+        size_t ssid_len = colon - ssid_start;
+        const char *pass_start = colon + 1;
+        size_t pass_len = strlen(pass_start);
+        if (ssid_len >= sizeof(out->param.wifi.ssid)) return false;
+        if (pass_len >= sizeof(out->param.wifi.password)) return false;
+        out->type = CMD_WIFI;
+        memset(out->param.wifi.ssid, 0, sizeof(out->param.wifi.ssid));
+        memset(out->param.wifi.password, 0, sizeof(out->param.wifi.password));
+        memcpy(out->param.wifi.ssid, ssid_start, ssid_len);
+        memcpy(out->param.wifi.password, pass_start, pass_len);
+        return true;
     }
 
     return false;  /* unrecognized command */

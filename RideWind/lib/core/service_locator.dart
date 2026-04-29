@@ -1,0 +1,41 @@
+import 'package:get_it/get_it.dart';
+import '../services/ble_service.dart';
+import '../protocol/command_sender.dart';
+import '../protocol/response_router.dart';
+import '../providers/bluetooth_provider.dart';
+import '../controllers/colorize_controller.dart';
+
+/// 全局服务定位器
+final sl = GetIt.instance;
+
+/// 初始化依赖注入
+///
+/// 调用顺序：main() → setupServiceLocator() → runApp()
+///
+/// 注册链：
+///   BLEService（单例）
+///     → CommandSender（单例，依赖 BLEService）
+///     → ResponseRouter（单例，依赖 CommandSender）
+///     → BluetoothProvider（单例，依赖以上三者）
+void setupServiceLocator() {
+  // 底层 BLE 服务
+  sl.registerLazySingleton<BLEService>(() => BLEService());
+
+  // 协议层
+  sl.registerLazySingleton<CommandSender>(() => CommandSender(sl<BLEService>()));
+  sl.registerLazySingleton<ResponseRouter>(() => ResponseRouter(sl<CommandSender>()));
+
+  // 状态管理层
+  sl.registerLazySingleton<BluetoothProvider>(
+    () => BluetoothProvider.withDependencies(
+      bleService: sl<BLEService>(),
+      commandSender: sl<CommandSender>(),
+      responseRouter: sl<ResponseRouter>(),
+    ),
+  );
+
+  // 控制器层
+  sl.registerLazySingleton<ColorizeController>(
+    () => ColorizeController(sl<BluetoothProvider>()),
+  );
+}

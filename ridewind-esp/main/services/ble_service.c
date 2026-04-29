@@ -10,6 +10,7 @@
 #include "ble_service.h"
 #include "protocol.h"
 #include "board_config.h"
+#include "esp_heap_caps.h"
 
 #include "esp_bt.h"
 #include "esp_bt_main.h"
@@ -86,9 +87,9 @@ static const esp_gatts_attr_db_t s_gatt_db[] = {
             sizeof(uint8_t), sizeof(char_prop), (uint8_t *)&char_prop
         }
     },
-    /* [2] Characteristic Value */
+    /* [2] Characteristic Value — use RSP_BY_APP to prevent echo on write */
     [2] = {
-        {ESP_GATT_AUTO_RSP},
+        {ESP_GATT_RSP_BY_APP},
         {
             ESP_UUID_LEN_16, (uint8_t *)&char_uuid_val,
             ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
@@ -111,15 +112,56 @@ static const esp_gatts_attr_db_t s_gatt_db[] = {
 /* ═══════════════════════════════════════════════════════════════
  *  Process received data: reassemble fragments, parse on '\n'
  * ═══════════════════════════════════════════════════════════════ */
+
+/* External logo data handler — defined in main.c (Phase 9) */
+extern void logo_upload_feed_hex(const char *hex_str, uint16_t len);
+extern void logo_upload_feed_binary(const uint8_t *data, uint16_t len);
+extern bool logo_is_binary_mode(void);
+
 static void process_rx_data(const uint8_t *data, uint16_t len)
 {
+    /* Binary logo mode: all incoming data is raw pixel bytes, no text framing.
+     * Exception: if we see "LOGO_END" text, exit binary mode. */
+    if (logo_is_binary_mode()) {
+        /* Check if this is the LOGO_END command (text, ends with \n) */
+        if (len >= 8 && len <= 10) {
+            /* Small packet might be LOGO_END\n or LOGO_END\r\n */
+            char tmp[16];
+            uint16_t copy_len = (len < sizeof(tmp) - 1) ? len : sizeof(tmp) - 1;
+            memcpy(tmp, data, copy_len);
+            tmp[copy_len] = '\0';
+            /* Strip trailing \r\n */
+            for (int i = copy_len - 1; i >= 0 && (tmp[i] == '\r' || tmp[i] == '\n'); i--) {
+                tmp[i] = '\0';
+            }
+            if (strcmp(tmp, "LOGO_END") == 0) {
+                /* Route to command parser */
+                cmd_msg_t msg;
+                if (protocol_parse(tmp, (uint16_t)strlen(tmp), &msg)) {
+                    if (cmd_queue) xQueueSend(cmd_queue, &msg, 0);
+                }
+                return;
+            }
+        }
+        /* Raw binary data — feed directly to PSRAM buffer */
+        logo_upload_feed_binary(data, len);
+        return;
+    }
+
     for (uint16_t i = 0; i < len; i++) {
         char c = (char)data[i];
 
         if (c == '\n' || c == '\r') {
             if (s_rx_len > 0) {
-                /* Complete command received — parse and enqueue */
                 s_rx_buf[s_rx_len] = '\0';
+
+                /* Fast path for LOGO_DATA — decode hex directly without queue */
+                if (s_rx_len > 10 && strncmp(s_rx_buf, "LOGO_DATA:", 10) == 0) {
+                    logo_upload_feed_hex(s_rx_buf + 10, s_rx_len - 10);
+                    s_rx_len = 0;
+                    continue;
+                }
+
                 cmd_msg_t msg;
                 if (protocol_parse(s_rx_buf, s_rx_len, &msg)) {
                     if (cmd_queue) {
@@ -134,7 +176,6 @@ static void process_rx_data(const uint8_t *data, uint16_t len)
             if (s_rx_len < RX_BUF_SIZE - 1) {
                 s_rx_buf[s_rx_len++] = c;
             } else {
-                /* Buffer overflow — discard */
                 ESP_LOGW(TAG, "RX buffer overflow, discarding");
                 s_rx_len = 0;
             }
@@ -173,16 +214,9 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
             s_gatts_if = gatts_if;
             /* Set device name */
             esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
-    /* Configure advertising data — include FFE0 service UUID so APP can find us */
-            static uint8_t svc_uuid_adv[16];
-            /* Convert 16-bit UUID 0xFFE0 to 128-bit BLE base UUID */
-            /* 0000FFE0-0000-1000-8000-00805F9B34FB in little-endian */
-            static const uint8_t ffe0_128[16] = {
-                0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80,
-                0x00, 0x10, 0x00, 0x00, 0xE0, 0xFF, 0x00, 0x00
-            };
-            memcpy(svc_uuid_adv, ffe0_128, 16);
-
+            /* Configure advertising data — device name only.
+             * APP side filters by device name "T1" and verifies FFE0 service
+             * after connection, so we don't need UUID in the adv packet. */
             esp_ble_adv_data_t adv_data = {
                 .set_scan_rsp        = false,
                 .include_name        = true,
@@ -194,8 +228,8 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
                 .p_manufacturer_data = NULL,
                 .service_data_len    = 0,
                 .p_service_data      = NULL,
-                .service_uuid_len    = 16,
-                .p_service_uuid      = svc_uuid_adv,
+                .service_uuid_len    = 0,
+                .p_service_uuid      = NULL,
                 .flag                = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
             };
             esp_ble_gap_config_adv_data(&adv_data);
@@ -217,9 +251,13 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         s_conn_id   = param->connect.conn_id;
         s_connected = true;
         s_rx_len    = 0;  /* Reset reassembly buffer */
-        ESP_LOGI(TAG, "Client connected, conn_id=%d", s_conn_id);
+        ESP_LOGI(TAG, "Client connected, conn_id=%d (free heap: %u, largest block: %u)",
+                 s_conn_id,
+                 (unsigned)esp_get_free_heap_size(),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
         /* Request higher MTU for better throughput */
         esp_ble_gatt_set_local_mtu(247);
+        /* Notify WiFi status after a short delay (let MTU negotiate first) */
         break;
 
     case ESP_GATTS_DISCONNECT_EVT:
@@ -233,10 +271,22 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         if (param->write.handle == s_char_handle && param->write.len > 0) {
             process_rx_data(param->write.value, param->write.len);
         }
+        /* Send write response manually (RSP_BY_APP mode) */
+        if (param->write.need_rsp) {
+            esp_ble_gatts_send_response(gatts_if, param->write.conn_id,
+                param->write.trans_id, ESP_GATT_OK, NULL);
+        }
         break;
 
     case ESP_GATTS_MTU_EVT:
         ESP_LOGI(TAG, "MTU updated to %d", param->mtu.mtu);
+        /* Only notify WiFi status if already connected — do NOT auto-connect.
+         * WiFi auto-connect was causing RF contention that killed BLE.
+         * APP should send WIFI:ssid:pass explicitly when it needs audio. */
+        {
+            extern void wifi_audio_service_notify_status(void);
+            wifi_audio_service_notify_status();
+        }
         break;
 
     default:
@@ -251,7 +301,7 @@ void ble_service_init(void)
 {
     ESP_LOGI(TAG, "Initializing BLE GATTS");
 
-    /* Release Classic BT memory — not needed until Phase 7 A2DP */
+    /* BLE-only mode (ESP32-S3 does not support Classic BT) */
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
@@ -281,8 +331,23 @@ void ble_service_stop(void)
 void ble_service_notify(const char *data, uint16_t len)
 {
     if (!s_connected || s_gatts_if == ESP_GATT_IF_NONE || s_char_handle == 0) return;
-    esp_ble_gatts_send_indicate(s_gatts_if, s_conn_id, s_char_handle,
-                                len, (uint8_t *)data, false);
+
+    /* Retry on congestion — BLE TX buffer can be full during high-throughput
+     * operations like logo upload. Without retry, ACK packets get silently
+     * dropped, causing the APP to timeout waiting for them. */
+    for (int retry = 0; retry < 10; retry++) {
+        esp_err_t err = esp_ble_gatts_send_indicate(s_gatts_if, s_conn_id, s_char_handle,
+                                                     len, (uint8_t *)data, false);
+        if (err == ESP_OK) return;
+
+        if (err == ESP_ERR_NO_MEM || err == ESP_GATT_CONGESTED) {
+            vTaskDelay(pdMS_TO_TICKS(20));  /* wait for TX buffer to drain */
+            continue;
+        }
+        ESP_LOGW(TAG, "Notify failed: %s", esp_err_to_name(err));
+        return;
+    }
+    ESP_LOGW(TAG, "Notify failed after 10 retries (congestion)");
 }
 
 void ble_service_notify_str(const char *str)

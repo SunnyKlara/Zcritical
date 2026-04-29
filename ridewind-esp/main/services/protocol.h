@@ -33,6 +33,8 @@ typedef enum {
     CMD_OTA_END,
     CMD_VOLUME,
     CMD_GET_VOLUME,
+    CMD_WIFI,           /* WIFI:ssid:password */
+    CMD_WIFI_SCAN,      /* WIFI_SCAN */
 } cmd_type_t;
 
 typedef struct {
@@ -42,9 +44,10 @@ typedef struct {
         int16_t  i16_val;
         struct { uint8_t strip; uint8_t r, g, b; } led;
         struct { uint8_t strip; uint8_t r, g, b; uint8_t speed; } led_gradient;
-        struct { uint8_t slot; uint32_t size; } logo_start;
+        struct { uint8_t slot; uint32_t size; uint32_t crc32; } logo_start;
         struct { uint8_t *data; uint16_t len; } binary_data;
         uint32_t ota_size;
+        struct { char ssid[33]; char password[65]; } wifi;
     } param;
 } cmd_msg_t;
 

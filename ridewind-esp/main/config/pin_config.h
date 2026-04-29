@@ -1,7 +1,7 @@
 #pragma once
 
 /* ═══════════════════════════════════════════════════════════════
- *  RideWind ESP32-S3 Pin Configuration
+ *  Critical ESP32-S3 Pin Configuration
  *  All GPIO assignments in one place
  * ═══════════════════════════════════════════════════════════════ */
 

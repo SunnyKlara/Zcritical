@@ -44,6 +44,9 @@ dependencies:
   # 状态管理
   provider: ^6.1.2
   
+  # 依赖注入
+  get_it: ^8.0.2
+  
   # 本地存储
   shared_preferences: ^2.2.3
   
@@ -84,7 +87,6 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
-  image: any
 flutter:
 
   # The following line ensures that the Material Icons font is

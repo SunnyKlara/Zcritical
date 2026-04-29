@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/bluetooth_provider.dart';
 import '../utils/euler_fluid_simulator.dart';
 
 /// 烟雾粒子：沿速度场移动的点
@@ -92,7 +94,16 @@ class SmokeTrailPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+/// BLE 通信日志条目
+class _BleLogEntry {
+  final DateTime timestamp;
+  final String data;
+
+  _BleLogEntry({required this.timestamp, required this.data});
+}
+
 /// 🧪 开发测试界面 - 5股烟雾射流（粒子轨迹 + 速度场驱动）
+/// 包含 BLE 通信日志查看功能 (需求 13.5)
 class DevTestScreen extends StatefulWidget {
   final bool isVisible;
   const DevTestScreen({super.key, this.isVisible = true});
@@ -115,6 +126,14 @@ class _DevTestScreenState extends State<DevTestScreen> {
   static const int gridSize = 80;
   static const int maxParticlesPerStream = 120;
   static const double ageDecay = 0.012; // 每帧衰减
+
+  // 🐛 BLE 通信日志 (需求 13.5)
+  bool _showBleLog = false;
+  final List<_BleLogEntry> _bleLogEntries = [];
+  static const int _maxLogEntries = 200;
+  StreamSubscription? _rawDataSub;
+  final ScrollController _logScrollController = ScrollController();
+  bool _autoScroll = true;
 
   @override
   void initState() {
@@ -145,6 +164,48 @@ class _DevTestScreenState extends State<DevTestScreen> {
     _streams = List.generate(5, (_) => <_SmokeParticle>[]);
 
     if (widget.isVisible) _startSimulation();
+
+    // 🐛 订阅 BLE 原始数据流 (需求 13.5)
+    _subscribeBleLog();
+  }
+
+  /// 🐛 订阅 BLE 原始数据流用于日志显示 (需求 13.5)
+  void _subscribeBleLog() {
+    // 延迟到 build 后获取 Provider，避免 initState 中直接访问
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        final bt = Provider.of<BluetoothProvider>(context, listen: false);
+        _rawDataSub = bt.rawDataStream.listen((data) {
+          if (!mounted) return;
+          setState(() {
+            _bleLogEntries.add(_BleLogEntry(
+              timestamp: DateTime.now(),
+              data: data,
+            ));
+            // 限制日志条目数量
+            if (_bleLogEntries.length > _maxLogEntries) {
+              _bleLogEntries.removeRange(
+                  0, _bleLogEntries.length - _maxLogEntries);
+            }
+          });
+          // 自动滚动到底部
+          if (_autoScroll && _showBleLog) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_logScrollController.hasClients) {
+                _logScrollController.animateTo(
+                  _logScrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 100),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+          }
+        });
+      } catch (e) {
+        debugPrint('⚠️ BLE 日志订阅失败: $e');
+      }
+    });
   }
 
   @override
@@ -162,6 +223,8 @@ class _DevTestScreenState extends State<DevTestScreen> {
   @override
   void dispose() {
     _stopSimulation();
+    _rawDataSub?.cancel();
+    _logScrollController.dispose();
     super.dispose();
   }
 
@@ -271,24 +334,211 @@ class _DevTestScreenState extends State<DevTestScreen> {
     }
   }
 
+  /// 🐛 构建 BLE 通信日志面板 (需求 13.5)
+  Widget _buildBleLogPanel() {
+    return Container(
+      color: Colors.black.withAlpha(220),
+      child: Column(
+        children: [
+          // 日志面板标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(15),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withAlpha(20)),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.terminal, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                const Text('BLE 通信日志',
+                    style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                const Spacer(),
+                // 日志条目计数
+                Text('${_bleLogEntries.length}',
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(100), fontSize: 11)),
+                const SizedBox(width: 12),
+                // 自动滚动切换
+                GestureDetector(
+                  onTap: () => setState(() => _autoScroll = !_autoScroll),
+                  child: Icon(
+                    _autoScroll
+                        ? Icons.vertical_align_bottom
+                        : Icons.vertical_align_center,
+                    color: _autoScroll ? Colors.green : Colors.white38,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 清空日志
+                GestureDetector(
+                  onTap: () => setState(() => _bleLogEntries.clear()),
+                  child: const Icon(Icons.delete_outline,
+                      color: Colors.white38, size: 16),
+                ),
+                const SizedBox(width: 12),
+                // 关闭面板
+                GestureDetector(
+                  onTap: () => setState(() => _showBleLog = false),
+                  child: const Icon(Icons.close,
+                      color: Colors.white38, size: 16),
+                ),
+              ],
+            ),
+          ),
+          // 日志列表
+          Expanded(
+            child: _bleLogEntries.isEmpty
+                ? Center(
+                    child: Text('等待 BLE 数据...',
+                        style: TextStyle(
+                            color: Colors.white.withAlpha(60),
+                            fontSize: 12)),
+                  )
+                : ListView.builder(
+                    controller: _logScrollController,
+                    itemCount: _bleLogEntries.length,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    itemBuilder: (ctx, i) {
+                      final entry = _bleLogEntries[i];
+                      final timeStr =
+                          '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
+                          '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
+                          '${entry.timestamp.second.toString().padLeft(2, '0')}.'
+                          '${entry.timestamp.millisecond.toString().padLeft(3, '0')}';
+
+                      // 根据内容类型着色
+                      Color dataColor = Colors.white70;
+                      if (entry.data.startsWith('OK:')) {
+                        dataColor = Colors.green;
+                      } else if (entry.data.contains('ERR') ||
+                          entry.data.contains('FAIL')) {
+                        dataColor = Colors.red;
+                      } else if (entry.data.startsWith('WIFI_')) {
+                        dataColor = Colors.cyan;
+                      } else if (entry.data.startsWith('LOGO_')) {
+                        dataColor = Colors.orange;
+                      } else if (entry.data.startsWith('OTA_')) {
+                        dataColor = Colors.amber;
+                      } else if (entry.data.startsWith('PRESET_') ||
+                          entry.data.startsWith('SPEED_') ||
+                          entry.data.startsWith('STATUS:')) {
+                        dataColor = Colors.lightBlue;
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(timeStr,
+                                style: TextStyle(
+                                    color: Colors.white.withAlpha(80),
+                                    fontSize: 10,
+                                    fontFamily: 'monospace')),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(entry.data,
+                                  style: TextStyle(
+                                      color: dataColor,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace')),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.black,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return GestureDetector(
-            onPanUpdate: (details) =>
-                _handlePanUpdate(details, constraints.biggest),
-            child: CustomPaint(
-              size: constraints.biggest,
-              painter: SmokeTrailPainter(
-                streams: _streams,
-                gridSize: gridSize,
+      child: Stack(
+        children: [
+          // 烟雾模拟层
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GestureDetector(
+                onPanUpdate: (details) =>
+                    _handlePanUpdate(details, constraints.biggest),
+                child: CustomPaint(
+                  size: constraints.biggest,
+                  painter: SmokeTrailPainter(
+                    streams: _streams,
+                    gridSize: gridSize,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // 🐛 BLE 日志切换按钮 (需求 13.5)
+          if (!_showBleLog)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => setState(() => _showBleLog = true),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(150),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.green.withAlpha(100)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.terminal,
+                          color: Colors.green, size: 14),
+                      const SizedBox(width: 4),
+                      const Text('BLE Log',
+                          style: TextStyle(
+                              color: Colors.green, fontSize: 11)),
+                      if (_bleLogEntries.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withAlpha(40),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('${_bleLogEntries.length}',
+                              style: const TextStyle(
+                                  color: Colors.green, fontSize: 9)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-          );
-        },
+
+          // 🐛 BLE 通信日志面板 (需求 13.5)
+          if (_showBleLog)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: _buildBleLogPanel(),
+            ),
+        ],
       ),
     );
   }

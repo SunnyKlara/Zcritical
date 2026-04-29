@@ -144,6 +144,15 @@ static void streamlight_process(void)
     uint8_t g2 = curr->rg + (int16_t)(next->rg - curr->rg) * phase / STREAMLIGHT_INTERP_STEPS;
     uint8_t b2 = curr->rb + (int16_t)(next->rb - curr->rb) * phase / STREAMLIGHT_INTERP_STEPS;
 
+    /* Store interpolated colors for LCD sync (F4: lcd_pei_se_realtime) */
+    g_app_state.streamlight_r1 = r1;
+    g_app_state.streamlight_g1 = g1;
+    g_app_state.streamlight_b1 = b1;
+    g_app_state.streamlight_r2 = r2;
+    g_app_state.streamlight_g2 = g2;
+    g_app_state.streamlight_b2 = b2;
+    g_app_state.streamlight_lcd_dirty = 1;
+
     /* Apply to strips: Main+Left get color1, Right+Tail get color2 */
     drv_led_set_strip_color(LED_STRIP_MAIN, r1, g1, b1);
     drv_led_set_strip_color(LED_STRIP_LEFT, r1, g1, b1);

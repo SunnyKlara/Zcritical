@@ -42,7 +42,7 @@ class AppUpdateService {
   /// GitHub 版本信息文件地址
   /// ⚠️ 发布前请替换为你的 GitHub 仓库地址
   static const String _versionUrl =
-      'https://raw.githubusercontent.com/SunnyKlara/RideWind/main/version.json';
+      'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/version.json';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -106,7 +106,7 @@ class AppUpdateService {
         downloadDir.createSync(recursive: true);
       }
 
-      final filePath = '${downloadDir.path}/RideWind-${info.version}.apk';
+      final filePath = '${downloadDir.path}/Critical-${info.version}.apk';
 
       // 如果已经下载过，直接安装
       final file = File(filePath);

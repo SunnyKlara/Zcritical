@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/sound_wave_scanner.dart';
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
-import '../utils/debug_logger.dart'; // 🆕 调试日志
+import '../services/ble_service.dart';
 import 'device_connect_screen.dart';
 import 'device_list_screen.dart';
 import 'no_device_screen.dart';
@@ -22,6 +24,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
   bool _isConnecting = false;
   DeviceModel? _foundDevice;
   String _statusText = '扫描中...';
+  bool _showDebugLog = false;
+  final List<String> _debugLogs = [];
 
   late AnimationController _slideController;
   late AnimationController _blurController;
@@ -73,83 +77,113 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
     super.dispose();
   }
 
-  /// 真实的蓝牙扫描流程
+  /// 添加调试日志并刷新 UI
+  void _log(String msg) {
+    final ts = DateTime.now().toString().substring(11, 19);
+    final line = '[$ts] $msg';
+    debugPrint('🐛 $line');
+    if (mounted) {
+      setState(() {
+        _debugLogs.add(line);
+      });
+    }
+  }
+
+  /// 真实的蓝牙扫描流程（带详细日志）
   Future<void> _startScanning() async {
     final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
-    final logger = DebugLogger();
 
     try {
-      // 扫描期间只显示声波动画，状态文字保持"扫描中..."
       setState(() {
         _statusText = '扫描中...';
       });
 
-      logger.log('🔍 开始蓝牙扫描...');
-      
-      // 记录开始时间
-      final startTime = DateTime.now();
-
-      // 开始扫描（4秒）
-      await btProvider.startScan();
-      logger.log('📡 扫描完成，找到 ${btProvider.devices.length} 个设备');
-
-      // 确保至少显示4秒的扫描动画
-      final elapsed = DateTime.now().difference(startTime);
-      if (elapsed.inSeconds < 4) {
-        await Future.delayed(Duration(seconds: 4 - elapsed.inSeconds));
-      }
-
-      // 检查是否找到设备
-      if (btProvider.devices.isEmpty) {
-        logger.log('❌ 未找到兼容的蓝牙设备');
-        // 未找到设备，返回到 NoDeviceScreen（pop 回到已有的 NoDeviceScreen）
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
+      // 1. 检查蓝牙支持
+      final supported = await FlutterBluePlus.isSupported;
+      _log('蓝牙支持: $supported');
+      if (!supported) {
+        _log('❌ 设备不支持蓝牙');
+        if (mounted) Navigator.of(context).pop();
         return;
       }
 
-      // 找到设备，自动连接第一个设备
+      // 2. 检查蓝牙状态
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      _log('蓝牙状态: $adapterState');
+      if (adapterState != BluetoothAdapterState.on) {
+        _log('❌ 蓝牙未开启');
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
+
+      // 3. 开始扫描
+      _log('开始扫描 (过滤 FFE0)...');
+      final startTime = DateTime.now();
+
+      await btProvider.startScan();
+
+      final elapsed = DateTime.now().difference(startTime);
+      _log('扫描耗时: ${elapsed.inMilliseconds}ms');
+      _log('发现设备数: ${btProvider.devices.length}');
+
+      // 列出所有发现的设备
+      for (var d in btProvider.devices) {
+        _log('  📱 ${d.name} (${d.id}) RSSI:${d.rssi}');
+      }
+
+      // 确保至少显示4秒的扫描动画
+      final totalElapsed = DateTime.now().difference(startTime);
+      if (totalElapsed.inSeconds < 4) {
+        await Future.delayed(Duration(seconds: 4 - totalElapsed.inSeconds));
+      }
+
+      // 5. 检查结果
+      if (btProvider.devices.isEmpty) {
+        _log('❌ 未找到 FFE0 设备');
+        // 不自动返回，让用户看日志
+        setState(() {
+          _statusText = '未找到设备';
+        });
+        return;
+      }
+
+      // 6. 自动连接第一个设备
       _foundDevice = btProvider.devices.first;
-      logger.log('✅ 发现设备: ${_foundDevice!.name}');
-      logger.log('🔗 开始连接设备...');
-      
+      _log('✅ 发现设备: ${_foundDevice!.name}');
+      _log('🔗 开始连接...');
+
       setState(() {
         _isConnecting = true;
       });
 
-      // 尝试连接
       bool connected = await btProvider.connectToDevice(_foundDevice!);
+      _log('连接结果: ${connected ? "成功" : "失败"}');
 
       if (!connected) {
-        logger.log('❌ 连接失败！');
-        // 连接失败，返回到 NoDeviceScreen
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
+        _log('❌ 连接失败');
+        setState(() {
+          _statusText = '连接失败';
+          _isConnecting = false;
+        });
         return;
       }
-      
-      logger.log('🎉 连接成功！');
 
-      // 连接成功，显示设备弹窗
+      _log('🎉 连接成功！');
+
       if (mounted) {
         setState(() {
           _showDialog = true;
           _isConnecting = false;
         });
-
-        // 触发弹窗动画
         _slideController.forward();
         _blurController.forward();
       }
-    } catch (e) {
-      logger.log('❌ 异常: $e');
-      debugPrint('扫描或连接失败: $e');
-      // 出错返回到 NoDeviceScreen
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+    } catch (e, stack) {
+      _log('❌ 异常: $e');
+      _log('堆栈: ${stack.toString().split('\n').take(3).join(' | ')}');
+      setState(() {
+        _statusText = '扫描异常';
+      });
     }
   }
 
@@ -210,8 +244,88 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                 child: _buildDeviceFoundDialog(),
               ),
             
-            // 🆕 调试按钮（右下角）
-            const DebugFloatingButton(),
+            // 🐛 调试日志面板
+            if (_showDebugLog)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 8,
+                right: 8,
+                bottom: 80,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(230),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.withAlpha(100)),
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.bug_report, color: Colors.green, size: 18),
+                            const SizedBox(width: 8),
+                            const Text('BLE 调试日志', style: TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.bold)),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () {
+                                // 复制日志到剪贴板
+                                Clipboard.setData(ClipboardData(text: _debugLogs.join('\n')));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('日志已复制'), duration: Duration(seconds: 1)),
+                                );
+                              },
+                              child: const Icon(Icons.copy, color: Colors.white54, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: () => setState(() => _showDebugLog = false),
+                              child: const Icon(Icons.close, color: Colors.white54, size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(color: Colors.green, height: 1),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: _debugLogs.length,
+                          itemBuilder: (_, i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              _debugLogs[i],
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 🐛 调试按钮（右下角）
+            Positioned(
+              bottom: 90,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => setState(() => _showDebugLog = !_showDebugLog),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _showDebugLog ? Colors.green : Colors.white.withAlpha(30),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.green.withAlpha(150)),
+                  ),
+                  child: const Icon(Icons.bug_report, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -419,15 +533,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                     height: 58,
                     child: ElevatedButton(
                       onPressed: () {
-                        // 先替换 ScanScreen 为 DeviceListScreen，再 push DeviceConnectScreen
-                        // 栈变为: [NoDevice, DeviceList, Connect]
-                        // 回退: Connect → DeviceList → NoDevice → 退出
+                        // 替换 ScanScreen 为 DeviceConnectScreen
+                        // 栈变为: [NoDevice, Connect]
+                        // 回退: Connect → NoDevice
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => const DeviceListScreen(),
-                          ),
-                        );
-                        Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) =>
                                 DeviceConnectScreen(device: _foundDevice!),

@@ -8,10 +8,11 @@ idf_component_register(
         "drivers/drv_gpio.c"
         "drivers/drv_audio.c"
         "services/ble_service.c"
-        "services/a2dp_service.c"
+        "services/wifi_audio_service.c"
         "services/protocol.c"
         "services/storage.c"
         "services/audio_engine.c"
+        "services/audio_player.c"
         "ui/ui_manager.c"
         "ui/ui_menu.c"
         "ui/ui_speed.c"
@@ -24,6 +25,8 @@ idf_component_register(
         "app/app_state.c"
         "app/led_effects.c"
         "app/encoder_handler.c"
+        "resources/menu_icons.c"
+        "resources/ui_images.c"
     INCLUDE_DIRS
         "."
         "config"
@@ -32,6 +35,10 @@ idf_component_register(
         "ui"
         "app"
         "resources"
+        "lib/minimp3"
+        "../取模数组"
     REQUIRES
-        bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s
+        bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s esp_wifi esp_netif esp_event littlefs
+    EMBED_FILES
+        "resources/engine.mp3"
 )

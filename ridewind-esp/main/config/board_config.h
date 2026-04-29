@@ -4,7 +4,7 @@
 #include "driver/spi_master.h"
 
 /* ═══════════════════════════════════════════════════════════════
- *  RideWind Hardware & Timing Constants
+ *  Critical Hardware & Timing Constants
  * ═══════════════════════════════════════════════════════════════ */
 
 /* LED strip physical counts */
@@ -75,7 +75,23 @@
 
 /* Menu */
 #define MENU_SWITCH_DEBOUNCE_MS     150
-#define MENU_DELTA_THRESHOLD        2
+#define MENU_DELTA_THRESHOLD        1
+#define MENU_PAGE_COUNT             7
+
+/* Menu layout (matching F4 parameters) */
+#define MENU_ICON_CENTER_Y          90
+#define MENU_TEXT_Y                 155
+#define MENU_DOT_Y                  205
+#define MENU_DOT_SPACING            15
+#define MENU_DOT_RADIUS             3
+#define MENU_DOT_ACTIVE_COLOR       0xFFFF   /* White */
+#define MENU_DOT_INACTIVE_COLOR     0x4208   /* Dark gray */
+
+/* Menu animation */
+#define MENU_ANIM_FRAMES            8
+#define MENU_ANIM_FRAME_DELAY       12       /* ms */
+#define MENU_ANIM_ZONE_TOP          50
+#define MENU_ANIM_ZONE_BOTTOM       190
 
 /* Boot */
 #define BOOT_LOGO_DURATION_MS       2000
@@ -90,3 +106,12 @@
 
 /* Preset count */
 #define COLOR_PRESET_COUNT          14
+
+/* Logo storage */
+#define MAX_LOGO_SLOTS              3
+#define LOGO_WIDTH                  240
+#define LOGO_HEIGHT                 240
+#define LOGO_PIXEL_BYTES            (LOGO_WIDTH * LOGO_HEIGHT * 2)  /* RGB565 */
+#define LOGO_MAGIC                  0xAA55
+#define LITTLEFS_MOUNT_POINT        "/storage"
+#define LITTLEFS_PARTITION_LABEL    "storage"

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/bluetooth_provider.dart';
+import '../utils/crc32.dart';
 
 // ════════════════════════════════════════════════════════════
 // 传输状态枚举
@@ -208,8 +209,8 @@ class SlidingWindow {
 // RTT估算器
 // ════════════════════════════════════════════════════════════
 class RTTEstimator {
-  double estimatedRTT = 200.0; // 🔥 从500ms降到200ms
-  double devRTT = 50.0; // 🔥 从100ms降到50ms
+  double estimatedRTT = 100.0; // 🔥 ESP32 BLE 延迟比 F4 低，初始 100ms
+  double devRTT = 30.0; // 🔥 偏差更小
 
   final double alpha = 0.125;
   final double beta = 0.25;
@@ -222,7 +223,7 @@ class RTTEstimator {
 
   int getTimeout() {
     final timeout = (estimatedRTT + 4 * devRTT).toInt();
-    return timeout.clamp(100, 1000); // 🔥 从300-3000ms改为100-1000ms
+    return timeout.clamp(80, 800); // 🔥 更紧凑的超时范围
   }
 }
 
@@ -493,6 +494,12 @@ class LogoTransmissionManager {
   final int totalPackets;
   final int chunkSize = 16;
 
+  /// 窗口大小，可配置（默认 40）
+  int windowSize;
+
+  /// 最大重试次数
+  static const int maxRetries = 10;
+
   late SlidingWindow window;
   late AdaptiveRateController rateController;
   late WindowSizeController windowController;
@@ -508,7 +515,11 @@ class LogoTransmissionManager {
   int totalRetransmitted = 0;
   DateTime? startTime;
 
+  /// 上传完成后分配的槽位号
+  int? assignedSlot;
+
   Function(double)? onProgress;
+  Function(TransmissionState)? onStateChange;
   Function(String)? onStatusChange;
   Function(TransmissionStats)? onComplete;
   Function(String)? onError;
@@ -520,16 +531,21 @@ class LogoTransmissionManager {
   int lastAckSeq = -1;
   int duplicateAckCount = 0;
 
+  /// 是否已取消
+  bool _cancelled = false;
+
   LogoTransmissionManager({
     required this.btProvider,
     required this.imageData,
+    this.windowSize = 40,
     this.onProgress,
+    this.onStateChange,
     this.onStatusChange,
     this.onComplete,
     this.onError,
   }) : totalPackets = (imageData.length / 16).ceil() {
     window = SlidingWindow(
-      windowSize: 40, // 🔥 从20改为40 - 更大的窗口
+      windowSize: windowSize,
       totalPackets: totalPackets,
     );
     rateController = AdaptiveRateController();
@@ -550,6 +566,7 @@ class LogoTransmissionManager {
 
       // 🔥 过滤回显：忽略APP发送的命令
       if (trimmed.startsWith('LOGO_START:') ||
+          trimmed.startsWith('LOGO_START_BIN:') ||
           trimmed.startsWith('LOGO_DATA:') ||
           trimmed == 'LOGO_END' ||
           trimmed == 'LOGO_DELETE' ||
@@ -584,14 +601,243 @@ class LogoTransmissionManager {
     return 'TIMEOUT';
   }
 
-  Future<void> transmit() async {
+  /// 上传 Logo 图片
+  ///
+  /// [slot] 目标槽位（0-2），null 表示自动分配
+  /// [useBinaryMode] 使用二进制模式（默认 true，比 hex 模式快 ~8 倍）
+  /// 返回 true 表示上传成功
+  Future<bool> transmit({int? slot, bool useBinaryMode = true}) async {
+    // 每次传输前重新设置响应监听器（上次传输的 finally 会 cancel 掉旧的）
+    _setupResponseListener();
+    if (useBinaryMode) {
+      return _transmitBinary(slot: slot);
+    }
+    return _transmitHex(slot: slot);
+  }
+
+  /// 🚀 二进制模式传输 — 直接发原始字节，利用满 MTU
+  ///
+  /// 可靠性机制：分段发送 + ACK 校验 + 断点重传
+  /// - 每发送 ~4KB（16 个 BLE 包 × 244 字节）等待 ESP32 确认收到的字节数
+  /// - 如果 ESP32 报告的字节数 < APP 已发送的字节数，说明丢包，从断点重传
+  /// - 最多重试 3 次，每次从 ESP32 实际收到的位置重传
+  ///
+  /// 115200 字节 / 244 字节 MTU = 472 包
+  /// 分 ~30 段，每段 16 包，每段有 ACK 确认
+  /// 预计传输时间：~10-15 秒
+  Future<bool> _transmitBinary({int? slot}) async {
     startTime = DateTime.now();
-    state = TransmissionState.starting;
+    _cancelled = false;
+    _setState(TransmissionState.starting);
 
     try {
-      // 发送LOGO_START
-      final crc32 = _calculateCRC32(imageData);
-      await btProvider.sendCommand('LOGO_START:${imageData.length}:$crc32');
+      final crc32 = Crc32.calculate(imageData);
+      final String startCmd;
+      if (slot != null) {
+        startCmd = 'LOGO_START_BIN:$slot:${imageData.length}:$crc32';
+      } else {
+        startCmd = 'LOGO_START_BIN:${imageData.length}:$crc32';
+      }
+      await btProvider.sendCommand(startCmd);
+
+      var response = await _waitForResponse(timeout: const Duration(seconds: 10));
+
+      if (response.contains('LOGO_ERASING')) {
+        _updateStatus('Flash擦除中...');
+        response = await _waitForResponse(timeout: const Duration(seconds: 15));
+      }
+
+      if (response.startsWith('LOGO_ERROR:')) {
+        throw TransmissionException(
+          error: TransmissionError.invalidResponse,
+          message: '硬件错误: ${response.substring(11)}',
+        );
+      }
+
+      if (!response.contains('LOGO_READY')) {
+        throw TransmissionException(
+          error: TransmissionError.invalidResponse,
+          message: '硬件未就绪: $response',
+        );
+      }
+
+      if (response.startsWith('LOGO_READY:')) {
+        assignedSlot = int.tryParse(response.substring(11));
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // 🚀 分段二进制传输 + ACK 校验 + 断点重传
+      // ═══════════════════════════════════════════════════════
+      _setState(TransmissionState.transmitting);
+      _updateStatus('传输中...');
+
+      final int mtuPayload = 244;
+      final int totalBytes = imageData.length;
+      // 每段发 16 个 BLE 包（~3904 字节），然后等 ACK 确认
+      final int segmentPackets = 16;
+      final int segmentBytes = segmentPackets * mtuPayload; // ~3904 bytes
+      int confirmed = 0; // ESP32 已确认收到的字节数
+      int segmentRetries = 0;
+      const int maxSegmentRetries = 3;
+
+      while (confirmed < totalBytes) {
+        if (_cancelled) {
+          throw TransmissionException(
+            error: TransmissionError.userCancelled,
+            message: '用户取消上传',
+          );
+        }
+
+        // 计算本段要发送的范围
+        final int segmentEnd = (confirmed + segmentBytes > totalBytes)
+            ? totalBytes
+            : confirmed + segmentBytes;
+        int sent = confirmed;
+
+        // 发送本段的所有 BLE 包
+        while (sent < segmentEnd) {
+          final int chunkEnd = (sent + mtuPayload > segmentEnd)
+              ? segmentEnd
+              : sent + mtuPayload;
+          final chunk = imageData.sublist(sent, chunkEnd);
+          await btProvider.writeBytes(Uint8List.fromList(chunk));
+          sent += chunk.length;
+
+          // 每 4 包一个微延迟，给 BLE 协议栈喘息
+          if ((sent - confirmed) ~/ mtuPayload % 4 == 0) {
+            await Future.delayed(const Duration(milliseconds: 2));
+          }
+        }
+
+        // 🔑 关键：发完一段后等 20ms，让 ESP32 BLE 协议栈有时间
+        // 处理完接收缓冲区并发出 ACK notify
+        await Future.delayed(const Duration(milliseconds: 20));
+
+        // 等待 ESP32 的 ACK，确认实际收到的字节数
+        // 超时 3 秒（给 BLE 拥塞重试足够时间）
+        final ackResponse = await _waitForResponse(
+          timeout: const Duration(seconds: 3),
+        );
+
+        if (ackResponse != 'TIMEOUT' && ackResponse.startsWith('LOGO_ACK_BIN:')) {
+          final receivedBytes = int.tryParse(ackResponse.substring(13));
+          if (receivedBytes != null) {
+            if (receivedBytes >= segmentEnd) {
+              // ✅ 本段全部收到，继续下一段
+              confirmed = receivedBytes;
+              segmentRetries = 0;
+              progress = confirmed / totalBytes;
+              onProgress?.call(progress);
+              logger.logImportant(
+                '✅ 段确认: $confirmed/$totalBytes (${(progress * 100).toStringAsFixed(1)}%)');
+            } else if (receivedBytes > confirmed) {
+              // ⚠️ 部分收到，从断点重传
+              confirmed = receivedBytes;
+              segmentRetries++;
+              logger.logImportant(
+                '⚠️ 部分收到: $confirmed/$segmentEnd, 重传剩余 (重试 $segmentRetries/$maxSegmentRetries)');
+              if (segmentRetries > maxSegmentRetries) {
+                throw TransmissionException(
+                  error: TransmissionError.packetLost,
+                  message: '段重传失败: ESP32 只收到 $confirmed/$segmentEnd 字节',
+                );
+              }
+              // 不增加 confirmed，下一轮循环会从 confirmed 位置重发
+              progress = confirmed / totalBytes;
+              onProgress?.call(progress);
+            } else {
+              // ❌ 没有新数据收到，重传整段
+              segmentRetries++;
+              logger.logImportant(
+                '❌ ACK 无进展: ESP32 仍在 $receivedBytes, 重传 (重试 $segmentRetries/$maxSegmentRetries)');
+              if (segmentRetries > maxSegmentRetries) {
+                throw TransmissionException(
+                  error: TransmissionError.packetLost,
+                  message: '段重传失败: ESP32 停在 $receivedBytes 字节',
+                );
+              }
+              // 加一点延迟再重传，让 ESP32 处理完
+              await Future.delayed(const Duration(milliseconds: 50));
+            }
+          }
+        } else {
+          // ACK 超时 — 可能是 notify 丢失，重试
+          segmentRetries++;
+          logger.logImportant(
+            '⏰ ACK 超时 (段 ${confirmed ~/ segmentBytes}), 重试 $segmentRetries/$maxSegmentRetries');
+          if (segmentRetries > maxSegmentRetries) {
+            throw TransmissionException(
+              error: TransmissionError.timeoutExceeded,
+              message: 'ACK 超时 $maxSegmentRetries 次，传输中止',
+            );
+          }
+          // 超时后不移动 confirmed，下一轮会重发这一段
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // 校验阶段
+      // ═══════════════════════════════════════════════════════
+      _setState(TransmissionState.verifying);
+      _updateStatus('校验中...');
+      await btProvider.sendCommand('LOGO_END');
+
+      response = await _waitForResponse(timeout: const Duration(seconds: 10));
+
+      if (response.startsWith('LOGO_OK')) {
+        if (response.startsWith('LOGO_OK:')) {
+          assignedSlot = int.tryParse(response.substring(8));
+        }
+      } else if (response.startsWith('LOGO_FAIL:')) {
+        throw TransmissionException(
+          error: TransmissionError.checksumMismatch,
+          message: '校验失败: ${response.substring(10)}',
+        );
+      } else {
+        throw TransmissionException(
+          error: TransmissionError.checksumMismatch,
+          message: '校验失败: $response',
+        );
+      }
+
+      _setState(TransmissionState.completed);
+      progress = 1.0;
+      onProgress?.call(1.0);
+      final elapsed = DateTime.now().difference(startTime!);
+      logger.logImportant('🚀 二进制传输完成！耗时 ${elapsed.inSeconds}s, '
+          '速率 ${(totalBytes / elapsed.inMilliseconds * 1000 / 1024).toStringAsFixed(1)} KB/s');
+      final stats = _getStats();
+      onComplete?.call(stats);
+      return true;
+    } catch (e) {
+      _setState(TransmissionState.error);
+      logger.logImportant('二进制传输失败: $e');
+      onError?.call(e.toString());
+      rethrow;
+    } finally {
+      _responseSub?.cancel();
+    }
+  }
+
+  /// Hex 模式传输（兼容旧设备）
+  Future<bool> _transmitHex({int? slot}) async {
+    startTime = DateTime.now();
+    _cancelled = false;
+    _setState(TransmissionState.starting);
+
+    try {
+      // 发送LOGO_START（使用共享 Crc32 工具类）
+      final crc32 = Crc32.calculate(imageData);
+      final String startCmd;
+      if (slot != null) {
+        // 指定槽位: LOGO_START:slot:size:crc32\n
+        startCmd = 'LOGO_START:$slot:${imageData.length}:$crc32';
+      } else {
+        // 自动分配: LOGO_START:size:crc32\n
+        startCmd = 'LOGO_START:${imageData.length}:$crc32';
+      }
+      await btProvider.sendCommand(startCmd);
 
       var response = await _waitForResponse(
         timeout: const Duration(seconds: 10),
@@ -602,6 +848,14 @@ class LogoTransmissionManager {
         response = await _waitForResponse(timeout: const Duration(seconds: 15));
       }
 
+      if (response.startsWith('LOGO_ERROR:')) {
+        final reason = response.substring(11);
+        throw TransmissionException(
+          error: TransmissionError.invalidResponse,
+          message: '硬件错误: $reason',
+        );
+      }
+
       if (!response.contains('LOGO_READY')) {
         throw TransmissionException(
           error: TransmissionError.invalidResponse,
@@ -609,27 +863,46 @@ class LogoTransmissionManager {
         );
       }
 
-      state = TransmissionState.transmitting;
+      // 解析 LOGO_READY:slot 中的槽位号
+      if (response.startsWith('LOGO_READY:')) {
+        assignedSlot = int.tryParse(response.substring(11));
+      }
+
+      _setState(TransmissionState.transmitting);
       await _transmitWithSlidingWindow();
 
-      state = TransmissionState.verifying;
+      _setState(TransmissionState.verifying);
       _updateStatus('校验中...');
       await btProvider.sendCommand('LOGO_END');
+
+      // 等待 LOGO_OK:slot 或 LOGO_FAIL:reason，超时 10 秒
       response = await _waitForResponse(timeout: const Duration(seconds: 10));
 
-      if (!response.startsWith('LOGO_OK')) {
+      if (response.startsWith('LOGO_OK')) {
+        // 解析 LOGO_OK:slot 中的槽位号
+        if (response.startsWith('LOGO_OK:')) {
+          assignedSlot = int.tryParse(response.substring(8));
+        }
+      } else if (response.startsWith('LOGO_FAIL:')) {
+        final reason = response.substring(10);
+        throw TransmissionException(
+          error: TransmissionError.checksumMismatch,
+          message: '校验失败: $reason',
+        );
+      } else {
         throw TransmissionException(
           error: TransmissionError.checksumMismatch,
           message: '校验失败: $response',
         );
       }
 
-      state = TransmissionState.completed;
+      _setState(TransmissionState.completed);
       final stats = _getStats();
       logger.logImportant('传输完成！\n$stats');
       onComplete?.call(stats);
+      return true;
     } catch (e) {
-      state = TransmissionState.error;
+      _setState(TransmissionState.error);
       final errorMsg = e.toString();
       logger.logImportant('传输失败: $errorMsg');
       onError?.call(errorMsg);
@@ -637,6 +910,27 @@ class LogoTransmissionManager {
     } finally {
       _responseSub?.cancel();
     }
+  }
+
+  /// 取消上传
+  void cancel() {
+    _cancelled = true;
+    _setState(TransmissionState.error);
+    _responseSub?.cancel();
+    // 通知 ESP32 结束上传会话，清理硬件端状态
+    try {
+      btProvider.sendCommand('LOGO_END');
+    } catch (_) {
+      // 忽略发送失败（可能已断连）
+    }
+    logger.logImportant('上传已取消');
+    onError?.call('用户取消上传');
+  }
+
+  /// 更新传输状态并触发回调
+  void _setState(TransmissionState newState) {
+    state = newState;
+    onStateChange?.call(newState);
   }
 
   Future<void> _transmitWithSlidingWindow() async {
@@ -660,16 +954,19 @@ class LogoTransmissionManager {
 
       // 🚀 策略1：快速填满窗口（不等待）
       while (!window.isFull && window.nextSeqNum < window.totalPackets) {
-        print('[SLIDING_WINDOW] 发送包 seq=${window.nextSeqNum}');
         await _sendPacket(window.nextSeqNum);
         window.nextSeqNum++;
-        // 🔥 极小延迟，让蓝牙有时间发送
-        await Future.delayed(const Duration(milliseconds: 2));
+        // 🔥 每4包一个微延迟，让 BLE 协议栈有时间处理
+        // 比每包 2ms 快 4 倍，ESP32 的 BLE 内部有流控不会丢
+        if (window.nextSeqNum % 4 == 0) {
+          await Future.delayed(const Duration(milliseconds: 1));
+        }
       }
 
-      // � 策略2：每发送10包才等待一次ACK（与硬件ACK频率匹配）
+      // 🎯 策略2：每发送16包才等待一次ACK（与ESP32 LOGO_BATCH_SIZE=16 对齐）
+      // ESP32 每收到16包才发一次 LOGO_ACK，APP 必须匹配这个频率
       final shouldWaitForAck =
-          (window.nextSeqNum - lastAckWaitSeq) >= 10 ||
+          (window.nextSeqNum - lastAckWaitSeq) >= 16 ||
           window.nextSeqNum >= window.totalPackets;
 
       if (shouldWaitForAck) {
@@ -717,7 +1014,10 @@ class LogoTransmissionManager {
 
     totalSent++;
     lossMonitor.recordSent();
-    logger.logPacket(seq, 'SEND', totalPackets);
+    // 只在每 100 包打印一次，避免高频日志拖慢 UI
+    if (seq % 100 == 0 || seq == totalPackets - 1) {
+      logger.logPacket(seq, 'SEND', totalPackets);
+    }
   }
 
   void _handleAckResponse(String response) {
@@ -737,6 +1037,13 @@ class LogoTransmissionManager {
         window.markLost(nakSeq);
         lossMonitor.recordLost();
       }
+    } else if (response.startsWith('LOGO_ERROR:')) {
+      final reason = response.substring(11);
+      logger.logImportant('收到LOGO_ERROR: $reason');
+      throw TransmissionException(
+        error: TransmissionError.unknownError,
+        message: '硬件错误: $reason',
+      );
     }
   }
 
@@ -777,6 +1084,10 @@ class LogoTransmissionManager {
   }
 
   void _handleSelectiveAck(int baseSeq, String bitmap) {
+    logger.logImportant(
+      '收到SACK: base=$baseSeq, bitmap=$bitmap (sendBase=${window.sendBase})',
+    );
+
     for (int i = 0; i < bitmap.length && i < 16; i++) {
       final seq = baseSeq + i + 1;
       if (bitmap[i] == '1') {
@@ -787,11 +1098,27 @@ class LogoTransmissionManager {
       }
     }
 
+    // 同时处理累积确认：base 之前的包都已确认
+    if (baseSeq >= window.sendBase) {
+      for (int seq = window.sendBase; seq <= baseSeq; seq++) {
+        window.ackedPackets.add(seq);
+        window.inFlightPackets.remove(seq);
+        window.lostPackets.remove(seq);
+      }
+    }
+
     // 更新sendBase到最小未确认包
     while (window.sendBase < totalPackets &&
         window.ackedPackets.contains(window.sendBase)) {
       window.sendBase++;
     }
+
+    // 确保nextSeqNum不会回退
+    if (window.nextSeqNum < window.sendBase) {
+      window.nextSeqNum = window.sendBase;
+    }
+
+    windowController.onSuccess();
   }
 
   Future<void> _handleTimeout() async {
@@ -804,10 +1131,10 @@ class LogoTransmissionManager {
 
       if (!packet.acked && packet.isTimeout(timeout)) {
         packet.retryCount++;
-        if (packet.retryCount > 10) {
+        if (packet.retryCount > maxRetries) {
           throw TransmissionException(
             error: TransmissionError.timeoutExceeded,
-            message: '包$seq重传失败,超过最大次数',
+            message: '包$seq重传失败,超过最大次数($maxRetries)',
           );
         }
         window.markLost(seq);
@@ -864,272 +1191,6 @@ class LogoTransmissionManager {
     );
   }
 
-  int _calculateCRC32(Uint8List data) {
-    const table = [
-      0x00000000,
-      0x77073096,
-      0xEE0E612C,
-      0x990951BA,
-      0x076DC419,
-      0x706AF48F,
-      0xE963A535,
-      0x9E6495A3,
-      0x0EDB8832,
-      0x79DCB8A4,
-      0xE0D5E91E,
-      0x97D2D988,
-      0x09B64C2B,
-      0x7EB17CBD,
-      0xE7B82D07,
-      0x90BF1D91,
-      0x1DB71064,
-      0x6AB020F2,
-      0xF3B97148,
-      0x84BE41DE,
-      0x1ADAD47D,
-      0x6DDDE4EB,
-      0xF4D4B551,
-      0x83D385C7,
-      0x136C9856,
-      0x646BA8C0,
-      0xFD62F97A,
-      0x8A65C9EC,
-      0x14015C4F,
-      0x63066CD9,
-      0xFA0F3D63,
-      0x8D080DF5,
-      0x3B6E20C8,
-      0x4C69105E,
-      0xD56041E4,
-      0xA2677172,
-      0x3C03E4D1,
-      0x4B04D447,
-      0xD20D85FD,
-      0xA50AB56B,
-      0x35B5A8FA,
-      0x42B2986C,
-      0xDBBBC9D6,
-      0xACBCF940,
-      0x32D86CE3,
-      0x45DF5C75,
-      0xDCD60DCF,
-      0xABD13D59,
-      0x26D930AC,
-      0x51DE003A,
-      0xC8D75180,
-      0xBFD06116,
-      0x21B4F4B5,
-      0x56B3C423,
-      0xCFBA9599,
-      0xB8BDA50F,
-      0x2802B89E,
-      0x5F058808,
-      0xC60CD9B2,
-      0xB10BE924,
-      0x2F6F7C87,
-      0x58684C11,
-      0xC1611DAB,
-      0xB6662D3D,
-      0x76DC4190,
-      0x01DB7106,
-      0x98D220BC,
-      0xEFD5102A,
-      0x71B18589,
-      0x06B6B51F,
-      0x9FBFE4A5,
-      0xE8B8D433,
-      0x7807C9A2,
-      0x0F00F934,
-      0x9609A88E,
-      0xE10E9818,
-      0x7F6A0DBB,
-      0x086D3D2D,
-      0x91646C97,
-      0xE6635C01,
-      0x6B6B51F4,
-      0x1C6C6162,
-      0x856530D8,
-      0xF262004E,
-      0x6C0695ED,
-      0x1B01A57B,
-      0x8208F4C1,
-      0xF50FC457,
-      0x65B0D9C6,
-      0x12B7E950,
-      0x8BBEB8EA,
-      0xFCB9887C,
-      0x62DD1DDF,
-      0x15DA2D49,
-      0x8CD37CF3,
-      0xFBD44C65,
-      0x4DB26158,
-      0x3AB551CE,
-      0xA3BC0074,
-      0xD4BB30E2,
-      0x4ADFA541,
-      0x3DD895D7,
-      0xA4D1C46D,
-      0xD3D6F4FB,
-      0x4369E96A,
-      0x346ED9FC,
-      0xAD678846,
-      0xDA60B8D0,
-      0x44042D73,
-      0x33031DE5,
-      0xAA0A4C5F,
-      0xDD0D7CC9,
-      0x5005713C,
-      0x270241AA,
-      0xBE0B1010,
-      0xC90C2086,
-      0x5768B525,
-      0x206F85B3,
-      0xB966D409,
-      0xCE61E49F,
-      0x5EDEF90E,
-      0x29D9C998,
-      0xB0D09822,
-      0xC7D7A8B4,
-      0x59B33D17,
-      0x2EB40D81,
-      0xB7BD5C3B,
-      0xC0BA6CAD,
-      0xEDB88320,
-      0x9ABFB3B6,
-      0x03B6E20C,
-      0x74B1D29A,
-      0xEAD54739,
-      0x9DD277AF,
-      0x04DB2615,
-      0x73DC1683,
-      0xE3630B12,
-      0x94643B84,
-      0x0D6D6A3E,
-      0x7A6A5AA8,
-      0xE40ECF0B,
-      0x9309FF9D,
-      0x0A00AE27,
-      0x7D079EB1,
-      0xF00F9344,
-      0x8708A3D2,
-      0x1E01F268,
-      0x6906C2FE,
-      0xF762575D,
-      0x806567CB,
-      0x196C3671,
-      0x6E6B06E7,
-      0xFED41B76,
-      0x89D32BE0,
-      0x10DA7A5A,
-      0x67DD4ACC,
-      0xF9B9DF6F,
-      0x8EBEEFF9,
-      0x17B7BE43,
-      0x60B08ED5,
-      0xD6D6A3E8,
-      0xA1D1937E,
-      0x38D8C2C4,
-      0x4FDFF252,
-      0xD1BB67F1,
-      0xA6BC5767,
-      0x3FB506DD,
-      0x48B2364B,
-      0xD80D2BDA,
-      0xAF0A1B4C,
-      0x36034AF6,
-      0x41047A60,
-      0xDF60EFC3,
-      0xA867DF55,
-      0x316E8EEF,
-      0x4669BE79,
-      0xCB61B38C,
-      0xBC66831A,
-      0x256FD2A0,
-      0x5268E236,
-      0xCC0C7795,
-      0xBB0B4703,
-      0x220216B9,
-      0x5505262F,
-      0xC5BA3BBE,
-      0xB2BD0B28,
-      0x2BB45A92,
-      0x5CB36A04,
-      0xC2D7FFA7,
-      0xB5D0CF31,
-      0x2CD99E8B,
-      0x5BDEAE1D,
-      0x9B64C2B0,
-      0xEC63F226,
-      0x756AA39C,
-      0x026D930A,
-      0x9C0906A9,
-      0xEB0E363F,
-      0x72076785,
-      0x05005713,
-      0x95BF4A82,
-      0xE2B87A14,
-      0x7BB12BAE,
-      0x0CB61B38,
-      0x92D28E9B,
-      0xE5D5BE0D,
-      0x7CDCEFB7,
-      0x0BDBDF21,
-      0x86D3D2D4,
-      0xF1D4E242,
-      0x68DDB3F8,
-      0x1FDA836E,
-      0x81BE16CD,
-      0xF6B9265B,
-      0x6FB077E1,
-      0x18B74777,
-      0x88085AE6,
-      0xFF0F6A70,
-      0x66063BCA,
-      0x11010B5C,
-      0x8F659EFF,
-      0xF862AE69,
-      0x616BFFD3,
-      0x166CCF45,
-      0xA00AE278,
-      0xD70DD2EE,
-      0x4E048354,
-      0x3903B3C2,
-      0xA7672661,
-      0xD06016F7,
-      0x4969474D,
-      0x3E6E77DB,
-      0xAED16A4A,
-      0xD9D65ADC,
-      0x40DF0B66,
-      0x37D83BF0,
-      0xA9BCAE53,
-      0xDEBB9EC5,
-      0x47B2CF7F,
-      0x30B5FFE9,
-      0xBDBDF21C,
-      0xCABAC28A,
-      0x53B39330,
-      0x24B4A3A6,
-      0xBAD03605,
-      0xCDD706B3,
-      0x54DE5729,
-      0x23D967BF,
-      0xB3667A2E,
-      0xC4614AB8,
-      0x5D681B02,
-      0x2A6F2B94,
-      0xB40BBE37,
-      0xC30C8EA1,
-      0x5A05DF1B,
-      0x2D02EF8D,
-    ];
-    int crc = 0xFFFFFFFF;
-    for (int i = 0; i < data.length; i++) {
-      crc = (crc >> 8) ^ table[(crc ^ data[i]) & 0xFF];
-    }
-    return crc ^ 0xFFFFFFFF;
-  }
-
   void dispose() {
     _responseSub?.cancel();
   }
@@ -1137,7 +1198,8 @@ class LogoTransmissionManager {
   /// 断点续传
   Future<void> resumeTransmission(String deviceId) async {
     startTime = DateTime.now();
-    state = TransmissionState.starting;
+    _cancelled = false;
+    _setState(TransmissionState.starting);
 
     try {
       // 查询硬件端进度
@@ -1172,19 +1234,30 @@ class LogoTransmissionManager {
       state = TransmissionState.transmitting;
       await _transmitWithSlidingWindow();
 
-      state = TransmissionState.verifying;
+      _setState(TransmissionState.verifying);
       _updateStatus('校验中...');
       await btProvider.sendCommand('LOGO_END');
       response = await _waitForResponse(timeout: const Duration(seconds: 10));
 
-      if (!response.startsWith('LOGO_OK')) {
+      if (response.startsWith('LOGO_OK')) {
+        // 解析 LOGO_OK:slot 中的槽位号
+        if (response.startsWith('LOGO_OK:')) {
+          assignedSlot = int.tryParse(response.substring(8));
+        }
+      } else if (response.startsWith('LOGO_FAIL:')) {
+        final reason = response.substring(10);
+        throw TransmissionException(
+          error: TransmissionError.checksumMismatch,
+          message: '校验失败: $reason',
+        );
+      } else {
         throw TransmissionException(
           error: TransmissionError.checksumMismatch,
           message: '校验失败: $response',
         );
       }
 
-      state = TransmissionState.completed;
+      _setState(TransmissionState.completed);
       final stats = _getStats();
       logger.logImportant('传输完成！\n$stats');
       onComplete?.call(stats);
@@ -1192,7 +1265,7 @@ class LogoTransmissionManager {
       // 清除断点进度
       await TransmissionProgress.clear(deviceId);
     } catch (e) {
-      state = TransmissionState.error;
+      _setState(TransmissionState.error);
       final errorMsg = e.toString();
       logger.logImportant('传输失败: $errorMsg');
       onError?.call(errorMsg);
@@ -1229,7 +1302,8 @@ class LogoTransmissionManager {
   }) async {
     // 初始化传输状态
     startTime = DateTime.now();
-    state = TransmissionState.starting;
+    _cancelled = false;
+    _setState(TransmissionState.starting);
 
     if (onProgressCallback != null) {
       onProgress = onProgressCallback;
@@ -1263,22 +1337,35 @@ class LogoTransmissionManager {
         response = await _waitForResponse(timeout: const Duration(seconds: 15));
       }
 
-      if (response != 'LOGO_READY') {
+      if (response.startsWith('LOGO_ERROR:')) {
+        final reason = response.substring(11);
+        throw TransmissionException(
+          error: TransmissionError.invalidResponse,
+          message: '硬件错误: $reason',
+        );
+      }
+
+      if (!response.contains('LOGO_READY')) {
         throw TransmissionException(
           error: TransmissionError.invalidResponse,
           message: '硬件未就绪: $response',
         );
       }
 
+      // 解析 LOGO_READY:slot 中的槽位号
+      if (response.startsWith('LOGO_READY:')) {
+        assignedSlot = int.tryParse(response.substring(11));
+      }
+
       // 3. 使用滑动窗口协议传输压缩数据
-      state = TransmissionState.transmitting;
+      _setState(TransmissionState.transmitting);
       _updateStatus('传输中...');
 
       // 执行传输
       await _transmitWithSlidingWindow();
 
-      // 4. 发送结束命令
-      state = TransmissionState.verifying;
+      // 4. 发送结束命令，等待 LOGO_OK:slot 或 LOGO_FAIL:reason，超时 10 秒
+      _setState(TransmissionState.verifying);
       _updateStatus('校验中...');
       await btProvider.sendCommand('LOGO_END');
 
@@ -1286,7 +1373,17 @@ class LogoTransmissionManager {
         timeout: const Duration(seconds: 10),
       );
 
-      if (!endResponse.startsWith('LOGO_OK')) {
+      if (endResponse.startsWith('LOGO_OK')) {
+        if (endResponse.startsWith('LOGO_OK:')) {
+          assignedSlot = int.tryParse(endResponse.substring(8));
+        }
+      } else if (endResponse.startsWith('LOGO_FAIL:')) {
+        final reason = endResponse.substring(10);
+        throw TransmissionException(
+          error: TransmissionError.checksumMismatch,
+          message: '校验失败: $reason',
+        );
+      } else {
         throw TransmissionException(
           error: TransmissionError.checksumMismatch,
           message: '校验失败: $endResponse',
@@ -1294,7 +1391,7 @@ class LogoTransmissionManager {
       }
 
       // 5. 完成
-      state = TransmissionState.completed;
+      _setState(TransmissionState.completed);
       final stats = _getStats();
       print('[COMPRESSED] 传输完成！\n$stats');
       if (onComplete != null) {
@@ -1303,7 +1400,7 @@ class LogoTransmissionManager {
 
       return true;
     } catch (e) {
-      state = TransmissionState.error;
+      _setState(TransmissionState.error);
       print('[COMPRESSED] 传输失败: $e');
       if (onError != null) {
         onError!('传输失败: $e');

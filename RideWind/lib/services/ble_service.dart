@@ -1,286 +1,363 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../utils/debug_logger.dart';
 
+/// 设备类型枚举
+enum DeviceType { esp32, f4, unknown }
+
+/// BLE 连接状态机
+enum BleConnectionState {
+  disconnected,
+  scanning,
+  connecting,
+  discoveringServices,
+  connected,
+  reconnecting,
+}
+
+/// 发送任务
+class _SendTask {
+  final List<int> data;
+  final Completer<void> completer;
+  _SendTask(this.data, this.completer);
+}
+
+/// BLE 底层服务
+///
+/// 职责：扫描、连接、收发数据。
+/// 扫描按 Service UUID 0xFFE0 过滤，不依赖设备名。
+/// 连接后协商 MTU、请求高优先级连接参数。
+/// 断线自动重连（指数退避，最多 5 次）。
+/// 发送队列化，防止并发写入冲突。
 class BLEService {
   BluetoothDevice? _device;
-  BluetoothCharacteristic? _txCharacteristic;
-  BluetoothCharacteristic? _rxCharacteristic;
+  BluetoothCharacteristic? _characteristic; // FFE1: write-without-response + notify
 
-  StreamSubscription? _connectionSubscription;
-  StreamSubscription? _dataSubscription;
+  StreamSubscription? _connectionSub;
+  StreamSubscription? _notifySub;
 
-  final StreamController<List<int>> _rxDataController =
-      StreamController<List<int>>.broadcast();
-  final StreamController<bool> _connectionController =
-      StreamController<bool>.broadcast();
+  final _rxController = StreamController<List<int>>.broadcast();
+  final _connectionController = StreamController<bool>.broadcast();
+  final _stateController = StreamController<BleConnectionState>.broadcast();
 
-  // ✅ Bug修复：发送锁，防止并发发送导致蓝牙指令混乱
-  bool _isSending = false;
+  // ── 发送队列 ──
+  final Queue<_SendTask> _sendQueue = Queue<_SendTask>();
+  bool _draining = false;
 
-  Stream<List<int>> get rxDataStream => _rxDataController.stream;
+  // ── MTU ──
+  int _effectiveMtu = 20; // 默认保守值，连接后动态更新
+
+  // ── 自动重连 ──
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
+  static const int _maxReconnectAttempts = 5;
+  bool _userDisconnected = false;
+
+  // ── UUID ──
+  static const String serviceUuid = '0000ffe0-0000-1000-8000-00805f9b34fb';
+  static const String charUuid = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+  BleConnectionState _state = BleConnectionState.disconnected;
+
+  // ── 设备类型 ──
+  DeviceType _deviceType = DeviceType.unknown;
+
+  // ── 公开接口 ──
+  Stream<List<int>> get rxDataStream => _rxController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
+  Stream<BleConnectionState> get stateStream => _stateController.stream;
+  BleConnectionState get state => _state;
+  DeviceType get deviceType => _deviceType;
+  int get effectiveMtu => _effectiveMtu;
 
-  // 🔧 关键修复：只有设备连接且TX/RX特征都初始化后才算真正连接成功
-  // 否则发送命令时 _txCharacteristic 为 null 会导致发送失败
   bool get isConnected =>
-      _device != null && _txCharacteristic != null && _rxCharacteristic != null;
+      _device != null &&
+      _characteristic != null &&
+      _state == BleConnectionState.connected;
 
-  // JDY-08常见UUID (透传模式)
-  static const String serviceUuid = "0000FFE0-0000-1000-8000-00805F9B34FB";
-  static const String charUuid = "0000FFE1-0000-1000-8000-00805F9B34FB";
+  void _setState(BleConnectionState s) {
+    _state = s;
+    _stateController.add(s);
+  }
 
-  /// 扫描BLE设备
+  // ═══════════════════════════════════════════════════════════════
+  //  扫描 — 按 Service UUID 0xFFE0 过滤
+  // ═══════════════════════════════════════════════════════════════
+
   Future<List<ScanResult>> scanDevices({
     Duration timeout = const Duration(seconds: 4),
   }) async {
-    List<ScanResult> results = [];
-
-    try {
-      // 1. 检查蓝牙是否可用
-      if (await FlutterBluePlus.isSupported == false) {
-        print("❌ 蓝牙不支持");
-        return results;
-      }
-
-      // 2. 检查蓝牙状态（不自动请求开启，权限应在引导页处理）
-      final adapterState = await FlutterBluePlus.adapterState.first;
-      print('📡 蓝牙状态: $adapterState');
-
-      if (adapterState != BluetoothAdapterState.on) {
-        print("❌ 蓝牙未开启");
-        return results;
-      }
-
-      // 3. 先停止之前的扫描（如果有）
-      await FlutterBluePlus.stopScan();
-
-      // 4. 开始扫描
-      print('🔍 开始扫描 (${timeout.inSeconds}秒)...');
-      await FlutterBluePlus.startScan(
-        timeout: timeout,
-        androidUsesFineLocation: true,
-      );
-
-      // 5. 等待扫描完成
-      await FlutterBluePlus.isScanning
-          .where((val) => val == false)
-          .first
-          .timeout(
-            timeout + const Duration(seconds: 2),
-            onTimeout: () => false,
-          );
-
-      print('✅ 扫描完成');
-
-      // 6. 获取扫描结果
-      results = FlutterBluePlus.lastScanResults;
-      print('📋 扫描到 ${results.length} 个设备');
-
-      // 7. 确保停止扫描
-      await FlutterBluePlus.stopScan();
-    } catch (e) {
-      print('❌ 扫描错误: $e');
-      try {
-        await FlutterBluePlus.stopScan();
-      } catch (_) {}
+    if (await FlutterBluePlus.isSupported == false) {
+      print('❌ 设备不支持蓝牙');
+      return [];
     }
 
+    final adapterState = await FlutterBluePlus.adapterState.first;
+    if (adapterState != BluetoothAdapterState.on) {
+      print('❌ 蓝牙未开启');
+      return [];
+    }
+
+    await FlutterBluePlus.stopScan();
+    _setState(BleConnectionState.scanning);
+
+    print('🔍 扫描 BLE 设备 (${timeout.inSeconds}s)...');
+
+    await FlutterBluePlus.startScan(
+      timeout: timeout,
+      androidUsesFineLocation: true,
+    );
+
+    await FlutterBluePlus.isScanning
+        .where((v) => v == false)
+        .first
+        .timeout(timeout + const Duration(seconds: 2), onTimeout: () => false);
+
+    await FlutterBluePlus.stopScan();
+
+    // 过滤：广播中包含 FFE0 服务 UUID，或设备名包含已知关键字
+    final allResults = FlutterBluePlus.lastScanResults;
+    final results = allResults.where((r) {
+      // 方式1：广播数据中包含 FFE0 服务 UUID
+      final hasFFE0 = r.advertisementData.serviceUuids.any(
+        (uuid) => uuid.toString().toLowerCase().contains('ffe0'),
+      );
+      if (hasFFE0) return true;
+
+      // 方式2：设备名匹配（ESP32 广播名 "T1"，或旧版 JDY/BT/HC）
+      final name = r.device.platformName.toUpperCase();
+      if (name == 'T1') return true;
+      if (name.contains('JDY') || name.contains('BT05') || name.contains('HC')) return true;
+
+      return false;
+    }).toList();
+
+    print('✅ 扫描完成，全部 ${allResults.length} 个，匹配 ${results.length} 个');
+
+    if (_state == BleConnectionState.scanning) {
+      _setState(BleConnectionState.disconnected);
+    }
     return results;
   }
 
-  /// 连接设备
-  Future<bool> connect(BluetoothDevice device) async {
-    final logger = DebugLogger();
+  // ═══════════════════════════════════════════════════════════════
+  //  连接
+  // ═══════════════════════════════════════════════════════════════
 
+  /// 用户主动连接（重置重连计数）
+  Future<bool> connect(BluetoothDevice device) async {
+    _userDisconnected = false;
+    _reconnectAttempt = 0;
+    _cancelReconnect();
+    return _connectInternal(device);
+  }
+
+  /// 内部连接流程（首次连接 + 自动重连共用）
+  Future<bool> _connectInternal(BluetoothDevice device) async {
     try {
+      _cleanupConnection();
       _device = device;
 
-      final msg1 = '🔗 [1/4] 连接: ${device.platformName}';
-      print(msg1);
-      logger.log(msg1);
+      // 1. 物理连接
+      _setState(BleConnectionState.connecting);
+      print('🔗 [1/4] 连接 ${device.platformName}...');
 
-      // 连接设备
-      await device.connect(timeout: const Duration(seconds: 15));
+      await device.connect(
+        timeout: const Duration(seconds: 10),
+        autoConnect: false,
+      );
+      print('✅ [1/4] 物理连接成功');
 
-      const msg2 = '✅ [2/4] 物理连接成功';
-      print(msg2);
-      logger.log(msg2);
+      // 1.5. 根据设备名判断设备类型
+      final deviceName = device.platformName.toUpperCase();
+      if (deviceName.contains('T1')) {
+        _deviceType = DeviceType.esp32;
+      } else if (deviceName.contains('JDY') ||
+          deviceName.contains('BT05') ||
+          deviceName.contains('HC')) {
+        _deviceType = DeviceType.f4;
+      } else {
+        _deviceType = DeviceType.unknown;
+      }
+      print('📱 设备类型: $_deviceType (名称: ${device.platformName})');
 
-      // 监听连接状态
-      _connectionSubscription = device.connectionState.listen((state) {
-        _connectionController.add(state == BluetoothConnectionState.connected);
-        if (state == BluetoothConnectionState.disconnected) {
-          _cleanup();
+      // 2. 监听连接状态
+      _connectionSub = device.connectionState.listen((s) {
+        if (s == BluetoothConnectionState.disconnected) {
+          print('⚡ 连接断开');
+          _onDisconnected();
         }
       });
 
-      // 发现服务
-      const msg3 = '🔍 [3/4] 发现服务...';
-      print(msg3);
-      logger.log(msg3);
+      // 3. MTU 协商 + 连接参数优化
+      print('📐 [2/4] 协商 MTU...');
+      try {
+        final mtu = await device.requestMtu(247);
+        _effectiveMtu = mtu - 3; // ATT header 占 3 字节
+        if (_effectiveMtu < 20) _effectiveMtu = 20;
+        print('✅ [2/4] MTU=$mtu, 有效载荷=${_effectiveMtu}B');
+      } catch (e) {
+        _effectiveMtu = 20;
+        print('⚠️ [2/4] MTU 协商失败，使用默认 20B: $e');
+      }
 
-      List<BluetoothService> services = await device.discoverServices();
+      try {
+        await device.requestConnectionPriority(
+          connectionPriorityRequest: ConnectionPriority.high,
+        );
+        print('✅ 连接参数已设为 high priority (11.25ms interval)');
+      } catch (e) {
+        print('⚠️ 连接参数设置失败（不影响功能）: $e');
+      }
 
-      final msg4 = '✅ [3/4] 发现 ${services.length} 个服务';
-      print(msg4);
-      logger.log(msg4);
+      // 4. 发现服务，查找 FFE1 特征
+      _setState(BleConnectionState.discoveringServices);
+      print('🔍 [3/4] 发现服务...');
 
-      // 查找特征
+      final services = await device.discoverServices();
+      print('✅ [3/4] 发现 ${services.length} 个服务');
+
       for (var service in services) {
-        final svcUuid = service.uuid.toString();
-        print('🔍 服务 UUID: $svcUuid');
-        logger.log('🔍 服务: $svcUuid');
+        if (!service.uuid.toString().toLowerCase().contains('ffe0')) continue;
 
         for (var char in service.characteristics) {
-          print('  📋 特征 UUID: ${char.uuid}');
-          logger.log('  📋 特征: ${char.uuid}');
+          if (!char.uuid.toString().toLowerCase().contains('ffe1')) continue;
 
-          final props =
-              'W=${char.properties.write ? "✓" : "✗"} '
-              'WN=${char.properties.writeWithoutResponse ? "✓" : "✗"} '
-              'N=${char.properties.notify ? "✓" : "✗"} '
-              'R=${char.properties.read ? "✓" : "✗"}';
-          print('     属性: $props');
-          logger.log('     $props');
+          _characteristic = char;
 
-          // 🔧 检查 UUID（支持短格式和长格式）
-          final charUuidStr = char.uuid.toString().toLowerCase();
-          final isFFE1 = charUuidStr.contains('ffe1');
-          final isFFE0Service = svcUuid.toLowerCase().contains('ffe0');
-
-          // 🔧 严格要求：必须是 FFE0 服务下的 FFE1 特征（JDY-08标准）
-          // 同一个特征既可写又可通知（透传模式）
-          if (isFFE0Service && isFFE1) {
-            // FFE1 用于发送（写入）
-            if (char.properties.writeWithoutResponse || char.properties.write) {
-              _txCharacteristic = char;
-              print('  ✅ 设置为TX特征（FFE1 写入）');
-              logger.log('  ✅ TX特征 (FFE1)');
-            }
-
-            // FFE1 也用于接收（通知）
-            if (char.properties.notify) {
-              _rxCharacteristic = char;
-              print('  ✅ 设置为RX特征（FFE1 通知）');
-              logger.log('  ✅ RX特征 (FFE1)');
-
-              // 订阅通知
-              await char.setNotifyValue(true);
-              print('  📡 已订阅FFE1通知');
-              logger.log('  📡 已订阅通知');
-
-              // 监听数据
-              _dataSubscription = char.lastValueStream.listen((data) {
-                if (data.isNotEmpty) {
-                  print('📥 收到数据: $data (${String.fromCharCodes(data)})');
-                  logger.log('📥 收到: ${String.fromCharCodes(data)}');
-                  _rxDataController.add(data);
-                }
-              });
-            }
+          // 订阅 notify
+          if (char.properties.notify) {
+            await char.setNotifyValue(true);
+            _notifySub = char.lastValueStream.listen((data) {
+              if (data.isNotEmpty) {
+                _rxController.add(data);
+              }
+            });
+            print('✅ [4/4] FFE1 特征就绪 (write + notify)');
           }
-          // 🚫 移除备用方案！不再接受非JDY-08设备！
+          break;
         }
+        if (_characteristic != null) break;
       }
 
-      print(
-        'TX特征: ${_txCharacteristic?.uuid}, RX特征: ${_rxCharacteristic?.uuid}',
-      );
-
-      bool success = _txCharacteristic != null && _rxCharacteristic != null;
-
-      if (success) {
-        const msg5 = '🎉 [4/4] 连接成功！';
-        print(msg5);
-        logger.log(msg5);
-      } else {
-        const msg5 = '❌ [4/4] 未找到FFE1特征';
-        print(msg5);
-        logger.log(msg5);
-        logger.log('   TX: ${_txCharacteristic != null ? "✓" : "✗"}');
-        logger.log('   RX: ${_rxCharacteristic != null ? "✓" : "✗"}');
-        _cleanup();
+      if (_characteristic == null) {
+        print('❌ 未找到 FFE1 特征');
+        _cleanupConnection();
+        _setState(BleConnectionState.disconnected);
+        return false;
       }
 
-      return success;
+      _setState(BleConnectionState.connected);
+      _connectionController.add(true);
+      _reconnectAttempt = 0;
+      print('🎉 连接完成！MTU=${_effectiveMtu + 3}');
+      return true;
     } catch (e) {
-      final msgErr = '❌ 连接异常: $e';
-      print(msgErr);
-      logger.log(msgErr);
-      _cleanup();
+      print('❌ 连接异常: $e');
+      _cleanupConnection();
+      _setState(BleConnectionState.disconnected);
       return false;
     }
   }
 
-  /// 发送数据
-  Future<void> sendData(List<int> data) async {
-    final logger = DebugLogger();
+  // ═══════════════════════════════════════════════════════════════
+  //  断线处理 + 自动重连
+  // ═══════════════════════════════════════════════════════════════
 
-    // ✅ Bug修复：增加发送锁，防止并发发送导致蓝牙指令混乱
-    // JDY-08 透传模式下，快速连续发送会导致数据粘包或丢失
-    // 🔧 修复：使用循环等待而不是直接丢弃
-    int waitCount = 0;
-    const maxWait = 50;  // 最多等待500ms
-    while (_isSending && waitCount < maxWait) {
-      await Future.delayed(const Duration(milliseconds: 10));
-      waitCount++;
+  void _onDisconnected() {
+    final wasDevice = _device;
+    _cleanupConnection();
+    _deviceType = DeviceType.unknown;
+    _connectionController.add(false);
+    _setState(BleConnectionState.disconnected);
+
+    // 队列中未完成的任务全部报错
+    while (_sendQueue.isNotEmpty) {
+      _sendQueue.removeFirst().completer.completeError(
+        Exception('BLE disconnected'),
+      );
     }
-    
-    if (_isSending) {
-      print('⚠️ [BLEService] 发送队列超时，强制发送');
-      // 不再丢弃，继续发送
+    _draining = false;
+
+    if (!_userDisconnected && wasDevice != null) {
+      _device = wasDevice; // 保留设备引用用于重连
+      _scheduleReconnect();
     }
+  }
 
-    _isSending = true;
-
-    print('📤 [BLEService] sendData 被调用');
-    logger.log('📤 [BLE] sendData 调用');
-
-    if (_txCharacteristic == null) {
-      print('❌ [BLEService] 发送特征未初始化');
-      logger.log('❌ [BLE] TX特征为null');
-      _isSending = false;
+  void _scheduleReconnect() {
+    if (_reconnectAttempt >= _maxReconnectAttempts) {
+      print('🔴 重连次数耗尽 ($_maxReconnectAttempts 次)');
+      _device = null;
       return;
     }
 
-    print('✅ [BLEService] TX特征正常: ${_txCharacteristic!.uuid}');
-    logger.log('✅ [BLE] TX特征: ${_txCharacteristic!.uuid}');
+    final delay = Duration(seconds: 1 << _reconnectAttempt);
+    _reconnectAttempt++;
+    print('🔄 ${delay.inSeconds}s 后第 $_reconnectAttempt 次重连...');
 
-    try {
-      print('📤 [BLEService] 准备发送 ${data.length} 字节: $data');
-      print('📤 [BLEService] 字符串形式: ${String.fromCharCodes(data)}');
-      logger.log('📤 [BLE] 发送: ${String.fromCharCodes(data).trim()}');
+    _setState(BleConnectionState.reconnecting);
 
-      // JDY-08透传模式，使用withoutResponse=true
-      if (data.length <= 20) {
-        print('📤 [BLEService] 调用 write...');
-        await _txCharacteristic!.write(data, withoutResponse: true);
-        print('✅ [BLEService] write 返回成功');
-        logger.log('✅ [BLE] 发送成功');
-      } else {
-        // 分包发送
-        print('📦 [BLEService] 数据过长，分包发送');
-        logger.log('📦 [BLE] 分包发送');
-        for (int i = 0; i < data.length; i += 20) {
-          int end = (i + 20 < data.length) ? i + 20 : data.length;
-          List<int> chunk = data.sublist(i, end);
-          await _txCharacteristic!.write(chunk, withoutResponse: true);
-          print('📤 [BLEService] 发送包 ${i ~/ 20 + 1}: $chunk');
-          await Future.delayed(
-            const Duration(milliseconds: 10), // 🔥 从80ms减少到10ms，提速8倍！
-          );
-        }
-        print('✅ 所有包发送完成');
+    _reconnectTimer = Timer(delay, () async {
+      if (_device == null || _userDisconnected) return;
+
+      final ok = await _connectInternal(_device!);
+      if (!ok && !_userDisconnected) {
+        _scheduleReconnect();
       }
+    });
+  }
 
-      // ✅ Bug修复：发送后增加最小间隔，防止指令粘包
-      // 🔥 从5ms减少到0ms，Logo上传不需要防粘包
-      // await Future.delayed(const Duration(milliseconds: 5));
-    } catch (e) {
-      print('❌ 发送失败: $e');
-    } finally {
-      _isSending = false;
+  void _cancelReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  发送 — Completer 队列，零 busy-wait
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 发送数据（自动排队，自动分包）
+  Future<void> sendData(List<int> data) async {
+    if (_characteristic == null) {
+      print('❌ 发送失败：特征未初始化');
+      return;
+    }
+
+    final completer = Completer<void>();
+    _sendQueue.add(_SendTask(data, completer));
+    if (!_draining) _drainQueue();
+    return completer.future;
+  }
+
+  Future<void> _drainQueue() async {
+    _draining = true;
+    while (_sendQueue.isNotEmpty) {
+      final task = _sendQueue.removeFirst();
+      try {
+        await _writeChunked(task.data);
+        task.completer.complete();
+      } catch (e) {
+        task.completer.completeError(e);
+      }
+    }
+    _draining = false;
+  }
+
+  Future<void> _writeChunked(List<int> data) async {
+    final chunkSize = _effectiveMtu;
+
+    if (data.length <= chunkSize) {
+      await _characteristic!.write(data, withoutResponse: true);
+    } else {
+      for (int i = 0; i < data.length; i += chunkSize) {
+        final end = (i + chunkSize < data.length) ? i + chunkSize : data.length;
+        await _characteristic!.write(data.sublist(i, end), withoutResponse: true);
+        // ESP32 BLE 协议栈有内部流控，最小间隔防极端情况
+        if (i + chunkSize < data.length) {
+          await Future.delayed(const Duration(milliseconds: 2));
+        }
+      }
     }
   }
 
@@ -289,29 +366,43 @@ class BLEService {
     await sendData(text.codeUnits);
   }
 
-  /// 断开连接
+  // ═══════════════════════════════════════════════════════════════
+  //  断开 + 清理
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 用户主动断开
   Future<void> disconnect() async {
+    _userDisconnected = true;
+    _cancelReconnect();
     try {
       await _device?.disconnect();
     } catch (e) {
       print('断开连接错误: $e');
     }
-    _cleanup();
-  }
-
-  /// 清理资源
-  void _cleanup() {
-    _connectionSubscription?.cancel();
-    _dataSubscription?.cancel();
+    _cleanupConnection();
     _device = null;
-    _txCharacteristic = null;
-    _rxCharacteristic = null;
+    _deviceType = DeviceType.unknown;
+    _connectionController.add(false);
+    _setState(BleConnectionState.disconnected);
   }
 
-  /// 释放资源
+  /// 清理连接资源（不清空 _device，重连需要）
+  void _cleanupConnection() {
+    _connectionSub?.cancel();
+    _connectionSub = null;
+    _notifySub?.cancel();
+    _notifySub = null;
+    _characteristic = null;
+  }
+
+  /// 释放所有资源
   void dispose() {
-    _cleanup();
-    _rxDataController.close();
+    _userDisconnected = true;
+    _cancelReconnect();
+    _cleanupConnection();
+    _device = null;
+    _rxController.close();
     _connectionController.close();
+    _stateController.close();
   }
 }

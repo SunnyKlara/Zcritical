@@ -31,7 +31,7 @@ class OtaUploadService {
   static const int ackTimeoutMs = 5000; // ACK 超时（毫秒）
   static const int maxRetries = 3; // 最大重试次数
   static const int packetDelayMs = 8; // 包间延迟（毫秒）
-  static const int maxFirmwareSize = 960 * 1024; // 960KB
+  static const int maxFirmwareSize = 2560 * 1024; // 2.5MB (ESP32 OTA 分区大小)
 
   // 回调
   Function(String)? onLog;
@@ -55,7 +55,7 @@ class OtaUploadService {
   ///
   /// 使用文件选择器让用户选择 .bin 固件文件，校验文件大小后返回固件数据。
   /// 返回 null 表示用户取消选择。
-  /// 抛出 Exception 当文件无效（0 字节）或过大（超过 960KB）时。
+  /// 抛出 Exception 当文件无效（0 字节）或过大（超过 2.5MB）时。
   static Future<Uint8List?> pickLocalFirmware() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -70,7 +70,7 @@ class OtaUploadService {
     final data = await file.readAsBytes();
 
     if (data.isEmpty) throw Exception('固件文件无效');
-    if (data.length > maxFirmwareSize) throw Exception('固件文件过大，最大支持 960KB');
+    if (data.length > maxFirmwareSize) throw Exception('固件文件过大，最大支持 2.5MB');
 
     return data;
   }
@@ -94,7 +94,7 @@ class OtaUploadService {
 
   /// 开始 OTA 升级
   ///
-  /// [firmwareData] 固件二进制数据，大小必须 > 0 且 ≤ 960KB
+  /// [firmwareData] 固件二进制数据，大小必须 > 0 且 ≤ 2.5MB
   /// 返回 true 表示升级成功（设备将重启）
   Future<bool> upload(Uint8List firmwareData) async {
     if (_isUploading) {
@@ -108,7 +108,7 @@ class OtaUploadService {
       return false;
     }
     if (firmwareData.length > maxFirmwareSize) {
-      onError?.call('固件文件过大，最大支持 960KB');
+      onError?.call('固件文件过大，最大支持 2.5MB');
       return false;
     }
 
@@ -358,10 +358,10 @@ class OtaUploadService {
     _connectionSub?.cancel();
     _connectionSub = _btProvider.connectionStream.listen((connected) {
       if (!connected && _isUploading) {
-        _log('蓝牙断开连接');
+        _log('蓝牙断开连接，中止 OTA 升级');
         _cancelled = true;
         _setState(OtaState.error);
-        onError?.call('蓝牙连接已断开');
+        onError?.call('蓝牙连接已断开，升级已中止。ESP32 将自动回滚到上一个有效固件。');
         _isUploading = false;
         _cleanup();
       }

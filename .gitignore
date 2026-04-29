@@ -1,0 +1,35 @@
+# ESP32 build artifacts
+ridewind-esp/build/
+ridewind-esp/managed_components/
+ridewind-esp/sdkconfig.old
+
+# Flutter build artifacts
+RideWind/build/
+RideWind/.dart_tool/
+RideWind/.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android build
+RideWind/android/.gradle/
+RideWind/android/build/
+RideWind/android/app/build/
+RideWind/android/.kotlin/
+
+# iOS/macOS generated
+RideWind/ios/Flutter/Generated.xcconfig
+RideWind/ios/Flutter/flutter_export_environment.sh
+RideWind/macos/Flutter/ephemeral/
+RideWind/ios/Pods/
+RideWind/macos/Pods/
+
+# ESPtest build
+ESPtest/build/
+ESPtest/.cache/

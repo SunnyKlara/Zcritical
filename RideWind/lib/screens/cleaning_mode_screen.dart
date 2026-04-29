@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
-import '../providers/device_provider.dart';
 import 'device_list_screen.dart';
 
 class CleaningModeScreen extends StatelessWidget {
@@ -38,7 +37,7 @@ class CleaningModeScreen extends StatelessWidget {
                 Consumer<BluetoothProvider>(
                   builder: (context, bluetoothProvider, _) {
                     return Text(
-                      bluetoothProvider.connectedDevice?.name ?? 'RideWind T1',
+                      bluetoothProvider.connectedDevice?.name ?? 'Critical T1',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -149,7 +148,7 @@ class CleaningModeScreen extends StatelessWidget {
         content: Consumer<BluetoothProvider>(
           builder: (context, bluetoothProvider, _) {
             return Text(
-              '将断开与"${bluetoothProvider.connectedDevice?.name ?? 'RideWind T1'}"的连接',
+              '将断开与"${bluetoothProvider.connectedDevice?.name ?? 'Critical T1'}"的连接',
               style: const TextStyle(color: Colors.white70),
             );
           },
@@ -165,13 +164,8 @@ class CleaningModeScreen extends StatelessWidget {
                 context,
                 listen: false,
               );
-              final deviceProvider = Provider.of<DeviceProvider>(
-                context,
-                listen: false,
-              );
               
               await bluetoothProvider.disconnect();
-              deviceProvider.reset();
               
               if (context.mounted) {
                 Navigator.of(context).pushAndRemoveUntil(

@@ -85,6 +85,9 @@ typedef struct {
     /* ── Streamlight ── */
     uint16_t streamlight_phase;     /* 0-99 interpolation step */
     uint8_t  streamlight_color_idx; /* Current color index 0-13 */
+    uint8_t  streamlight_r1, streamlight_g1, streamlight_b1; /* Current left/main interpolated color */
+    uint8_t  streamlight_r2, streamlight_g2, streamlight_b2; /* Current right interpolated color */
+    uint8_t  streamlight_lcd_dirty;  /* 1 = LCD color bar needs refresh */
 
     /* ── Speed reporting ── */
     int16_t  last_reported_speed;

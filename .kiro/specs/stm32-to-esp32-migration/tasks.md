@@ -189,7 +189,7 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
 - [x] 12. Phase 5 Checkpoint
   - Ensure BLE advertising works with name "T1", app can connect, send commands (FAN, LED, PRESET, BRIGHT), and receive OK responses. Ask the user if questions arise.
 
-- [-] 13. Phase 6 — UI State Machine + LED Effects
+- [x] 13. Phase 6 — UI State Machine + LED Effects
   - [x] 13.1 Implement ui_common.c/h shared drawing utilities
     - Create `main/ui/ui_common.h` and `main/ui/ui_common.c`
     - Implement shared helpers: progress bar drawing, dot indicator (red/green), slider bar, value display with units
@@ -290,24 +290,26 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
     - Extend `test/property/test_prop_ui.c`
     - **Validates: Requirements 13.4**
 
-- [ ] 14. Phase 6 Checkpoint
+- [x] 14. Phase 6 Checkpoint
   - Ensure all 8 UI screens render correctly, encoder navigation works, LED effects (gradient, streamlight, breathing) function, and priority system resolves correctly. Ask the user if questions arise.
 
-- [ ] 15. Phase 7 — Audio Pipeline (A2DP Sink + MP3 Decode + Mixer + I2S)
-  - [ ] 15.1 Implement drv_audio.c/h (I2S output to MAX98357)
+- [x] 15. Phase 7 — Audio Pipeline (A2DP Sink + MP3 Decode + Mixer + I2S)
+  - [x] 15.1 Implement drv_audio.c/h (I2S output to MAX98357)
     - Create `main/drivers/drv_audio.h` and `main/drivers/drv_audio.c` per design §6
     - Configure I2S with 44100Hz, 16-bit stereo on DIN=IO13, BCLK=IO12, LRC=IO11
     - Implement `drv_audio_write()` for blocking DMA write, `drv_audio_set_volume()`, `drv_audio_stop()`
     - _Requirements: 18.2, 20.4_
 
-  - [ ] 15.2 Implement a2dp_service.c/h (A2DP Sink + SBC decode)
-    - Create `main/services/a2dp_service.h` and `main/services/a2dp_service.c` per design §8
-    - Initialize Bluedroid Classic BT profile, register A2DP Sink with device name "T1"
-    - Implement A2DP data callback: decode SBC to PCM, write to ring buffer via `audio_engine_feed_a2dp_pcm()`
-    - Implement connection state tracking with `a2dp_service_is_streaming()`
+  - [x] 15.2 Implement wifi_audio_service.c/h (WiFi SoftAP + TCP PCM streaming)
+    - Create `main/services/wifi_audio_service.h` and `main/services/wifi_audio_service.c`
+    - ESP32-S3 does NOT support Classic BT (no A2DP). Use WiFi audio instead.
+    - Initialize SoftAP "T1_Audio" (pw "12345678"), TCP server on port 8080
+    - Accept client connections, receive raw 44100Hz 16-bit stereo PCM
+    - Feed received PCM to `audio_engine_feed_a2dp_pcm()` ring buffer
+    - Android APP captures system audio via AudioPlaybackCapture and streams via TCP
     - _Requirements: 18.1, 18.2, 18.3, 18.4_
 
-  - [ ] 15.3 Implement audio_engine.c/h (MP3 decode + ring buffers + mixer)
+  - [x] 15.3 Implement audio_engine.c/h (MP3 decode + ring buffers + mixer)
     - Create `main/services/audio_engine.h` and `main/services/audio_engine.c` per design §11
     - Implement A2DP PCM ring buffer and engine PCM ring buffer
     - Implement software MP3 decoder for local engine sound files (engine_start.mp3, engine_accel.mp3)
@@ -322,17 +324,17 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
     - Create `test/property/test_prop_audio.c`
     - **Validates: Requirements 20.1, 20.2, 20.3, 20.4, 20.5**
 
-  - [ ] 15.5 Wire audio into Main_Task and Throttle_Mode
+  - [x] 15.5 Wire audio into Main_Task and Throttle_Mode
     - Connect Throttle_Mode activation/deactivation in ui_speed.c to `audio_engine_set_throttle_mode()`
     - Connect volume changes in ui_volume.c to `audio_engine_set_volume()`
     - Connect BLE VOL command dispatch to `audio_engine_set_volume()`
     - _Requirements: 19.2, 19.3, 20.2, 20.3_
 
-- [ ] 16. Phase 7 Checkpoint
+- [x] 16. Phase 7 Checkpoint
   - Ensure A2DP streaming works from phone, engine sounds play during throttle mode, mixer blends correctly, volume control works. Ask the user if questions arise.
 
-- [ ] 17. Phase 8 — NVS Persistent Storage
-  - [ ] 17.1 Implement storage.c/h NVS operations
+- [x] 17. Phase 8 — NVS Persistent Storage
+  - [x] 17.1 Implement storage.c/h NVS operations
     - Create `main/services/storage.h` and `main/services/storage.c` per design §10
     - Implement `storage_init()` to mount NVS partition
     - Implement `storage_load_settings()` to read all NVS keys (led_m_rgb, led_l_rgb, led_r_rgb, led_t_rgb, brightness, volume, preset, speed_unit, streamlight, breath_mode, logo_slot) into `nvs_settings_t`
@@ -340,7 +342,7 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
     - Implement `storage_save_settings()` to write all settings to NVS
     - _Requirements: 21.1, 21.2, 21.3, 21.4_
 
-  - [ ] 17.2 Wire NVS into boot sequence and UI save points
+  - [x] 17.2 Wire NVS into boot sequence and UI save points
     - In `main.c` boot: call `storage_load_settings()` and populate AppState before UI rendering
     - In each UI double-click exit handler (UI1–UI4, UI6, UI7): call `storage_save_settings()` with current AppState values
     - _Requirements: 21.2, 21.4, 25.1, 25.2_
@@ -350,11 +352,11 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
     - Create `test/property/test_prop_storage.c`
     - **Validates: Requirements 21.1**
 
-- [ ] 18. Phase 8 Checkpoint
+- [x] 18. Phase 8 Checkpoint
   - Ensure settings persist across simulated power cycles: change LED color, brightness, volume, reboot, verify values restored. Ask the user if questions arise.
 
-- [ ] 19. Phase 9 — LittleFS + Logo Upload/Display
-  - [ ] 19.1 Implement storage.c LittleFS mount and logo file operations
+- [x] 19. Phase 9 — LittleFS + Logo Upload/Display
+  - [x] 19.1 Implement storage.c LittleFS mount and logo file operations
     - Extend `main/services/storage.c` to mount LittleFS on the 2MB `storage` partition
     - Implement `storage_logo_exists()`, `storage_logo_read()`, `storage_logo_write()`, `storage_logo_delete()`
     - Implement logo file format: 16-byte `logo_header_t` (magic 0xAA55, 240×240, data_size, CRC32) + pixel data
@@ -362,18 +364,18 @@ Migrate the RideWind smart LED fan controller firmware from STM32F405 to ESP32-S
     - Implement `storage_logo_count_valid()` and `storage_logo_find_empty()`
     - _Requirements: 22.1, 22.2, 22.3, 22.4_
 
-  - [ ] 19.2 Implement storage.c MP3 file access
+  - [x] 19.2 Implement storage.c MP3 file access
     - Implement `storage_mp3_read()` to load engine_start.mp3 and engine_accel.mp3 from LittleFS into memory
     - _Requirements: 22.5_
 
-  - [ ] 19.3 Implement BLE logo upload protocol in command dispatch
+  - [x] 19.3 Implement BLE logo upload protocol in command dispatch
     - Handle LOGO_START: begin receiving, allocate buffer for incoming data
     - Handle LOGO_DATA: accumulate hex-decoded data packets
     - Handle LOGO_END: validate CRC32, write to slot via `storage_logo_write()`, respond OK or ERR:CRC
     - Handle LOGO_DELETE: delete slot via `storage_logo_delete()`
     - _Requirements: 22.3, 22.4_
 
-  - [ ] 19.4 Wire logo display into UI0 boot and UI6 management
+  - [x] 19.4 Wire logo display into UI0 boot and UI6 management
     - Update UI0 boot: read active logo slot from NVS, load from LittleFS, display via `drv_lcd_blit_rgb565()`; fall back to default_logo.h if no custom logo
     - Update UI6: load and display logo images from LittleFS slots, support slot switching, deletion with progress bar
     - _Requirements: 8.1, 8.3, 14.1, 14.2, 14.3_

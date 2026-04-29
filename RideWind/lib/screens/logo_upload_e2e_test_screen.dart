@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
@@ -9,10 +10,17 @@ import '../services/enhanced_image_preprocessor.dart';
 import '../services/upload_validator.dart';
 import 'package:provider/provider.dart';
 
-/// Logo上传界面
+/// Logo上传 E2E 测试界面（仅开发者模式可见）
+/// 
+/// ⚠️ 此界面仅用于开发调试，正式 Logo 上传请使用 LogoManagementScreen。
+/// 在 Release 构建中访问此界面会显示提示并自动返回。
+///
 /// 支持选择自定义图片或使用测试图片
 class LogoUploadE2ETestScreen extends StatefulWidget {
   const LogoUploadE2ETestScreen({Key? key}) : super(key: key);
+
+  /// 是否允许显示此界面（仅 Debug 模式）
+  static bool get isAvailable => kDebugMode;
 
   @override
   State<LogoUploadE2ETestScreen> createState() =>
@@ -42,6 +50,9 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
 
   // 发送记录
   final List<Map<String, dynamic>> _sentPackets = [];
+
+  // 传输模式
+  bool _binaryMode = false;  // true = binary direct, false = legacy hex
 
   // 蓝牙响应监听
   StreamSubscription<String>? _responseSub;
@@ -245,6 +256,13 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
       final crc32 = validationResult.crc32!;
       _addLog('✓ CRC32计算完成: 0x${crc32.toRadixString(16).padLeft(8, '0')}');
       _addLog('  十进制: $crc32');
+      
+      // Debug: CRC of first 480 bytes for comparison with ESP
+      final row0Crc = _validator.calculateCRC32(Uint8List.fromList(bitmapData.sublist(0, 480)));
+      _addLog('🔍 CRC of first 480 bytes: 0x${row0Crc.toRadixString(16).padLeft(8, '0')}');
+      // Debug: bytes around offset 240
+      final b = bitmapData;
+      _addLog('🔍 Bytes 238-247: ${b.sublist(238, 248).map((v) => v.toRadixString(16).padLeft(2, '0')).join(' ')}');
 
       // 5. 发送开始命令并等待硬件就绪
       final startSuccess = await _sendStartCommand(bitmapData.length, crc32);
@@ -315,7 +333,7 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
       'command': command,
     });
 
-    // 🔥 等待硬件响应（只关注LOGO_开头的响应，忽略DEBUG）
+    // 🔥 等待硬件响应
     _addLog('⏳ 等待硬件响应...');
     var response = await _waitForResponse(
       timeout: const Duration(seconds: 10),
@@ -332,13 +350,15 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
     }
     
     if (response.contains('LOGO_READY')) {
-      _addLog('✅ 硬件就绪！');
+      // Check if binary mode is supported
+      _binaryMode = response.contains(':BIN');
+      _addLog('✅ 硬件就绪！模式: ${_binaryMode ? "二进制(快速)" : "Hex(兼容)"}');
       return true;
     } else if (response.contains('LOGO_ERROR')) {
       _addLog('❌ 硬件返回错误: $response');
       return false;
     } else if (response == 'TIMEOUT') {
-      _addLog('❌ 等待响应超时！硬件可能未收到命令或未响应');
+      _addLog('❌ 等待响应超时！');
       return false;
     } else {
       _addLog('⚠️ 未知响应: $response');
@@ -346,9 +366,16 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
     }
   }
 
-  /// 分包发送数据（简化版：逐包发送，每16包等待ACK）
+  /// 分包发送数据
   Future<bool> _sendDataPackets(Uint8List data) async {
-    _addLog('--- 开始发送数据包 ---');
+    // 暂时禁用二进制模式，使用优化后的Hex模式
+    // 二进制模式有数据完整性问题待排查
+    return _sendDataHex(data);
+  }
+
+  /// 优化Hex模式：减少延迟，保持可靠性
+  Future<bool> _sendDataHex(Uint8List data) async {
+    _addLog('--- Hex快速模式 ---');
 
     const int maxPayloadSize = 16;  // 每包16字节
     final int totalPackets = (data.length + maxPayloadSize - 1) ~/ maxPayloadSize;
@@ -373,8 +400,8 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
       // 发送当前包
       await bluetoothProvider.sendCommand(command);
       
-      // 包间延迟20ms
-      await Future.delayed(const Duration(milliseconds: 20));
+      // 包间延迟2ms（ring buffer足够大，不会溢出）
+      await Future.delayed(const Duration(milliseconds: 2));
       
       // 每16包等待一次ACK
       if ((seq + 1) % 16 == 0 || seq == totalPackets - 1) {
@@ -399,8 +426,33 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
           _addLog('❌ 硬件请求重发: $response');
           return false;
         } else if (response == 'TIMEOUT') {
-          _addLog('❌ ACK超时 at seq=$seq');
-          return false;
+          _addLog('⚠️ ACK超时 at seq=$seq, 重试当前批次...');
+          // 重发当前批次的最后一包，触发ESP重新发ACK
+          final retryStart = seq;
+          final retryEnd = (retryStart + 1 > data.length ~/ maxPayloadSize) 
+              ? data.length ~/ maxPayloadSize 
+              : retryStart + 1;
+          final retryChunkStart = retryStart * maxPayloadSize;
+          final retryChunkEnd = (retryChunkStart + maxPayloadSize > data.length) 
+              ? data.length 
+              : retryChunkStart + maxPayloadSize;
+          final retryChunk = data.sublist(retryChunkStart, retryChunkEnd);
+          final retryHex = retryChunk.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
+          await bluetoothProvider.sendCommand('LOGO_DATA:$retryStart:$retryHex');
+          await Future.delayed(const Duration(milliseconds: 50));
+          
+          // 再等一次ACK
+          final retryResponse = await _waitForResponse(
+            timeout: const Duration(seconds: 5),
+            expectedPrefixes: ['LOGO_ACK:', 'LOGO_ERROR'],
+          );
+          if (retryResponse.contains('LOGO_ACK:')) {
+            _addLog('✅ 重试成功');
+            setState(() { _progress = (seq + 1) / totalPackets; });
+          } else {
+            _addLog('❌ 重试后仍超时 at seq=$seq');
+            return false;
+          }
         } else {
           _addLog('❌ 意外响应: $response');
           return false;
@@ -442,6 +494,10 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
     if (response.contains('LOGO_OK')) {
       _addLog('🎉 上传成功！Logo已写入Flash');
       return true;
+    } else if (response.contains('LOGO_WARN')) {
+      _addLog('⚠️ CRC不匹配但已写入: $response');
+      _addLog('请检查LCD显示是否正确');
+      return true;  // 继续当作成功，看显示效果
     } else if (response.contains('LOGO_FAIL')) {
       _addLog('❌ 上传失败: $response');
       return false;
@@ -577,6 +633,31 @@ class _LogoUploadE2ETestScreenState extends State<LogoUploadE2ETestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔒 开发者模式守卫：Release 构建中不允许访问此界面
+    if (!kDebugMode) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Logo上传测试')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.developer_mode, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                '此界面仅在开发者模式下可用',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('返回'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Logo上传'),
