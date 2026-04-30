@@ -185,11 +185,11 @@ static void gc9a01_init_seq(void)
 
     /* Sleep out */
     lcd_cmd(0x11);
-    vTaskDelay(pdMS_TO_TICKS(120));
+    vTaskDelay(pdMS_TO_TICKS(50));  /* GC9A01 typically ready in ~50ms */
 
-    /* Display ON */
-    lcd_cmd(0x29);
-    vTaskDelay(pdMS_TO_TICKS(20));
+    /* NOTE: Display ON (0x29) is NOT called here.
+     * Caller must clear GRAM first, then call drv_lcd_set_backlight(true)
+     * to avoid showing random GRAM data (snow/flicker) on boot. */
 }
 
 /* ── Public API ────────────────────────────────────────────── */
@@ -207,7 +207,7 @@ void drv_lcd_init(void)
         gpio_set_level(PIN_LCD_RST, 0);
         vTaskDelay(pdMS_TO_TICKS(10));
         gpio_set_level(PIN_LCD_RST, 1);
-        vTaskDelay(pdMS_TO_TICKS(120));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 
     /* SPI bus configuration */

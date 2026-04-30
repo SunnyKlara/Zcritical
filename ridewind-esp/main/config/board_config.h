@@ -94,7 +94,7 @@
 #define MENU_ANIM_ZONE_BOTTOM       190
 
 /* Boot */
-#define BOOT_LOGO_DURATION_MS       2000
+#define BOOT_LOGO_DURATION_MS       3000
 
 /* Message queue */
 #define CMD_QUEUE_DEPTH             32

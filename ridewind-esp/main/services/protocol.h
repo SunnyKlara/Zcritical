@@ -35,6 +35,11 @@ typedef enum {
     CMD_GET_VOLUME,
     CMD_WIFI,           /* WIFI:ssid:password */
     CMD_WIFI_SCAN,      /* WIFI_SCAN */
+    CMD_AUDIO_START,    /* AUDIO_START:layer:size:crc32 */
+    CMD_AUDIO_DATA,     /* AUDIO_DATA:seq:hex */
+    CMD_AUDIO_END,      /* AUDIO_END */
+    CMD_AUDIO_DELETE,   /* AUDIO_DELETE or AUDIO_DELETE:layer */
+    CMD_GET_AUDIO,      /* GET:AUDIO — query custom audio status */
 } cmd_type_t;
 
 typedef struct {
@@ -45,6 +50,7 @@ typedef struct {
         struct { uint8_t strip; uint8_t r, g, b; } led;
         struct { uint8_t strip; uint8_t r, g, b; uint8_t speed; } led_gradient;
         struct { uint8_t slot; uint32_t size; uint32_t crc32; } logo_start;
+        struct { uint8_t layer; uint32_t size; uint32_t crc32; } audio_start;
         struct { uint8_t *data; uint16_t len; } binary_data;
         uint32_t ota_size;
         struct { char ssid[33]; char password[65]; } wifi;

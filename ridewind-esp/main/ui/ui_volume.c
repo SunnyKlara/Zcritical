@@ -7,6 +7,7 @@
 #include "drv_lcd.h"
 #include "drv_encoder.h"
 #include "audio_engine.h"
+#include "ble_service.h"
 #include <stdio.h>
 
 /* UI7 - Volume Control
@@ -74,6 +75,11 @@ void ui_volume_update(void)
             if (val > 100) val = 100;
             g_app_state.volume = (uint8_t)val;
             audio_engine_set_volume((uint8_t)val);
+            {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "VOL:%d\r\n", (uint8_t)val);
+                ble_service_notify_str(buf);
+            }
             break;
         }
         case ENC_EVT_DOUBLE_CLICK:

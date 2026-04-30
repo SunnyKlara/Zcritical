@@ -8,6 +8,7 @@
 #include "drv_led.h"
 #include "drv_encoder.h"
 #include "led_effects.h"
+#include "ble_service.h"
 #include <stdio.h>
 
 /* UI3 - 3-Layer RGB Custom

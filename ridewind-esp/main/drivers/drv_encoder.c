@@ -112,11 +112,13 @@ bool drv_encoder_poll(encoder_event_t *evt)
     int delta = count - s_last_count;
 
     if (delta != 0) {
-        s_last_count = count;
-
         /* Quadrature gives 4 counts per detent, divide by 2 for sensitivity */
         int16_t steps = (int16_t)(delta / 2);
         if (steps != 0) {
+            /* Only consume the counts that map to whole steps,
+             * preserve remainder so small rotations aren't lost */
+            s_last_count += steps * 2;
+
             /* Clamp to ±3 like STM32 version */
             if (steps > 3) steps = 3;
             if (steps < -3) steps = -3;

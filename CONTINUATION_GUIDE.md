@@ -1,7 +1,7 @@
 # Critical 项目开发续接文档
 
 > **用途：** 换会话/换设备/改文件夹名后，把这份文档发给 AI 助手即可继续开发。
-> **最后更新：** 2026-04-29
+> **最后更新：** 2026-04-30
 
 ---
 
@@ -33,8 +33,10 @@ zcritical/                     （原 4.8/，根目录文件夹）
 | 2 | ESP32 LCD 菜单轮盘 UI 重构 | ✅ 完成 |
 | 3 | APP 适配 ESP32 协议（14项需求，17个任务） | ✅ 完成 |
 | 4 | APP 架构重构（协议层✅ Provider✅ Screen部分✅ DI✅） | 🔧 进行中 |
-| 5 | 真机联调验证 | ⬜ 待做 |
-| 6 | 上架准备（CI/CD、国际化） | ⬜ 待做 |
+| 4.5 | 引擎音效系统重写（4层可变采样率合成引擎） | ✅ 完成 |
+| 5 | 用户自定义引擎音频上传功能 | ✅ 完成 |
+| 6 | 真机联调验证 | ⬜ 待做 |
+| 7 | 上架准备（CI/CD、国际化） | ⬜ 待做 |
 
 ---
 
@@ -45,7 +47,7 @@ zcritical/                     （原 4.8/，根目录文件夹）
 ```
 ridewind-esp/main/
 ├── drivers/     硬件驱动：drv_lcd(ST7789), drv_led(WS2812B), drv_encoder, drv_pwm, drv_audio(I2S), drv_gpio
-├── services/    服务层：ble_service(GATT), protocol(文本协议), wifi_audio_service(TCP), audio_engine(MP3+混音), storage(NVS)
+├── services/    服务层：ble_service(GATT), protocol(文本协议), wifi_audio_service(TCP), audio_engine(WiFi音频混音), audio_player(4层引擎声合成), storage(NVS)
 ├── app/         应用层：app_state(全局状态), led_effects(14种预设), encoder_handler(编码器事件)
 ├── ui/          UI状态机：ui_manager, ui_speed, ui_preset, ui_rgb, ui_bright, ui_volume, ui_logo, ui_menu
 ├── config/      配置：pin_config.h, board_config.h, preset_colors.h
@@ -87,6 +89,11 @@ ridewind-esp/main/
 | `OTA_START:size:crc32` | 字节数:CRC32 | OTA升级开始 | `OTA_READY\r\n` |
 | `OTA_DATA:seq:hex` | 序号:十六进制 | OTA数据包 | `OTA_ACK:seq\r\n` |
 | `OTA_END` | 无 | OTA升级结束 | `OTA_OK\r\n` 或 `OTA_FAIL:reason\r\n` |
+| `AUDIO_START_BIN:layer:size:crc32` | layer=0-3, 字节数, CRC32 | 音频上传开始(二进制) | `AUDIO_READY:layer\r\n` |
+| `AUDIO_END` | 无 | 音频上传结束 | `AUDIO_OK:layer\r\n` 或 `AUDIO_FAIL:reason\r\n` |
+| `AUDIO_DELETE` | 无 | 删除全部自定义音频 | `OK:AUDIO_DELETE_ALL\r\n` |
+| `AUDIO_DELETE:layer` | 0-3 | 删除指定层音频 | `OK:AUDIO_DELETE:layer\r\n` |
+| `GET:AUDIO` | 无 | 查询自定义音频状态 | `AUDIO_STATUS:v0:v1:v2:v3:custom\r\n` |
 
 #### ESP32→APP 主动上报
 
@@ -103,6 +110,8 @@ ridewind-esp/main/
 | WiFi IP | `WIFI_IP:x.x.x.x\r\n` | ESP32连接WiFi后上报 |
 | WiFi错误 | `WIFI_ERR:reason\r\n` | WiFi连接失败 |
 | 音频就绪 | `AUDIO_READY:ip:port\r\n` | TCP音频服务器就绪 |
+| 音频上传ACK | `AUDIO_ACK_BIN:bytes\r\n` | 音频上传字节确认 |
+| 音频重载 | `AUDIO_RELOAD:OK\r\n` | 4层全部上传后自动重载 |
 
 ---
 
@@ -234,3 +243,166 @@ flutter build apk --debug
 - MethodChannel 名 com.example.ridewind/audio_capture
 - 文件夹名 RideWind/、ridewind-esp/
 - Kotlin 文件路径 com/example/ridewind/
+
+
+---
+
+## 七、引擎音效系统（2026-04-30 完成）
+
+### 架构
+
+完全重写了 `audio_player.c`，从 MP3 循环播放改为 **4 层可变采样率实时合成引擎**：
+
+```
+speed_percent (0-100) → target_rpm → 非线性惯性平滑 → current_rpm
+                                                          │
+                                    ┌─────────────────────┼─────────────────────┐
+                                    ▼                     ▼                     ▼
+                              find_blend()          calc_step()           vol_gain
+                              (选2层+混合比)        (音调/步进)          (fade×master)
+                                    │                     │                     │
+                    ┌───────────────┴───────────────┐     │                     │
+                    ▼                               ▼     ▼                     ▼
+            Layer[lo] × lo_gain          Layer[hi] × hi_gain                    │
+                    └───────────┬───────────┘                                   │
+                                ▼                                               │
+                          crossfade mix (-128..127)                              │
+                                │                                               │
+                                ▼                                               │
+                          << 8 (→ 16-bit)  ×  vol_gain  >> 8                    │
+                                │                                               │
+                                ▼                                               │
+                    stereo I2S DMA → MAX98357 → 扬声器
+```
+
+### 4 层采样
+
+| 层 | RPM | 文件 | 大小 |
+|----|-----|------|------|
+| IDLE | 800 | engine_idle.h | 84893 samples (83KB) |
+| LOW | 2000 | engine_low.h | 84893 samples (83KB) |
+| MID | 4000 | engine_mid.h | 84893 samples (83KB) |
+| HIGH | 7000 | engine_high.h | 84893 samples (83KB) |
+
+素材由 enginesound (DasEtwas, MIT) 程序化生成，位于 `其他/enginesound-1.6/`。
+生成命令：`target\release\enginesound.exe -h -c example5.esc -o output.wav -r <RPM> -v 0.5 -l 4 -w 2 -f 0.3 -q 22050`
+
+### 关键技术点
+
+- **可变采样率**：16.16 定点步进 + 线性插值，step = rpm / layer_rpm × 0.5
+- **相邻层交叉淡入淡出**：任何 RPM 下只混合 2 个相邻层，过渡平滑
+- **非线性 RPM 惯性**：低转速加速慢(100)，高转速加速快(200)；减速慢(50)，急减速快(200)
+- **I2S 阻塞写入做时钟**：无 vTaskDelay，512 帧/buffer 匹配 DMA 描述符
+- **淡入淡出**：启动 ~800ms 淡入，停止 ~350ms 淡出，启动前 4 个静音 buffer 清 DMA
+- **与 WiFi 音频互斥**：start 时 audio_engine_pause()，stop 时 audio_engine_resume()
+
+### 文件变更
+
+| 文件 | 变化 |
+|------|------|
+| audio_player.c | 完全重写 — 4 层可变采样率合成 |
+| audio_player.h | 新增 set_target_rpm()，保留 set_engine_volume() 兼容 |
+| engine_idle.h / engine_low.h / engine_mid.h / engine_high.h | 新增 — 4 层 PCM 采样 |
+| engine.mp3 | 不再使用（仍在目录中，可删除） |
+| minimp3.h | 不再引用（lib/minimp3/ 仍在，可删除） |
+| CMakeLists.txt | 移除 EMBED_FILES engine.mp3，移除 lib/minimp3 INCLUDE_DIR |
+| ui_speed.c | set_engine_volume → set_target_rpm，油门模式同步 RPM |
+| ui_rgb.c | 补了缺失的 ble_service.h include |
+| ui_treadmill.c | 修了 drv_lcd_draw_pixel / snprintf / font_8x16 三个编译错误 |
+| main.c | CMD_SPEED 处理增加 audio_player_set_target_rpm 调用 |
+
+### 工具
+
+- `ridewind-esp/tools/wav_to_header.py` — WAV → C 头文件转换（支持 32-bit float WAV）
+- `ridewind-esp/tools/wav4_to_headers.py` — 批量转换 4 层 WAV
+- `ridewind-esp/tools/samples_to_wav.py` — C 头文件 → WAV 预览
+
+### 下一步：用户自定义引擎音频上传
+
+计划让用户通过 APP 上传自己的引擎声音频到 ESP32：
+- APP 端：选择音频文件 → 预处理（转 22050Hz 单声道 8-bit PCM）→ BLE 分包传输
+- ESP32 端：接收存入 LittleFS → audio_player 启动时优先读 LittleFS 文件
+- 复用 Logo 上传的 BLE 分包协议模式（AUDIO_START/DATA/END）
+- LittleFS 空间充足：4 层 × 83KB = 332KB，分区有 10MB
+
+---
+
+## 八、用户自定义引擎音频上传（2026-04-30 完成）
+
+### 架构
+
+复用 Logo 上传的 BLE 二进制分包协议，新增 AUDIO_START_BIN/AUDIO_END 命令。
+用户通过 APP 选择 WAV 文件 → 自动转码为 22050Hz 8-bit signed PCM → BLE 分段传输到 ESP32 → 存入 LittleFS → audio_player 自动重载。
+
+```
+APP: 选择 WAV → AudioPreprocessor.convertWavToPcm()
+     → 22050Hz mono 8-bit signed PCM (Uint8List)
+     → AudioTransmissionManager.transmit()
+        → AUDIO_START_BIN:layer:size:crc32
+        → [raw binary BLE packets, 244 bytes each]
+        → AUDIO_ACK_BIN:received (every ~4KB)
+        → AUDIO_END
+        → AUDIO_OK:layer
+
+ESP32: ble_service.c → audio_upload_feed_binary() → PSRAM buffer
+       → AUDIO_END → storage_audio_write() → LittleFS
+       → 4层全部到齐 → audio_player_reload_layers()
+       → synth task 使用 PSRAM 中的自定义采样
+```
+
+### 协议
+
+| 命令 | 方向 | 说明 |
+|------|------|------|
+| `AUDIO_START_BIN:layer:size:crc32` | APP→ESP | 开始上传，layer=0-3 |
+| `AUDIO_READY:layer` | ESP→APP | 就绪，PSRAM 已分配 |
+| [raw binary data] | APP→ESP | BLE 包直传 PCM 数据 |
+| `AUDIO_ACK_BIN:bytes` | ESP→APP | 每 ~4KB 确认已收字节数 |
+| `AUDIO_END` | APP→ESP | 传输结束，触发 CRC 校验 + 写入 |
+| `AUDIO_OK:layer` | ESP→APP | 写入成功 |
+| `AUDIO_FAIL:reason` | ESP→APP | 失败原因 |
+| `AUDIO_RELOAD:OK` | ESP→APP | 4层全部到齐，引擎已重载 |
+| `GET:AUDIO` | APP→ESP | 查询状态 |
+| `AUDIO_STATUS:v0:v1:v2:v3:custom` | ESP→APP | 各层存在+是否使用自定义 |
+| `AUDIO_DELETE` | APP→ESP | 删除全部自定义音频 |
+
+### LittleFS 文件
+
+| 层 | 文件路径 | 说明 |
+|----|----------|------|
+| 0 (idle) | /storage/engine_idle.pcm | 怠速 800 RPM |
+| 1 (low) | /storage/engine_low.pcm | 低转速 2000 RPM |
+| 2 (mid) | /storage/engine_mid.pcm | 中转速 4000 RPM |
+| 3 (high) | /storage/engine_high.pcm | 高转速 7000 RPM |
+
+格式：raw signed 8-bit PCM, 22050 Hz, mono, 无头部。
+最大 256KB/层。建议 2-4 秒循环片段（44-88 KB）。
+
+### audio_player.c 改动
+
+- `LAYERS[]` 改为 `s_layers[]`（可变），`BUILTIN_LAYERS[]`（只读）
+- `audio_player_init()` 调用 `load_audio_layers()`：检查 LittleFS 4 层是否齐全，齐全则从 PSRAM 加载，否则用内置
+- 新增 `audio_player_reload_layers()`：上传完成后热重载（停止→加载→重启）
+- 新增 `audio_player_has_custom_audio()`：查询是否使用自定义
+- 自定义音频存在 PSRAM 中（`heap_caps_malloc(MALLOC_CAP_SPIRAM)`），不占内部 SRAM
+
+### Flutter 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `lib/services/audio_transmission_manager.dart` | 音频 BLE 传输管理器 |
+| `lib/services/audio_preprocessor.dart` | WAV → PCM 转码器 |
+| `lib/screens/audio_management_screen.dart` | 音频管理 UI 界面 |
+
+### ESP32 改动文件
+
+| 文件 | 变化 |
+|------|------|
+| protocol.h | 新增 CMD_AUDIO_START/DATA/END/DELETE/GET_AUDIO |
+| protocol.c | 新增 AUDIO_* 命令解析 |
+| storage.h | 新增 storage_audio_* API |
+| storage.c | 新增 LittleFS 音频文件读写删除 |
+| audio_player.h | 新增 reload_layers(), has_custom_audio() |
+| audio_player.c | LAYERS→s_layers, load_audio_layers(), PSRAM 加载 |
+| ble_service.c | 新增 audio binary mode 处理 |
+| main.c | 新增 audio upload state machine + dispatch |

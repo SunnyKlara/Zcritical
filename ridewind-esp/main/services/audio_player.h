@@ -4,35 +4,50 @@
 
 /**
  * @file audio_player.h
- * @brief Local MP3 file player using minimp3 decoder.
+ * @brief Variable-rate multi-track engine sound synthesizer.
  *
- * Decodes embedded MP3 data (engine.mp3) and outputs PCM to I2S.
- * Supports looping playback and volume control tied to speed.
+ * Mixes idle + rev + knock PCM samples with variable playback rate
+ * (pitch follows RPM) and crossfade (timbre follows RPM).
+ * Outputs 16-bit stereo PCM to I2S at 44100 Hz via drv_audio.
+ *
+ * Inspired by Rc_Engine_Sound_ESP32 (TheDIYGuy999, GPL-3.0).
  */
 
-/** Initialize the audio player (call once at startup) */
+/** Initialize the engine sound system (call once at startup) */
 void audio_player_init(void);
 
-/** Start playing the embedded engine sound in a loop */
+/** Start the engine sound synthesis task */
 void audio_player_start_engine(void);
 
-/** Stop engine sound playback */
+/** Stop the engine sound (with fade-out) */
 void audio_player_stop_engine(void);
 
 /** Check if engine sound is currently playing */
 bool audio_player_is_playing(void);
 
 /**
- * Set engine volume based on speed (0-100).
- * 0 = quiet idle, 100 = full roar.
+ * Set target RPM from speed percentage (0-100).
+ * The actual RPM will smoothly interpolate toward this target
+ * with configurable acceleration/deceleration inertia.
  */
-void audio_player_set_engine_volume(uint8_t speed_percent);
+void audio_player_set_target_rpm(uint8_t speed_percent);
 
-/** Set master volume (0-100), applied on top of speed volume */
+/**
+ * Set master volume (0-100).
+ * Applied as final gain stage before I2S output.
+ */
 void audio_player_set_master_volume(uint8_t volume);
 
 /**
- * Decode and play one MP3 frame. Call from main loop (~20ms period).
- * Non-blocking decode, blocking I2S write (~26ms per frame).
+ * Legacy API — maps to set_target_rpm for backward compatibility.
  */
+void audio_player_set_engine_volume(uint8_t speed_percent);
+
+/** No-op, kept for API compatibility */
 void audio_player_pump(void);
+
+/** Reload audio layers from LittleFS (call after custom audio upload) */
+void audio_player_reload_layers(void);
+
+/** Check if custom audio is loaded from LittleFS */
+bool audio_player_has_custom_audio(void);

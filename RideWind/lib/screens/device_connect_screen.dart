@@ -21,6 +21,7 @@ import '../widgets/colorize_preset_view.dart';
 import '../widgets/colorize_rgb_detail_view.dart';
 import 'no_device_screen.dart';
 import 'logo_management_screen.dart';
+import 'audio_management_screen.dart';
 import 'dev_test_screen.dart';
 import 'ota_upgrade_screen.dart';
 import 'audio_stream_screen.dart';
@@ -770,6 +771,29 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
                 Navigator.push(
                   parentContext,
                   MaterialPageRoute(builder: (_) => const AudioStreamScreen()),
+                );
+              }
+            });
+          },
+        ),
+        // 引擎音频管理选项
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.music_note_outlined, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text(
+                '引擎音效',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          onTap: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.push(
+                  parentContext,
+                  MaterialPageRoute(builder: (_) => const AudioManagementScreen()),
                 );
               }
             });

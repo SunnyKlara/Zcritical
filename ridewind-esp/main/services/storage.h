@@ -40,5 +40,15 @@ uint8_t storage_logo_find_empty(void);
 /* LittleFS MP3 file access */
 bool storage_mp3_read(const char *filename, uint8_t **out_data, uint32_t *out_size);
 
+/* LittleFS custom audio PCM file operations */
+#define AUDIO_LAYER_COUNT       4
+#define AUDIO_MAX_PCM_SIZE      (256 * 1024)  /* 256KB max per layer */
+bool storage_audio_exists(uint8_t layer);
+bool storage_audio_write(uint8_t layer, const uint8_t *data, uint32_t size, uint32_t crc32);
+bool storage_audio_read(uint8_t layer, int8_t **out_data, uint32_t *out_size);
+bool storage_audio_delete(uint8_t layer);
+void storage_audio_delete_all(void);
+uint8_t storage_audio_count(void);
+
 /* Standard CRC-32 (matches APP Dart implementation) */
 uint32_t storage_crc32(const uint8_t *data, uint32_t len);

@@ -21,12 +21,14 @@ idf_component_register(
         "ui/ui_bright.c"
         "ui/ui_logo.c"
         "ui/ui_volume.c"
+        "ui/ui_treadmill.c"
         "ui/ui_common.c"
         "app/app_state.c"
         "app/led_effects.c"
         "app/encoder_handler.c"
         "resources/menu_icons.c"
         "resources/ui_images.c"
+        "resources/boot_logo_240.c"
     INCLUDE_DIRS
         "."
         "config"
@@ -35,10 +37,7 @@ idf_component_register(
         "ui"
         "app"
         "resources"
-        "lib/minimp3"
         "../取模数组"
     REQUIRES
         bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s esp_wifi esp_netif esp_event littlefs
-    EMBED_FILES
-        "resources/engine.mp3"
 )

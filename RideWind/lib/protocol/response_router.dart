@@ -42,6 +42,7 @@ class ResponseRouter {
   final _volumeCtrl = StreamController<int>.broadcast();
   final _wifiScanCtrl = StreamController<String>.broadcast();
   final _rawResponseCtrl = StreamController<String>.broadcast();
+  final _ledUpdateCtrl = StreamController<Map<String, int>>.broadcast();
 
   // ── 公开流 ──
   Stream<SpeedReport> get speedReportStream => _speedReportCtrl.stream;
@@ -59,6 +60,7 @@ class ResponseRouter {
   Stream<Map<String, dynamic>> get audioReadyStream => _audioReadyCtrl.stream;
   Stream<int> get volumeStream => _volumeCtrl.stream;
   Stream<String> get wifiScanStream => _wifiScanCtrl.stream;
+  Stream<Map<String, int>> get ledUpdateStream => _ledUpdateCtrl.stream;
 
   /// 原始响应流（每条完整命令，用于调试和向后兼容）
   Stream<String> get rawResponseStream => _rawResponseCtrl.stream;
@@ -243,6 +245,9 @@ class ResponseRouter {
     final knob = ProtocolParser.parseKnobDelta(response);
     if (knob != null) { _knobDeltaCtrl.add(knob); return; }
 
+    final ledUpdate = ProtocolParser.parseLedUpdate(response);
+    if (ledUpdate != null) { _ledUpdateCtrl.add(ledUpdate); return; }
+
     final btn = ProtocolParser.parseButtonEvent(response);
     if (btn != null) { _buttonEventCtrl.add(btn); return; }
 
@@ -288,6 +293,7 @@ class ResponseRouter {
     _volumeCtrl.close();
     _wifiScanCtrl.close();
     _rawResponseCtrl.close();
+    _ledUpdateCtrl.close();
     for (final c in _pendingRequests.values) {
       if (!c.isCompleted) {
         c.complete({'success': false, 'error': 'disposed'});

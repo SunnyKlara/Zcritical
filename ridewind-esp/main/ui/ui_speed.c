@@ -129,6 +129,7 @@ static void throttle_process(void)
             if (fan > 100) fan = 100;
             g_app_state.fan_speed = fan;
             drv_pwm_set_duty(fan);
+            audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
         }
     } else {
         if (elapsed >= THROTTLE_DECEL_MS && g_app_state.current_speed_kmh > 0) {
@@ -137,6 +138,7 @@ static void throttle_process(void)
             uint8_t fan = (uint8_t)((g_app_state.current_speed_kmh * 100 + 50) / 100);
             g_app_state.fan_speed = fan;
             drv_pwm_set_duty(fan);
+            audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
 
             if (g_app_state.current_speed_kmh == 0) {
                 s_throttle_mode = 0;
@@ -160,15 +162,25 @@ void ui_speed_enter(void)
     s_last_wuhuaqi = 0xFF;
     s_throttle_mode = 0;
 
-    /* Start engine sound when entering speed UI */
-    audio_player_start_engine();
-    audio_player_set_engine_volume((uint8_t)g_app_state.current_speed_kmh);
+    /* Only start engine sound if speed is already non-zero */
+    if (g_app_state.current_speed_kmh > 0) {
+        audio_player_start_engine();
+        audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
+    }
 }
 
 void ui_speed_update(void)
 {
+    /* Sync local throttle flag with remote BLE changes */
+    if (!s_throttle_mode && g_app_state.wuhuaqi_state == 2) {
+        s_throttle_mode = 1;
+        g_app_state.throttle_last_tick = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    } else if (s_throttle_mode && g_app_state.wuhuaqi_state != 2) {
+        s_throttle_mode = 0;
+    }
+
     /* Throttle mode */
-    if (s_throttle_mode || g_app_state.wuhuaqi_state == 2) {
+    if (s_throttle_mode) {
         encoder_event_t evt;
         while (drv_encoder_poll(&evt)) {
             if (evt.type == ENC_EVT_ROTATE) {
@@ -184,7 +196,7 @@ void ui_speed_update(void)
                 break;
             }
         }
-        if (s_throttle_mode || g_app_state.wuhuaqi_state == 2) {
+        if (s_throttle_mode) {
             throttle_process();
         }
         draw_speed_screen();
@@ -201,8 +213,18 @@ void ui_speed_update(void)
             if (g_app_state.current_speed_kmh > 100) g_app_state.current_speed_kmh = 100;
             g_app_state.fan_speed = (uint8_t)g_app_state.current_speed_kmh;
             drv_pwm_set_duty(g_app_state.fan_speed);
-            /* Update engine sound volume with speed */
-            audio_player_set_engine_volume((uint8_t)g_app_state.current_speed_kmh);
+
+            /* Engine sound: start when speed goes above 0, stop when it hits 0 */
+            if (g_app_state.current_speed_kmh > 0) {
+                if (!audio_player_is_playing()) {
+                    audio_player_start_engine();
+                }
+                audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
+            } else {
+                if (audio_player_is_playing()) {
+                    audio_player_stop_engine();
+                }
+            }
             {
                 char buf[48];
                 int16_t disp = g_app_state.speed_unit == 0

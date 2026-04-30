@@ -51,7 +51,7 @@ static uint8_t  s_last_drawn_running = 0xFF;
 #define UNIT_Y          140
 
 /* ── Simple text rendering using font_8x16 ── */
-extern const unsigned char font_8x16[][16];
+#include "font_8x16.h"
 
 static void draw_char_scaled(uint16_t x, uint16_t y, char c,
                               uint16_t color, uint8_t scale)
@@ -63,7 +63,7 @@ static void draw_char_scaled(uint16_t x, uint16_t y, char c,
         for (uint8_t col = 0; col < 8; col++) {
             if (bits & (0x80 >> col)) {
                 if (scale == 1) {
-                    drv_lcd_draw_pixel(x + col, y + row, color);
+                    drv_lcd_fill_rect(x + col, y + row, 1, 1, color);
                 } else {
                     drv_lcd_fill_rect(x + col * scale, y + row * scale,
                                       scale, scale, color);
@@ -95,7 +95,7 @@ static void draw_full_screen(void)
     draw_text_centered(TITLE_Y, "TREADMILL", COLOR_TITLE, 2);
 
     /* Speed number */
-    char speed_str[8];
+    char speed_str[16];
     snprintf(speed_str, sizeof(speed_str), "%d.%d",
              s_target_speed_x10 / 10, s_target_speed_x10 % 10);
     draw_text_centered(SPEED_Y, speed_str, COLOR_SPEED, 4);
@@ -122,7 +122,7 @@ static void update_speed_display(void)
     /* Clear speed area */
     drv_lcd_fill_rect(0, SPEED_Y, LCD_WIDTH, 16 * 4, COLOR_BG);
 
-    char speed_str[8];
+    char speed_str[16];
     snprintf(speed_str, sizeof(speed_str), "%d.%d",
              s_target_speed_x10 / 10, s_target_speed_x10 % 10);
     draw_text_centered(SPEED_Y, speed_str, COLOR_SPEED, 4);

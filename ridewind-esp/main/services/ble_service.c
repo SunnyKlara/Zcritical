@@ -118,6 +118,10 @@ extern void logo_upload_feed_hex(const char *hex_str, uint16_t len);
 extern void logo_upload_feed_binary(const uint8_t *data, uint16_t len);
 extern bool logo_is_binary_mode(void);
 
+/* External audio data handler — defined in main.c */
+extern void audio_upload_feed_binary(const uint8_t *data, uint16_t len);
+extern bool audio_is_binary_mode(void);
+
 static void process_rx_data(const uint8_t *data, uint16_t len)
 {
     /* Binary logo mode: all incoming data is raw pixel bytes, no text framing.
@@ -145,6 +149,29 @@ static void process_rx_data(const uint8_t *data, uint16_t len)
         }
         /* Raw binary data — feed directly to PSRAM buffer */
         logo_upload_feed_binary(data, len);
+        return;
+    }
+
+    /* Binary audio mode: all incoming data is raw PCM bytes.
+     * Exception: if we see "AUDIO_END" text, exit binary mode. */
+    if (audio_is_binary_mode()) {
+        if (len >= 9 && len <= 11) {
+            char tmp[16];
+            uint16_t copy_len = (len < sizeof(tmp) - 1) ? len : sizeof(tmp) - 1;
+            memcpy(tmp, data, copy_len);
+            tmp[copy_len] = '\0';
+            for (int i = copy_len - 1; i >= 0 && (tmp[i] == '\r' || tmp[i] == '\n'); i--) {
+                tmp[i] = '\0';
+            }
+            if (strcmp(tmp, "AUDIO_END") == 0) {
+                cmd_msg_t msg;
+                if (protocol_parse(tmp, (uint16_t)strlen(tmp), &msg)) {
+                    if (cmd_queue) xQueueSend(cmd_queue, &msg, 0);
+                }
+                return;
+            }
+        }
+        audio_upload_feed_binary(data, len);
         return;
     }
 
@@ -214,9 +241,13 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
             s_gatts_if = gatts_if;
             /* Set device name */
             esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
-            /* Configure advertising data — device name only.
-             * APP side filters by device name "T1" and verifies FFE0 service
-             * after connection, so we don't need UUID in the adv packet. */
+            /* Configure advertising data — include device name and service UUID.
+             * APP side filters by device name "T1" and/or UUID 0xFFE0. */
+            static uint8_t adv_svc_uuid128[16] = {
+                /* 0000FFE0-0000-1000-8000-00805F9B34FB in little-endian */
+                0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80,
+                0x00, 0x10, 0x00, 0x00, 0xE0, 0xFF, 0x00, 0x00,
+            };
             esp_ble_adv_data_t adv_data = {
                 .set_scan_rsp        = false,
                 .include_name        = true,
@@ -228,8 +259,8 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
                 .p_manufacturer_data = NULL,
                 .service_data_len    = 0,
                 .p_service_data      = NULL,
-                .service_uuid_len    = 0,
-                .p_service_uuid      = NULL,
+                .service_uuid_len    = sizeof(adv_svc_uuid128),
+                .p_service_uuid      = adv_svc_uuid128,
                 .flag                = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
             };
             esp_ble_gap_config_adv_data(&adv_data);

@@ -123,6 +123,24 @@ class ProtocolParser {
     return int.parse(match.group(1)!);
   }
 
+  /// 解析 LED_UPDATE:strip:r:g:b (硬件端 RGB 调色后上报)
+  /// 返回: {strip: 1-4, r: 0-255, g: 0-255, b: 0-255}
+  static Map<String, int>? parseLedUpdate(String response) {
+    final match = RegExp(r'^LED_UPDATE:(\d+):(\d+):(\d+):(\d+)')
+        .firstMatch(response.trim());
+    if (match == null) return null;
+    try {
+      return {
+        'strip': int.parse(match.group(1)!),
+        'r': int.parse(match.group(2)!),
+        'g': int.parse(match.group(3)!),
+        'b': int.parse(match.group(4)!),
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  ESP32 特有响应
   // ═══════════════════════════════════════════════════════════════
@@ -173,9 +191,12 @@ class ProtocolParser {
     return null;
   }
 
-  /// 解析 VOL:xx (0-100)
+  /// 解析 VOL:xx (0-100) — 匹配 "VOL:xx" 但排除 "OK:VOL:xx"
   static int? parseVolume(String response) {
-    final match = RegExp(r'^VOL:(\d+)').firstMatch(response.trim());
+    final trimmed = response.trim();
+    // OK:VOL 是命令确认，不是音量上报，由 isAckResponse 处理
+    if (trimmed.startsWith('OK:VOL:')) return null;
+    final match = RegExp(r'VOL:(\d+)').firstMatch(trimmed);
     if (match == null) return null;
     final volume = int.parse(match.group(1)!);
     return (volume >= 0 && volume <= 100) ? volume : null;
@@ -199,6 +220,7 @@ class ProtocolParser {
     final trimmed = response.trim();
     return trimmed.startsWith('OK:') ||
         trimmed.startsWith('LOGO_ACK:') ||
+        trimmed.startsWith('LOGO_ACK_BIN:') ||
         trimmed.startsWith('LOGO_SACK:') ||
         trimmed.startsWith('LOGO_READY:') ||
         trimmed.startsWith('LOGO_OK:') ||
@@ -209,6 +231,7 @@ class ProtocolParser {
         trimmed.startsWith('OTA_READY') ||
         trimmed.startsWith('OTA_OK') ||
         trimmed.startsWith('OTA_FAIL:') ||
-        trimmed.startsWith('PRESET_REPORT:');
+        trimmed.startsWith('PRESET_REPORT:') ||
+        trimmed.startsWith('LED_UPDATE:');
   }
 }

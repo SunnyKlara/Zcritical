@@ -256,11 +256,11 @@ class _SplashScreenState extends State<SplashScreen>
   /// Logo品牌区域 — 使用图片（裁剪掉截图中的状态栏和底部按钮，只保留Logo）
   Widget _buildLogoSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: ClipRect(
         child: Align(
-          alignment: const Alignment(0.0, -0.15), // 稍偏上，对准Logo中心
-          heightFactor: 0.25, // 只显示图片高度的25%（Logo区域）
+          alignment: const Alignment(0.0, -0.1),
+          heightFactor: 0.35,
           child: Image.asset(
             'assets/images/splash_logo.jpg',
             fit: BoxFit.fitWidth,

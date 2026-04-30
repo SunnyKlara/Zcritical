@@ -16,6 +16,7 @@
 #include "esp_littlefs.h"
 #include "esp_log.h"
 #include "esp_crc.h"
+#include "esp_heap_caps.h"
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -372,4 +373,143 @@ bool storage_mp3_read(const char *filename, uint8_t **out_data, uint32_t *out_si
     *out_size = (uint32_t)fsize;
     ESP_LOGI(TAG, "MP3 loaded: %s (%u bytes)", filename, (unsigned)fsize);
     return true;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+ *  LittleFS: Custom engine audio PCM file operations
+ *
+ *  Files: /storage/engine_idle.pcm, engine_low.pcm, engine_mid.pcm, engine_high.pcm
+ *  Format: raw signed 8-bit PCM, 22050 Hz, mono
+ *  No header — just raw samples. Size = sample count.
+ * ═══════════════════════════════════════════════════════════════ */
+
+static const char *s_audio_filenames[AUDIO_LAYER_COUNT] = {
+    "engine_idle.pcm",
+    "engine_low.pcm",
+    "engine_mid.pcm",
+    "engine_high.pcm",
+};
+
+static void audio_path(uint8_t layer, char *buf, size_t buf_size)
+{
+    snprintf(buf, buf_size, LITTLEFS_MOUNT_POINT "/%s", s_audio_filenames[layer]);
+}
+
+bool storage_audio_exists(uint8_t layer)
+{
+    if (!s_littlefs_mounted || layer >= AUDIO_LAYER_COUNT) return false;
+    char path[64];
+    audio_path(layer, path, sizeof(path));
+    struct stat st;
+    return (stat(path, &st) == 0 && st.st_size > 0);
+}
+
+bool storage_audio_write(uint8_t layer, const uint8_t *data, uint32_t size, uint32_t crc32)
+{
+    if (!s_littlefs_mounted || layer >= AUDIO_LAYER_COUNT || !data || size == 0) return false;
+    if (size > AUDIO_MAX_PCM_SIZE) {
+        ESP_LOGE(TAG, "Audio layer %d: too large (%u > %u)", layer, (unsigned)size, AUDIO_MAX_PCM_SIZE);
+        return false;
+    }
+
+    /* Validate CRC32 */
+    uint32_t calc_crc = storage_crc32(data, size);
+    if (crc32 != 0 && calc_crc != crc32) {
+        ESP_LOGE(TAG, "Audio layer %d: CRC mismatch (expected=0x%08X calc=0x%08X)",
+                 layer, (unsigned)crc32, (unsigned)calc_crc);
+        return false;
+    }
+
+    char path[64];
+    audio_path(layer, path, sizeof(path));
+
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        ESP_LOGE(TAG, "Audio layer %d: cannot open for write", layer);
+        return false;
+    }
+
+    bool ok = (fwrite(data, 1, size, f) == size);
+    fclose(f);
+
+    if (!ok) {
+        ESP_LOGE(TAG, "Audio layer %d: write failed, removing partial", layer);
+        remove(path);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Audio layer %d: written OK (%u bytes, CRC=0x%08X)",
+             layer, (unsigned)size, (unsigned)calc_crc);
+    return true;
+}
+
+bool storage_audio_read(uint8_t layer, int8_t **out_data, uint32_t *out_size)
+{
+    if (!s_littlefs_mounted || layer >= AUDIO_LAYER_COUNT || !out_data || !out_size) return false;
+
+    char path[64];
+    audio_path(layer, path, sizeof(path));
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (fsize <= 0 || fsize > AUDIO_MAX_PCM_SIZE) {
+        fclose(f);
+        return false;
+    }
+
+    /* Allocate in PSRAM for large audio buffers */
+    int8_t *buf = (int8_t *)heap_caps_malloc((size_t)fsize, MALLOC_CAP_SPIRAM);
+    if (!buf) {
+        ESP_LOGE(TAG, "Audio layer %d: PSRAM alloc failed (%ld bytes)", layer, fsize);
+        fclose(f);
+        return false;
+    }
+
+    size_t read_bytes = fread(buf, 1, (size_t)fsize, f);
+    fclose(f);
+
+    if (read_bytes != (size_t)fsize) {
+        free(buf);
+        return false;
+    }
+
+    *out_data = buf;
+    *out_size = (uint32_t)fsize;
+    ESP_LOGI(TAG, "Audio layer %d: loaded from LittleFS (%u samples)", layer, (unsigned)fsize);
+    return true;
+}
+
+bool storage_audio_delete(uint8_t layer)
+{
+    if (!s_littlefs_mounted || layer >= AUDIO_LAYER_COUNT) return false;
+    char path[64];
+    audio_path(layer, path, sizeof(path));
+    if (remove(path) == 0) {
+        ESP_LOGI(TAG, "Audio layer %d: deleted", layer);
+        return true;
+    }
+    return false;
+}
+
+void storage_audio_delete_all(void)
+{
+    for (uint8_t i = 0; i < AUDIO_LAYER_COUNT; i++) {
+        storage_audio_delete(i);
+    }
+    ESP_LOGI(TAG, "All custom audio deleted");
+}
+
+uint8_t storage_audio_count(void)
+{
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < AUDIO_LAYER_COUNT; i++) {
+        if (storage_audio_exists(i)) count++;
+    }
+    return count;
 }

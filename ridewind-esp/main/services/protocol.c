@@ -69,6 +69,7 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         if (strcmp(param, "LOGO") == 0)        { out->type = CMD_GET_LOGO; return true; }
         if (strcmp(param, "LOGO_SLOTS") == 0) { out->type = CMD_GET_LOGO; return true; }
         if (strcmp(param, "VOL") == 0)         { out->type = CMD_GET_VOLUME; return true; }
+        if (strcmp(param, "AUDIO") == 0)       { out->type = CMD_GET_AUDIO; return true; }
         return false;  /* unknown GET */
     }
 
@@ -272,6 +273,76 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         return true;
     }
 
+    /* ── AUDIO upload commands ── */
+    if (strncmp(buf, "AUDIO_START_BIN:", 16) == 0) {
+        /* AUDIO_START_BIN:layer:size:crc32 — binary mode */
+        p = buf + 16;
+        char *end;
+        unsigned long nums[3] = {0};
+        int num_count = 0;
+        for (int i = 0; i < 3 && p && *p; i++) {
+            nums[i] = strtoul(p, &end, 10);
+            if (end == p) break;
+            num_count++;
+            p = (*end == ':') ? end + 1 : NULL;
+        }
+        out->type = CMD_AUDIO_START;
+        if (num_count == 3) {
+            out->param.audio_start.layer = (uint8_t)(nums[0] | 0x80); /* bit7 = binary */
+            out->param.audio_start.size = (uint32_t)nums[1];
+            out->param.audio_start.crc32 = (uint32_t)nums[2];
+        } else {
+            return false;
+        }
+        if (out->param.audio_start.size == 0) return false;
+        return true;
+    }
+    if (strncmp(buf, "AUDIO_START:", 12) == 0) {
+        /* AUDIO_START:layer:size:crc32 */
+        p = buf + 12;
+        char *end;
+        unsigned long nums[3] = {0};
+        int num_count = 0;
+        for (int i = 0; i < 3 && p && *p; i++) {
+            nums[i] = strtoul(p, &end, 10);
+            if (end == p) break;
+            num_count++;
+            p = (*end == ':') ? end + 1 : NULL;
+        }
+        if (num_count != 3) return false;
+        out->type = CMD_AUDIO_START;
+        out->param.audio_start.layer = (uint8_t)nums[0];
+        out->param.audio_start.size = (uint32_t)nums[1];
+        out->param.audio_start.crc32 = (uint32_t)nums[2];
+        if (out->param.audio_start.size == 0) return false;
+        return true;
+    }
+    if (strncmp(buf, "AUDIO_DATA:", 11) == 0) {
+        out->type = CMD_AUDIO_DATA;
+        return true;
+    }
+    if (strcmp(buf, "AUDIO_END") == 0) {
+        out->type = CMD_AUDIO_END;
+        return true;
+    }
+    if (strncmp(buf, "AUDIO_DELETE:", 12) == 0) {
+        if (!parse_int(buf + 12, &val)) {
+            /* AUDIO_DELETE without layer = delete all */
+            out->type = CMD_AUDIO_DELETE;
+            out->param.u8_val = 0xFF;
+            return true;
+        }
+        if (val < 0 || val > 3) return false;
+        out->type = CMD_AUDIO_DELETE;
+        out->param.u8_val = (uint8_t)val;
+        return true;
+    }
+    if (strcmp(buf, "AUDIO_DELETE") == 0) {
+        out->type = CMD_AUDIO_DELETE;
+        out->param.u8_val = 0xFF;  /* delete all */
+        return true;
+    }
+
     /* ── WIFI:ssid:password ── */
     if (strncmp(buf, "WIFI:", 5) == 0) {
         const char *ssid_start = buf + 5;
@@ -388,6 +459,18 @@ int protocol_format_cmd(const cmd_msg_t *cmd, char *buf, uint32_t buf_size)
     case CMD_GET_UI:          n = snprintf(buf, buf_size, "GET:UI\n"); break;
     case CMD_GET_LOGO:        n = snprintf(buf, buf_size, "GET:LOGO\n"); break;
     case CMD_GET_VOLUME:      n = snprintf(buf, buf_size, "GET:VOL\n"); break;
+    case CMD_GET_AUDIO:       n = snprintf(buf, buf_size, "GET:AUDIO\n"); break;
+    case CMD_AUDIO_START:
+        n = snprintf(buf, buf_size, "AUDIO_START:%d:%u:%u\n",
+                     cmd->param.audio_start.layer,
+                     (unsigned)cmd->param.audio_start.size,
+                     (unsigned)cmd->param.audio_start.crc32);
+        break;
+    case CMD_AUDIO_DATA:      n = snprintf(buf, buf_size, "AUDIO_DATA:\n"); break;
+    case CMD_AUDIO_END:       n = snprintf(buf, buf_size, "AUDIO_END\n"); break;
+    case CMD_AUDIO_DELETE:
+        n = snprintf(buf, buf_size, "AUDIO_DELETE:%d\n", cmd->param.u8_val);
+        break;
     case CMD_LOGO_START:
         n = snprintf(buf, buf_size, "LOGO_START:%d:%u\n",
                      cmd->param.logo_start.slot, (unsigned)cmd->param.logo_start.size);

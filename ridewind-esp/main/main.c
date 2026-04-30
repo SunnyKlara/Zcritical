@@ -28,6 +28,7 @@
 #include "audio_engine.h"
 #include "audio_player.h"
 #include "storage.h"
+#include "boot_logo_240.h"
 
 static const char *TAG = "MAIN";
 
@@ -185,6 +186,72 @@ static void logo_rx_cleanup(void)
 }
 
 /* ═══════════════════════════════════════════════════════════════
+ *  Audio upload — PSRAM buffer approach (same pattern as Logo)
+ *
+ *  Protocol (binary mode):
+ *    APP sends: AUDIO_START_BIN:layer:size:crc32\n
+ *    ESP replies: AUDIO_READY:layer\r\n
+ *    APP sends: raw binary PCM data in BLE packets
+ *    ESP replies: AUDIO_ACK_BIN:received_bytes\r\n (every ~4KB)
+ *    APP sends: AUDIO_END\n
+ *    ESP replies: AUDIO_OK:layer\r\n or AUDIO_FAIL:reason\r\n
+ * ═══════════════════════════════════════════════════════════════ */
+static struct {
+    bool     active;
+    uint8_t  layer;          /* 0=idle, 1=low, 2=mid, 3=high */
+    uint32_t expected_size;
+    uint32_t expected_crc32;
+    uint32_t received;
+    uint8_t *buf;            /* PSRAM buffer */
+} s_audio_rx = {0};
+
+static bool s_audio_binary_mode = false;
+static uint32_t s_audio_bin_batch_bytes = 0;
+#define AUDIO_BIN_ACK_INTERVAL  (16 * 244)
+
+/* Called from BLE callback for binary audio data */
+void audio_upload_feed_binary(const uint8_t *data, uint16_t len)
+{
+    if (!s_audio_rx.active || !s_audio_rx.buf || !data || len == 0) {
+        if (!s_audio_rx.active) {
+            ble_service_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
+        }
+        return;
+    }
+
+    if (s_audio_rx.received >= s_audio_rx.expected_size) return;
+
+    uint32_t space = s_audio_rx.expected_size - s_audio_rx.received;
+    uint16_t copy_len = (len <= space) ? len : (uint16_t)space;
+    memcpy(s_audio_rx.buf + s_audio_rx.received, data, copy_len);
+    s_audio_rx.received += copy_len;
+
+    s_audio_bin_batch_bytes += copy_len;
+    if (s_audio_bin_batch_bytes >= AUDIO_BIN_ACK_INTERVAL ||
+        s_audio_rx.received >= s_audio_rx.expected_size) {
+        char ack[48];
+        snprintf(ack, sizeof(ack), "AUDIO_ACK_BIN:%u\r\n", (unsigned)s_audio_rx.received);
+        ble_service_notify_str(ack);
+        s_audio_bin_batch_bytes = 0;
+    }
+}
+
+bool audio_is_binary_mode(void) { return s_audio_binary_mode; }
+
+static void audio_rx_cleanup(void)
+{
+    s_audio_rx.active = false;
+    s_audio_rx.received = 0;
+    s_audio_rx.expected_size = 0;
+    s_audio_binary_mode = false;
+    s_audio_bin_batch_bytes = 0;
+    if (s_audio_rx.buf) {
+        free(s_audio_rx.buf);
+        s_audio_rx.buf = NULL;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
  *  BLE Command Dispatch — apply cmd_msg_t to AppState + hardware
  * ═══════════════════════════════════════════════════════════════ */
 static void dispatch_ble_command(const cmd_msg_t *cmd)
@@ -221,6 +288,17 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             g_app_state.fan_speed = (uint8_t)internal_spd;
             drv_pwm_set_duty((uint8_t)internal_spd);
             g_app_state.remote_active_tick = xTaskGetTickCount();
+        }
+        /* Update engine sound based on speed */
+        if (internal_spd > 0) {
+            if (!audio_player_is_playing()) {
+                audio_player_start_engine();
+            }
+            audio_player_set_target_rpm((uint8_t)internal_spd);
+        } else {
+            if (audio_player_is_playing()) {
+                audio_player_stop_engine();
+            }
         }
         /* No OK response for SPEED (matches STM32 behavior) */
         break;
@@ -706,6 +784,146 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         wifi_audio_service_scan();
         break;
 
+    /* ── Audio upload protocol ── */
+    case CMD_AUDIO_START: {
+        if (s_audio_rx.active) {
+            audio_rx_cleanup();
+        }
+        uint8_t raw_layer = cmd->param.audio_start.layer;
+        uint32_t size = cmd->param.audio_start.size;
+        uint32_t crc = cmd->param.audio_start.crc32;
+
+        bool binary_mode = (raw_layer & 0x80) != 0;
+        uint8_t layer = raw_layer & 0x7F;
+
+        if (layer >= AUDIO_LAYER_COUNT) {
+            ble_service_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
+            break;
+        }
+        if (size == 0 || size > AUDIO_MAX_PCM_SIZE) {
+            char err[64];
+            snprintf(err, sizeof(err), "AUDIO_ERROR:SIZE:%u (max %u)\r\n",
+                     (unsigned)size, AUDIO_MAX_PCM_SIZE);
+            ble_service_notify_str(err);
+            break;
+        }
+
+        s_audio_rx.buf = (uint8_t *)heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+        if (!s_audio_rx.buf) {
+            ESP_LOGE(TAG, "Audio PSRAM alloc failed for %u bytes", (unsigned)size);
+            ble_service_notify_str("AUDIO_ERROR:MEM\r\n");
+            break;
+        }
+        memset(s_audio_rx.buf, 0, size);
+
+        s_audio_rx.layer = layer;
+        s_audio_rx.expected_size = size;
+        s_audio_rx.expected_crc32 = crc;
+        s_audio_rx.received = 0;
+        s_audio_rx.active = true;
+        s_audio_binary_mode = binary_mode;
+        s_audio_bin_batch_bytes = 0;
+
+        ESP_LOGI(TAG, "Audio upload started: layer=%d size=%u crc=0x%08X mode=%s",
+                 layer, (unsigned)size, (unsigned)crc,
+                 binary_mode ? "BINARY" : "HEX");
+
+        char ready[32];
+        snprintf(ready, sizeof(ready), "AUDIO_READY:%d\r\n", layer);
+        ble_service_notify_str(ready);
+        break;
+    }
+
+    case CMD_AUDIO_DATA:
+        /* Hex mode handled in BLE service if needed; binary goes through feed_binary */
+        break;
+
+    case CMD_AUDIO_END: {
+        if (!s_audio_rx.active || !s_audio_rx.buf) {
+            ble_service_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
+            break;
+        }
+
+        uint32_t data_size = s_audio_rx.received;
+        ESP_LOGI(TAG, "Audio END: layer=%d received=%u expected=%u",
+                 s_audio_rx.layer, (unsigned)data_size, (unsigned)s_audio_rx.expected_size);
+
+        if (data_size != s_audio_rx.expected_size) {
+            char fail[64];
+            snprintf(fail, sizeof(fail), "AUDIO_FAIL:SIZE:%u/%u\r\n",
+                     (unsigned)data_size, (unsigned)s_audio_rx.expected_size);
+            ble_service_notify_str(fail);
+            audio_rx_cleanup();
+            break;
+        }
+
+        /* CRC32 check */
+        uint32_t calc_crc = storage_crc32(s_audio_rx.buf, data_size);
+        ESP_LOGI(TAG, "Audio CRC: calc=0x%08X expect=0x%08X",
+                 (unsigned)calc_crc, (unsigned)s_audio_rx.expected_crc32);
+
+        if (s_audio_rx.expected_crc32 != 0 && calc_crc != s_audio_rx.expected_crc32) {
+            char fail[64];
+            snprintf(fail, sizeof(fail), "AUDIO_FAIL:CRC:0x%08X:0x%08X\r\n",
+                     (unsigned)s_audio_rx.expected_crc32, (unsigned)calc_crc);
+            ble_service_notify_str(fail);
+            audio_rx_cleanup();
+            break;
+        }
+
+        /* Write to LittleFS */
+        if (storage_audio_write(s_audio_rx.layer, s_audio_rx.buf, data_size, calc_crc)) {
+            ESP_LOGI(TAG, "Audio layer %d written OK (%u bytes)", s_audio_rx.layer, (unsigned)data_size);
+            char ok_resp[32];
+            snprintf(ok_resp, sizeof(ok_resp), "AUDIO_OK:%d\r\n", s_audio_rx.layer);
+            ble_service_notify_str(ok_resp);
+
+            /* If all 4 layers are now present, reload the audio engine */
+            if (storage_audio_count() == AUDIO_LAYER_COUNT) {
+                audio_player_reload_layers();
+                ble_service_notify_str("AUDIO_RELOAD:OK\r\n");
+            }
+        } else {
+            ble_service_notify_str("AUDIO_FAIL:WRITE\r\n");
+        }
+
+        audio_rx_cleanup();
+        break;
+    }
+
+    case CMD_AUDIO_DELETE: {
+        uint8_t layer = cmd->param.u8_val;
+        if (layer == 0xFF) {
+            /* Delete all custom audio */
+            storage_audio_delete_all();
+            audio_player_reload_layers();
+            ble_service_notify_str("OK:AUDIO_DELETE_ALL\r\n");
+        } else if (layer < AUDIO_LAYER_COUNT) {
+            storage_audio_delete(layer);
+            audio_player_reload_layers();
+            char ok[32];
+            snprintf(ok, sizeof(ok), "OK:AUDIO_DELETE:%d\r\n", layer);
+            ble_service_notify_str(ok);
+        } else {
+            ble_service_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
+        }
+        break;
+    }
+
+    case CMD_GET_AUDIO: {
+        /* Report custom audio status: AUDIO_STATUS:idle:low:mid:high:custom
+         * Each layer: 1=exists, 0=not; custom: 1=using custom, 0=using built-in */
+        char audio_resp[64];
+        snprintf(audio_resp, sizeof(audio_resp), "AUDIO_STATUS:%d:%d:%d:%d:%d\r\n",
+                 storage_audio_exists(0) ? 1 : 0,
+                 storage_audio_exists(1) ? 1 : 0,
+                 storage_audio_exists(2) ? 1 : 0,
+                 storage_audio_exists(3) ? 1 : 0,
+                 audio_player_has_custom_audio() ? 1 : 0);
+        ble_service_notify_str(audio_resp);
+        break;
+    }
+
     default:
         break;
     }
@@ -776,13 +994,13 @@ void app_main(void)
     /* 2. Command queue */
     cmd_queue = xQueueCreate(CMD_QUEUE_DEPTH, sizeof(cmd_msg_t));
 
-    /* Phase 1: LCD init + test pattern */
+    /* Phase 1: LCD init + brand boot logo */
     drv_lcd_init();
+    drv_lcd_set_backlight(false);  /* Display OFF — hide random GRAM data */
     drv_lcd_fill_rect(0, 0, 240, 240, 0x0000);
-    drv_lcd_draw_string(40, 100, "Critical", 0x07FF, 0x0000, 2);
-    drv_lcd_draw_string(60, 140, "ESP32-S3", 0xFFFF, 0x0000, 2);
-    drv_lcd_draw_circle(120, 120, 118, 0x07FF, false);
-    ESP_LOGI(TAG, "LCD test pattern displayed");
+    drv_lcd_blit_rgb565(0, 0, 240, 240, (const uint16_t *)gImage_boot_logo_240);
+    drv_lcd_set_backlight(true);   /* Display ON — logo is ready */
+    ESP_LOGI(TAG, "Brand boot logo displayed");
 
     /* Phase 2: LED init */
     drv_led_init();
@@ -848,40 +1066,7 @@ void app_main(void)
 #endif
     ESP_LOGI(TAG, "═══════════════════════════════════════");
 
-    /* Phase 6 Task 13.14: Boot logo display (2 seconds) */
-    drv_lcd_clear(0x0000);
-    {
-        /* Phase 9: Try loading custom logo from LittleFS (row-by-row, no large malloc) */
-        bool logo_shown = false;
-        uint8_t logo_slot = g_app_state.active_logo_slot;
-        if (storage_logo_exists(logo_slot)) {
-            char path[48];
-            snprintf(path, sizeof(path), LITTLEFS_MOUNT_POINT "/logo_%d.bin", logo_slot);
-            FILE *f = fopen(path, "rb");
-            if (f) {
-                logo_header_t hdr;
-                if (fread(&hdr, 1, sizeof(hdr), f) == sizeof(hdr) &&
-                    hdr.magic == LOGO_MAGIC) {
-                    uint16_t row[LOGO_WIDTH];  /* 480 bytes on stack */
-                    for (uint16_t y = 0; y < LOGO_HEIGHT; y++) {
-                        size_t n = fread(row, 1, sizeof(row), f);
-                        if (n < sizeof(row)) memset((uint8_t *)row + n, 0, sizeof(row) - n);
-                        drv_lcd_blit_rgb565(0, y, LOGO_WIDTH, 1, row);
-                    }
-                    logo_shown = true;
-                    ESP_LOGI(TAG, "Boot logo from slot %d", logo_slot);
-                }
-                fclose(f);
-            }
-        }
-        if (!logo_shown) {
-            /* Fallback: default text logo */
-            drv_lcd_draw_string(50, 90, "Critical", 0x07FF, 0x0000, 2);
-            drv_lcd_draw_string(75, 130, "v1.0",
-                                rgb565_color(0x80, 0x80, 0x80), 0x0000, 1);
-            drv_lcd_draw_circle(120, 120, 60, 0x07FF, false);
-        }
-    }
+    /* Boot logo displayed at LCD init — hold for 2 seconds */
     vTaskDelay(pdMS_TO_TICKS(BOOT_LOGO_DURATION_MS));
     /* Transition to UI5 menu */
     ui_manager_set_ui(5);
