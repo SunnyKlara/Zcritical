@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Hardware Config Sync Guard",
+  "description": "When hardware config files (pin definitions, board config) are edited, reminds the AI to check if the pin documentation needs updating to maintain single source of truth.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/board_config.h",
+      "**/pin_config.h"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "你刚修改了硬件配置文件。检查：引脚分配或板级参数是否变化？如果是，同步更新 ridewind-esp/引脚文档配置.md。确保没有在其他文件中 hardcode 引脚号——所有引脚定义必须引用 board_config.h。"
+  }
+}

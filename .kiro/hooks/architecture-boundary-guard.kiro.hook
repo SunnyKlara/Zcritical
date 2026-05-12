@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Architecture Boundary Guard",
+  "description": "Before writing code files in ridewind-esp or RideWind, checks architectural boundary violations. Skips non-code files (docs, configs, steering).",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检查写入目标：如果目标文件是 .md/.json/.yaml/.toml/.csv/.kiro 或在 .kiro/ 目录下，这不是代码文件，跳过检查，直接允许写入。只有当目标文件是 .c/.h/.dart/.kt/.swift 等代码文件时才执行以下检查：1) 如果在 ridewind-esp/main/services/ 或 ui/ 中，确认没有直接调用 ESP-IDF 外设 API（gpio_set_level、spi_device_transmit、rmt_transmit、ledc_set_duty 等）——这些必须通过 drivers/ 层。2) 如果在 ridewind-esp/main/drivers/ 中，确认没有 #include 来自 services/ 或 app/ 的头文件（drivers 不依赖上层）。3) 如果是 Flutter .dart 文件，确认没有引入新的状态管理框架（保持 Provider + get_it）。如果不涉及以上情况或没有违反，允许写入继续。"
+  }
+}

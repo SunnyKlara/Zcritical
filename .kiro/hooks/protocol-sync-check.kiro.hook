@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Protocol Sync Guard",
+  "description": "When protocol implementation files (ESP32 protocol.c/h or Flutter protocol_parser.dart/command_sender.dart) are edited, reminds the AI to check if the protocol-contract.md truth source needs updating.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/protocol.c",
+      "**/protocol.h",
+      "**/protocol_parser.dart",
+      "**/command_sender.dart"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "你刚修改了协议实现文件。检查：这次修改是否涉及新增/修改/删除命令或响应格式？如果是，你必须同步更新 .kiro/steering/specs/protocol-contract.md（唯一真值源）。如果不涉及协议格式变化（比如只是重构内部逻辑），忽略此提醒。"
+  }
+}
