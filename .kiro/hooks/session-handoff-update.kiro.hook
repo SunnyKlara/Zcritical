@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Session Handoff Updater",
+  "description": "After each agent task completes, reminds the AI to update the session handoff document with what was done, decisions made, and current build status.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "对话即将结束。执行 session handoff 自检：1) CONTINUATION_GUIDE.md 是否反映当前状态？2) 本次做了什么决策需要记录？3) 有没有新的阻塞项或下一步变化？4) 如果修改了代码，编译状态是什么？如果有变化，更新 CONTINUATION_GUIDE.md。如果本次只是讨论/分析没有代码变更，可以跳过。"
+  }
+}

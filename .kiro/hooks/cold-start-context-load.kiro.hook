@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Cold Start Context Loader",
+  "description": "Before starting any spec task, reminds the AI to read the START-HERE.md and current session handoff to ensure it has proper context before making changes.",
+  "version": "1",
+  "when": {
+    "type": "preTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "任务开始前，确认你已读取必要上下文：1) .kiro/steering/START-HERE.md（项目定位 + 能力边界 + 必知规则）2) CONTINUATION_GUIDE.md（当前状态 + 阻塞项 + 下一步）。如果本次任务涉及协议修改，还需读取 .kiro/steering/specs/protocol-contract.md。不要在没有上下文的情况下开始写代码。"
+  }
+}

@@ -1,0 +1,54 @@
+# ESP32 build artifacts
+ridewind-esp/build/
+ridewind-esp/managed_components/
+ridewind-esp/sdkconfig.old
+
+# Flutter build artifacts
+RideWind/build/
+RideWind/.dart_tool/
+RideWind/.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+.vs/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android build
+RideWind/android/.gradle/
+RideWind/android/build/
+RideWind/android/app/build/
+RideWind/android/.kotlin/
+
+# iOS/macOS generated
+RideWind/ios/Flutter/Generated.xcconfig
+RideWind/ios/Flutter/flutter_export_environment.sh
+RideWind/macos/Flutter/ephemeral/
+RideWind/ios/Pods/
+RideWind/macos/Pods/
+
+# ESPtest build
+ESPtest/build/
+ESPtest/.cache/
+
+# Keil MDK build artifacts (legacy STM32 reference)
+f4_26_1.1/**/Objects/
+f4_26_1.1/**/Listings/
+f4_26_1.1/**/*.uvguix.*
+f4_26_1.1/**/DebugConfig/
+
+# PlatformIO build (audio reference project)
+audio参考项目/.pio/
+audio参考项目/build/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Misc
+*.bak
+*.tmp
