@@ -33,3 +33,21 @@ RideWind/macos/Pods/
 # ESPtest build
 ESPtest/build/
 ESPtest/.cache/
+
+# Keil MDK build artifacts (legacy STM32 reference)
+f4_26_1.1/**/Objects/
+f4_26_1.1/**/Listings/
+f4_26_1.1/**/*.uvguix.*
+f4_26_1.1/**/DebugConfig/
+
+# PlatformIO build (audio reference project)
+audio参考项目/.pio/
+audio参考项目/build/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Misc
+*.bak
+*.tmp

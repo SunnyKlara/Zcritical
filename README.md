@@ -32,26 +32,35 @@ Flutter 跨平台应用，支持 Android / iOS。
 ## 项目结构
 
 ```
-├── ridewind-esp/          ESP32-S3 固件（C, ESP-IDF v5.3.5）
+├── .kiro/
+│   ├── steering/              AI 协作文档体系
+│   │   ├── START-HERE.md      唯一入口（新对话从这里开始）
+│   │   ├── specs/             不可变约束（协议真值源）
+│   │   ├── guides/            操作指南（AI行为、构建命令）
+│   │   └── knowledge/         知识传承（教训、决策、架构设计）
+│   └── specs/                 已完成的 Kiro Specs（历史参考）
+│
+├── ridewind-esp/              ESP32-S3 固件（C, ESP-IDF v5.3.5）
 │   └── main/
-│       ├── drivers/       硬件驱动（LCD、LED、编码器、PWM、I2S、GPIO）
-│       ├── services/      BLE、协议解析、WiFi音频、音频引擎、NVS存储
-│       ├── app/           应用逻辑（状态管理、灯效、编码器事件）
-│       ├── ui/            LCD菜单状态机（速度/预设/RGB/亮度/音量/Logo）
-│       └── config/        引脚定义、板级配置、预设颜色
+│       ├── drivers/           硬件驱动（LCD、LED、编码器、PWM、I2S、GPIO）
+│       ├── services/          BLE、协议解析、WiFi音频、音频引擎、NVS存储
+│       ├── app/               应用逻辑（状态管理、灯效、编码器事件）
+│       ├── ui/                LCD菜单状态机（速度/预设/RGB/亮度/音量/Logo）
+│       └── config/            引脚定义、板级配置、预设颜色
 │
-├── RideWind/              Flutter APP（Dart）
+├── RideWind/                  Flutter APP（Dart）
 │   └── lib/
-│       ├── protocol/      BLE协议层（解析、命令发送、响应路由、错误映射）
-│       ├── services/      BLE底层、音频投射、Logo传输、OTA、固件更新
-│       ├── providers/     状态管理（BluetoothProvider）
-│       ├── controllers/   业务逻辑控制器
-│       ├── screens/       页面（启动页、扫描、连接控制、Logo管理、OTA...）
-│       ├── widgets/       可复用组件
-│       └── models/        数据模型
+│       ├── protocol/          BLE协议层（解析、命令发送、响应路由、错误映射）
+│       ├── services/          BLE底层、音频投射、Logo传输、OTA、固件更新
+│       ├── providers/         状态管理（BluetoothProvider）
+│       ├── controllers/       业务逻辑控制器
+│       ├── screens/           页面（启动页、扫描、连接控制、Logo管理、OTA...）
+│       ├── widgets/           可复用组件
+│       └── models/            数据模型
 │
-├── f4_26_1.1/             旧版 STM32F405 固件（仅参考）
-└── CONTINUATION_GUIDE.md  开发文档
+├── f4_26_1.1/                 旧版 STM32F405 固件（仅参考）
+├── CONTINUATION_GUIDE.md      Session Handoff（当前状态 + 下一步）
+└── DEBUG_PLAN.md              真机调试计划
 ```
 
 ## 通信协议
@@ -65,7 +74,7 @@ Flutter 跨平台应用，支持 Android / iOS。
 
 支持的控制：风扇速度、LED 预设/RGB/亮度、流水灯、雾化器、音量、速度单位、油门模式、LCD 开关、WiFi 配置、Logo 上传、OTA 升级。
 
-详细协议表见 [CONTINUATION_GUIDE.md](CONTINUATION_GUIDE.md)。
+详细协议表见 [protocol-contract.md](.kiro/steering/specs/protocol-contract.md)。
 
 ## 构建
 
