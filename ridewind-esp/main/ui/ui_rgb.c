@@ -241,8 +241,8 @@ void ui_rgb_update(void)
             int16_t delta = evt.delta;
 
             if (mode == 0) {
-                /* ── Mode 0: select strip ── */
-                int8_t s = g_app_state.ui3_strip + (delta > 0 ? 1 : -1);
+                /* ── Mode 0: select strip (D14: reversed direction) ── */
+                int8_t s = g_app_state.ui3_strip + (delta > 0 ? -1 : 1);
                 if (s < 0) s = 3;
                 if (s > 3) s = 0;
                 g_app_state.ui3_strip = s;
@@ -256,8 +256,8 @@ void ui_rgb_update(void)
                 esp_deng(1, strip);
 
             } else if (mode == 1) {
-                /* ── Mode 1: select channel ── */
-                int8_t c = g_app_state.ui3_channel + (delta > 0 ? 1 : -1);
+                /* ── Mode 1: select channel (D14: reversed direction) ── */
+                int8_t c = g_app_state.ui3_channel + (delta > 0 ? -1 : 1);
                 if (c < 0) c = 2;
                 if (c > 2) c = 0;
                 g_app_state.ui3_channel = c;
@@ -273,7 +273,7 @@ void ui_rgb_update(void)
                 /* ── Mode 2: adjust value ── */
                 uint8_t chan = g_app_state.ui3_channel;
                 int16_t val = g_app_state.led_edit[strip][chan];
-                val += delta * 2;
+                val -= delta * 2;  /* D14: reversed direction */
                 if (val < 0) val = 0;
                 if (val > 255) val = 255;
                 g_app_state.led_edit[strip][chan] = val;

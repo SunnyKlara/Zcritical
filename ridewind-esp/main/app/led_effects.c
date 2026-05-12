@@ -123,8 +123,14 @@ static void streamlight_process(void)
 {
     if (!s_streamlight_running) return;
 
+    /* ── Wind-reactive period: faster LED motion at higher fan speed ── */
+    /* speed 0..100 → period 30ms..6ms (linear inverse) */
+    uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
+    if (spd > 100) spd = 100;
+    uint32_t period_ms = STREAMLIGHT_PERIOD_MS - ((STREAMLIGHT_PERIOD_MS - 6) * spd / 100);
+
     uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    if (now - s_streamlight_tick < STREAMLIGHT_PERIOD_MS) return;
+    if (now - s_streamlight_tick < period_ms) return;
     s_streamlight_tick = now;
 
     uint8_t curr_idx = g_app_state.streamlight_color_idx;
@@ -144,7 +150,34 @@ static void streamlight_process(void)
     uint8_t g2 = curr->rg + (int16_t)(next->rg - curr->rg) * phase / STREAMLIGHT_INTERP_STEPS;
     uint8_t b2 = curr->rb + (int16_t)(next->rb - curr->rb) * phase / STREAMLIGHT_INTERP_STEPS;
 
-    /* Store interpolated colors for LCD sync (F4: lcd_pei_se_realtime) */
+    /* ── Wind-reactive brightness: speed 0..100 → scale 50%..100% ──
+     * Throttle mode: add 4Hz pulse on top (±15%) for racing intensity. */
+    uint16_t bright_scale = 128 + (128 * spd / 100);   /* 128..256 (0.5..1.0 in Q8) */
+
+    if (g_app_state.wuhuaqi_state == 2) {
+        /* 4Hz sine pulse ≈ 250ms period. Phase drives via streamlight_tick. */
+        static uint16_t s_pulse_phase = 0;
+        s_pulse_phase += (period_ms * 6283UL / 250) >> 8;  /* scale to Q4 approx */
+        /* Simple triangular pulse (avoid sinf() dependency): 0..64..0 over 2π */
+        uint16_t p = s_pulse_phase & 0xFF;
+        int16_t pulse = (p < 128) ? (int16_t)p : (int16_t)(255 - p);  /* 0..128..0 */
+        /* Map to ±38 (±15% of 256) */
+        int16_t pulse_delta = (pulse - 64) * 38 / 64;
+        int32_t scaled = (int32_t)bright_scale + pulse_delta;
+        if (scaled < 64) scaled = 64;
+        if (scaled > 256) scaled = 256;
+        bright_scale = (uint16_t)scaled;
+    }
+
+    /* Apply brightness scale to computed colors (Q8 multiplication) */
+    uint8_t br1 = (uint8_t)((uint16_t)r1 * bright_scale >> 8);
+    uint8_t bg1 = (uint8_t)((uint16_t)g1 * bright_scale >> 8);
+    uint8_t bb1 = (uint8_t)((uint16_t)b1 * bright_scale >> 8);
+    uint8_t br2 = (uint8_t)((uint16_t)r2 * bright_scale >> 8);
+    uint8_t bg2 = (uint8_t)((uint16_t)g2 * bright_scale >> 8);
+    uint8_t bb2 = (uint8_t)((uint16_t)b2 * bright_scale >> 8);
+
+    /* Store interpolated (raw, not scaled) colors for LCD sync */
     g_app_state.streamlight_r1 = r1;
     g_app_state.streamlight_g1 = g1;
     g_app_state.streamlight_b1 = b1;
@@ -153,10 +186,10 @@ static void streamlight_process(void)
     g_app_state.streamlight_b2 = b2;
     g_app_state.streamlight_lcd_dirty = 1;
 
-    /* Apply to strips: Main+Left get color1, Right+Tail get color2 */
-    drv_led_set_strip_color(LED_STRIP_MAIN, r1, g1, b1);
-    drv_led_set_strip_color(LED_STRIP_LEFT, r1, g1, b1);
-    drv_led_set_strip_color(LED_STRIP_RIGHT, r2, g2, b2);
+    /* Apply brightness-scaled colors to strips */
+    drv_led_set_strip_color(LED_STRIP_MAIN, br1, bg1, bb1);
+    drv_led_set_strip_color(LED_STRIP_LEFT, br1, bg1, bb1);
+    drv_led_set_strip_color(LED_STRIP_RIGHT, br2, bg2, bb2);
     /* Tail stays static during streamlight (matching STM32 behavior) */
     drv_led_refresh();
 

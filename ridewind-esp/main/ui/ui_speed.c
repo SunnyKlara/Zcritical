@@ -184,15 +184,31 @@ void ui_speed_update(void)
         encoder_event_t evt;
         while (drv_encoder_poll(&evt)) {
             if (evt.type == ENC_EVT_ROTATE) {
+                /* Exit throttle mode — preserve current speed as normal-mode value.
+                 * No decay, no reset; fan PWM stays at current_speed_kmh. */
                 s_throttle_mode = 0;
                 g_app_state.wuhuaqi_state = g_app_state.wuhuaqi_state_saved;
-                g_app_state.fan_speed = 0;
-                g_app_state.current_speed_kmh = 0;
-                drv_pwm_set_duty(0);
+                /* Keep current_speed_kmh as-is, sync fan_speed to it */
+                uint8_t fan = (uint8_t)g_app_state.current_speed_kmh;
+                if (fan > 100) fan = 100;
+                g_app_state.fan_speed = fan;
+                drv_pwm_set_duty(fan);
                 if (g_app_state.wuhuaqi_state == 0)
                     drv_gpio_set_humidifier(false);
                 audio_engine_set_throttle_mode(false);
+                /* Stop engine sound if speed dropped to 0 already */
+                if (g_app_state.current_speed_kmh == 0 && audio_player_is_playing()) {
+                    audio_player_stop_engine();
+                }
                 ble_service_notify_str("THROTTLE_REPORT:0\n");
+                {
+                    char buf[48];
+                    int16_t disp = g_app_state.speed_unit == 0
+                        ? (int16_t)(g_app_state.current_speed_kmh * 3.4f + 0.5f)
+                        : (int16_t)(g_app_state.current_speed_kmh * 3.4f * 0.621371f + 0.5f);
+                    snprintf(buf, sizeof(buf), "SPEED_REPORT:%d:%d\n", disp, g_app_state.speed_unit);
+                    ble_service_notify_str(buf);
+                }
                 break;
             }
         }
@@ -236,20 +252,7 @@ void ui_speed_update(void)
             break;
 
         case ENC_EVT_CLICK:
-            g_app_state.speed_unit ^= 1;
-            {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "UNIT_REPORT:%d\n", g_app_state.speed_unit);
-                ble_service_notify_str(buf);
-            }
-            break;
-
-        case ENC_EVT_DOUBLE_CLICK:
-            audio_player_stop_engine();
-            ui_manager_set_ui(5);
-            return;
-
-        case ENC_EVT_TRIPLE_CLICK:
+            /* Enter throttle mode */
             s_throttle_mode = 1;
             g_app_state.wuhuaqi_state_saved = g_app_state.wuhuaqi_state;
             g_app_state.wuhuaqi_state = 2;
@@ -257,8 +260,26 @@ void ui_speed_update(void)
             g_app_state.throttle_initialized = 1;
             drv_gpio_set_humidifier(true);
             audio_engine_set_throttle_mode(true);
+            /* B1: Idle fan push for visible mist flow — starts at 10% when
+             * entering throttle from a stopped state. Gives users instant
+             * visual feedback that throttle mode is active. */
+            if (g_app_state.current_speed_kmh == 0) {
+                g_app_state.current_speed_kmh = 10;
+                g_app_state.fan_speed = 10;
+                drv_pwm_set_duty(10);
+            }
+            /* Ensure engine sound is running for throttle */
+            if (!audio_player_is_playing()) {
+                audio_player_start_engine();
+            }
+            audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
             ble_service_notify_str("THROTTLE_REPORT:1\n");
             break;
+
+        case ENC_EVT_DOUBLE_CLICK:
+            audio_player_stop_engine();
+            ui_manager_set_ui(5);
+            return;
 
         default: break;
         }

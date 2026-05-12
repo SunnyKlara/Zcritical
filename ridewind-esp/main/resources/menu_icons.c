@@ -43,10 +43,7 @@ const menu_page_info_t menu_pages[MENU_PAGE_COUNT] = {
     /* 4 — Logo */
     { (const uint16_t *)gImage_logotubiao,       68, 68,
       (const uint16_t *)gImage_logo,             79, 33, 6 },
-    /* 5 — Volume */
-    { (const uint16_t *)gImage_voicetubiao,      73, 58,
-      (const uint16_t *)gImage_voice,            90, 27, 7 },
-    /* 6 — Treadmill (placeholder: reuses Speed icon, needs custom icon) */
+    /* 5 — Treadmill (placeholder: reuses Speed icon, needs custom icon) */
     { (const uint16_t *)gImage_fengsu_68_58,     68, 58,
       (const uint16_t *)gImage_speed_99_33,      99, 33, 8 },
 };
