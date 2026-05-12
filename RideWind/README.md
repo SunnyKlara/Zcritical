@@ -65,7 +65,7 @@ lib/
 - 响应格式: `OK:COMMAND\r\n` (ESP32 → APP)
 - 事件上报: `EVENT_REPORT:data\n` (ESP32 → APP)
 
-完整协议文档: [PROTOCOL_SPECIFICATION.md](PROTOCOL_SPECIFICATION.md)
+完整协议文档: [protocol-contract.md](../.kiro/steering/specs/protocol-contract.md)
 
 ## 开发
 

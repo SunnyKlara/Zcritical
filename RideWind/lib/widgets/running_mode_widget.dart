@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math'; // 🚀 用于乱序加速
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1015,7 +1015,7 @@ class RunningModeWidgetState extends State<RunningModeWidget>
           top: 0,
           left: 0,
           right: 0,
-          bottom: config.bottomButtonAreaHeight,
+          bottom: 0,  /* D9 fix: fill entire area, no black gap at bottom */
           child: Center(
             child: SizedBox(
               height: wheelHeight,

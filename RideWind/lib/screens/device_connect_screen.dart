@@ -22,16 +22,14 @@ import '../widgets/colorize_rgb_detail_view.dart';
 import 'no_device_screen.dart';
 import 'logo_management_screen.dart';
 import 'audio_management_screen.dart';
-import 'dev_test_screen.dart';
 import 'ota_upgrade_screen.dart';
 import 'audio_stream_screen.dart';
 
-/// 核心控制页面 — 3505行，正在渐进式拆分中
+/// 核心控制页面 — 正在渐进式拆分中
 ///
-/// 包含 3 个模式（PageView 左右滑动切换）：
-///   index=0: DevTest Mode（开发调试）
-///   index=1: Running Mode（速度/油门控制，默认）
-///   index=2: Colorize Mode（LED预设/RGB调色/流水灯）
+/// 包含 2 个模式（PageView 左右滑动切换）：
+///   index=0: Running Mode（速度/油门控制，默认）
+///   index=1: Colorize Mode（LED预设/RGB调色/流水灯）
 ///
 /// 已提取到独立文件：
 ///   - _DeviceConnectConfig → configs/device_connect_config.dart（typedef桥接）
@@ -46,7 +44,6 @@ import 'audio_stream_screen.dart';
 // ║          🔄 控制模式枚举（3个模式）                            ║
 // ╚══════════════════════════════════════════════════════════════╝
 enum ControlMode {
-  devTest, // 🧪 开发测试模式（最左侧）
   running, // Running Mode - 速度/油门控制（默认）
   colorize, // Colorize Mode - LED颜色控制（右滑进入）
 }
@@ -72,7 +69,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   // ╚══════════════════════════════════════════════════════════════╝
 
   // ========== 🏠 页面状态（简化：直接进入模式界面）==========
-  int _currentModeIndex = 1; // 0=devTest, 1=running(默认), 2=colorize
+  int _currentModeIndex = 0; // 0=running(默认), 1=colorize
   late PageController _modePageController; // 模式页面滑动控制器
 
   // ========== 🌬️ 雾化器状态 ==========
@@ -135,10 +132,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   ControlMode get _currentMode {
     switch (_currentModeIndex) {
       case 0:
-        return ControlMode.devTest;
-      case 1:
         return ControlMode.running;
-      case 2:
+      case 1:
         return ControlMode.colorize;
       default:
         return ControlMode.running;
@@ -837,8 +832,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     ).then((_) {
       // 返回后恢复硬件UI
       if (mounted && btProvider.isConnected && _lastSentHardwareUI == 6) {
-        // 0=devTest(不改变), 1=running(UI=1), 2=colorize(UI=2)
-        final targetUI = _currentModeIndex == 1 ? 1 : (_currentModeIndex == 2 ? 2 : _lastSentHardwareUI);
+        // 0=running(UI=1), 1=colorize(UI=2)
+        final targetUI = _currentModeIndex == 0 ? 1 : 2;
         if (targetUI != 6) {
           btProvider.setHardwareUI(targetUI);
           _lastSentHardwareUI = targetUI;
@@ -1220,25 +1215,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             ),
           ),
 
-        // ========== 🧪 调试：引导系统触发按钮（仅 Dev Test 页面可见）==========
-        if (_currentModeIndex == 0)
-          Positioned(
-            bottom: 40,
-            left: 16,
-            right: 16,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildDebugGuideButton('Running 引导', Icons.directions_car, () {
-                  _debugResetAndShowGuide(GuideType.runningMode);
-                }),
-                const SizedBox(width: 12),
-                _buildDebugGuideButton('Colorize 引导', Icons.palette, () {
-                  _debugResetAndShowGuide(GuideType.colorizeMode);
-                }),
-              ],
-            ),
-          ),
+
       ],
     );
   }
@@ -1246,8 +1223,6 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   /// 获取背景图（根据当前模式和状态）
   String _getBackgroundImage() {
     switch (_currentMode) {
-      case ControlMode.devTest:
-        return 'assets/images/running_mode_no_text.png'; // 测试模式使用默认背景
       case ControlMode.running:
         return 'assets/images/running_mode_no_text.png';
       case ControlMode.colorize:
@@ -1295,7 +1270,6 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         }
       },
       children: [
-        DevTestScreen(isVisible: _currentModeIndex == 0), // 🧪 开发测试界面（最左侧）
         _buildRunningModeContent(config),
         _buildColorizeModeContent(config),
       ],
@@ -1351,7 +1325,6 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         externalUnitStream: btProvider.unitReportStream,
         connectionStream: btProvider.connectionStream,
         isConnected: btProvider.isConnected,
-        rawDataStream: btProvider.rawDataStream,
         onKeysReady: (keys) {
           setState(() {
             _runningModeKeys = keys;
@@ -1414,7 +1387,6 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           await btProvider.setFanSpeed(0);
         },
         onSpeedControlVisibilityChanged: null, // 🔑 不需要这个回调了
-        debugMode: _debugMode,
           );
         },
       );
