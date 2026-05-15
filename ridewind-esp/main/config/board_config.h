@@ -43,8 +43,8 @@
 #define ENCODER_POLL_PERIOD_MS      20
 
 /* Button detection */
-#define BUTTON_TIMEOUT_MS           400
-#define LONG_PRESS_MS               800
+#define BUTTON_TIMEOUT_MS           250
+#define LONG_PRESS_MS               600
 
 /* LED effects */
 #define LED_GRADIENT_PERIOD_MS      20

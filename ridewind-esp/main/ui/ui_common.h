@@ -33,6 +33,15 @@ void ui_draw_f4_background(void);
 void ui_draw_large_digit(uint16_t x, uint16_t y, uint8_t digit);
 
 /**
+ * @brief  Draw a large digit with color tinting (for throttle mode).
+ *         Applies tint_color to the white digit bitmap proportionally.
+ * @param  x, y       Position
+ * @param  digit      0-9
+ * @param  tint_color RGB565 color to apply
+ */
+void ui_draw_large_digit_tinted(uint16_t x, uint16_t y, uint8_t digit, uint16_t tint_color);
+
+/**
  * @brief  Get the width of a large digit image.
  */
 uint8_t ui_large_digit_width(uint8_t digit);
@@ -51,6 +60,10 @@ void ui_draw_large_number_right(uint16_t right_x, uint16_t y,
 /* Internal: signed jianju version matching F4 exactly */
 void ui_draw_large_number_right_ex(uint16_t right_x, uint16_t y,
                                     uint16_t num, int8_t jianju);
+
+/* Tinted version for throttle mode (colored digits) */
+void ui_draw_large_number_tinted_ex(uint16_t right_x, uint16_t y,
+                                     uint16_t num, int8_t jianju, uint16_t tint_color);
 
 /**
  * @brief  Draw F4 status indicator LED (12x21 pixel image).

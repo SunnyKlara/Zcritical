@@ -77,6 +77,45 @@ void ui_draw_large_digit(uint16_t x, uint16_t y, uint8_t digit)
                      s_large_digit_data[digit]);
 }
 
+/* ── Tinted digit rendering for throttle mode ── */
+
+/* Static buffer for tinted digit (max 51×53×2 = 5406 bytes) */
+static uint16_t s_tint_buf[51 * 53];
+
+void ui_draw_large_digit_tinted(uint16_t x, uint16_t y, uint8_t digit, uint16_t tint_color)
+{
+    if (digit > 9) return;
+    uint8_t w = s_large_digit_width[digit];
+    uint16_t h = F4_SPEED_NUM_HIGH;
+    uint32_t pixel_count = (uint32_t)w * h;
+    const uint16_t *src = (const uint16_t *)s_large_digit_data[digit];
+
+    /* Extract tint RGB components (5-6-5) */
+    uint8_t tr = (tint_color >> 11) & 0x1F;
+    uint8_t tg = (tint_color >> 5) & 0x3F;
+    uint8_t tb = tint_color & 0x1F;
+
+    /* Tint: for each pixel, use its brightness to scale the tint color.
+     * Original digits are white-on-black, so brightness = max(r,g,b).
+     * Black pixels (0x0000) stay black. White pixels get the tint color. */
+    for (uint32_t i = 0; i < pixel_count; i++) {
+        uint16_t px = src[i];
+        if (px == 0x0000) {
+            s_tint_buf[i] = 0x0000;
+        } else {
+            /* Extract source brightness (use green channel as proxy, 6-bit) */
+            uint8_t sg = (px >> 5) & 0x3F;
+            /* Scale tint by brightness (sg/63) */
+            uint8_t r = (uint8_t)((uint16_t)tr * sg / 63);
+            uint8_t g = (uint8_t)((uint16_t)tg * sg / 63);
+            uint8_t b = (uint8_t)((uint16_t)tb * sg / 63);
+            s_tint_buf[i] = (r << 11) | (g << 5) | b;
+        }
+    }
+
+    drv_lcd_blit_rgb565(x, y, w, h, s_tint_buf);
+}
+
 void ui_draw_large_number_right(uint16_t right_x, uint16_t y,
                                 uint16_t num, uint8_t spacing)
 {
@@ -129,6 +168,51 @@ void ui_draw_large_number_right_ex(uint16_t right_x, uint16_t y,
     } else {
         int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
         ui_draw_large_digit((uint16_t)x1, y, d_c);
+    }
+}
+
+/* Tinted version: same layout as above but uses colored digits */
+void ui_draw_large_number_tinted_ex(uint16_t right_x, uint16_t y,
+                                     uint16_t num, int8_t jianju, uint16_t tint_color)
+{
+    uint8_t d_a, d_b, d_c, count;
+
+    if (num >= 100) {
+        d_a = num / 100;
+        d_b = (num % 100) / 10;
+        d_c = num % 10;
+        count = 3;
+    } else if (num >= 10) {
+        d_a = 0;
+        d_b = num / 10;
+        d_c = num % 10;
+        count = 2;
+    } else {
+        d_a = 0;
+        d_b = 0;
+        d_c = num;
+        count = 1;
+    }
+
+    uint8_t w_a = s_large_digit_width[d_a];
+    uint8_t w_b = s_large_digit_width[d_b];
+    uint8_t w_c = s_large_digit_width[d_c];
+
+    if (count == 3) {
+        int16_t x3 = (int16_t)right_x - w_a - w_b - w_c - jianju * 3;
+        int16_t x2 = (int16_t)right_x - w_b - w_c - jianju * 2;
+        int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
+        ui_draw_large_digit_tinted((uint16_t)x3, y, d_a, tint_color);
+        ui_draw_large_digit_tinted((uint16_t)x2, y, d_b, tint_color);
+        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
+    } else if (count == 2) {
+        int16_t x2 = (int16_t)right_x - w_b - w_c - jianju * 2;
+        int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
+        ui_draw_large_digit_tinted((uint16_t)x2, y, d_b, tint_color);
+        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
+    } else {
+        int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
+        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
     }
 }
 

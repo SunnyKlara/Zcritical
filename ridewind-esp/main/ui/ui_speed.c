@@ -26,6 +26,34 @@ static int16_t  s_last_speed = -1;
 static uint8_t  s_last_unit = 0xFF;
 static uint8_t  s_last_wuhuaqi = 0xFF;
 static uint8_t  s_throttle_mode = 0;
+static uint8_t  s_last_throttle_draw = 0;  /* Was last number draw in throttle mode? */
+
+static uint8_t s_last_throttle_bar = 0;  /* Last drawn bar width (0=none) */
+
+/* Speed-to-color mapping for throttle mode.
+ * Cool-to-warm gradient inspired by Tixing:
+ *   0%  = Cool blue-white  (180, 210, 255) — calm, idle
+ *   50% = Warm white       (255, 240, 200) — mid acceleration
+ *   100% = Hot amber-orange (255, 160, 60)  — full throttle
+ * Avoids saturated primary colors for a refined, non-garish look. */
+static uint16_t speed_color_565(uint8_t percent)
+{
+    uint8_t r, g, b;
+    if (percent <= 50) {
+        /* Cool blue-white (180,210,255) → Warm white (255,240,200) */
+        uint16_t t = (uint16_t)percent * 2;  /* 0-100 */
+        r = (uint8_t)(180 + (255 - 180) * t / 100);
+        g = (uint8_t)(210 + (240 - 210) * t / 100);
+        b = (uint8_t)(255 + (200 - 255) * t / 100);
+    } else {
+        /* Warm white (255,240,200) → Hot amber (255,160,60) */
+        uint16_t t = (uint16_t)(percent - 50) * 2;  /* 0-100 */
+        r = 255;
+        g = (uint8_t)(240 + (160 - 240) * t / 100);
+        b = (uint8_t)(200 + (60 - 200) * t / 100);
+    }
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
 
 static void draw_speed_screen(void)
 {
@@ -82,11 +110,19 @@ static void draw_speed_screen(void)
     }
 
     /* Partial: number only — clear matches F4 exactly */
-    if (display_spd != s_last_speed) {
+    if (display_spd != s_last_speed || s_throttle_mode != s_last_throttle_draw) {
         drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
-        ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
-                                      (uint16_t)display_spd, F4_JIANJU);
+        if (s_throttle_mode) {
+            /* Throttle mode: draw tinted number (color changes with speed) */
+            uint16_t tint = speed_color_565((uint8_t)g_app_state.current_speed_kmh);
+            ui_draw_large_number_tinted_ex(F4_X_QI, F4_Y_QI,
+                                           (uint16_t)display_spd, F4_JIANJU, tint);
+        } else {
+            ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
+                                          (uint16_t)display_spd, F4_JIANJU);
+        }
         s_last_speed = display_spd;
+        s_last_throttle_draw = s_throttle_mode;
     }
 
     /* Partial: unit label + LED */
@@ -141,14 +177,11 @@ static void throttle_process(void)
             audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
 
             if (g_app_state.current_speed_kmh == 0) {
-                s_throttle_mode = 0;
-                g_app_state.wuhuaqi_state = g_app_state.wuhuaqi_state_saved;
+                /* Speed hit zero — stay in throttle mode, just idle.
+                 * User can press again to accelerate, or rotate encoder to exit.
+                 * This prevents accidental exit when user releases briefly. */
                 g_app_state.fan_speed = 0;
                 drv_pwm_set_duty(0);
-                if (g_app_state.wuhuaqi_state == 0)
-                    drv_gpio_set_humidifier(false);
-                ble_service_notify_str("THROTTLE_REPORT:0\n");
-                audio_engine_set_throttle_mode(false);
             }
         }
     }
@@ -181,6 +214,10 @@ void ui_speed_update(void)
 
     /* Throttle mode */
     if (s_throttle_mode) {
+        /* Throttle mode event handling:
+         * - ROTATE: exit throttle, return to normal mode
+         * - DOUBLE_CLICK: exit throttle AND go to menu
+         * - All other button events: ignored (throttle uses raw GPIO) */
         encoder_event_t evt;
         while (drv_encoder_poll(&evt)) {
             if (evt.type == ENC_EVT_ROTATE) {
@@ -211,6 +248,23 @@ void ui_speed_update(void)
                 }
                 break;
             }
+            if (evt.type == ENC_EVT_DOUBLE_CLICK) {
+                /* Double click in throttle: exit throttle + go to menu */
+                s_throttle_mode = 0;
+                g_app_state.wuhuaqi_state = g_app_state.wuhuaqi_state_saved;
+                g_app_state.current_speed_kmh = 0;
+                g_app_state.fan_speed = 0;
+                drv_pwm_set_duty(0);
+                if (g_app_state.wuhuaqi_state == 0)
+                    drv_gpio_set_humidifier(false);
+                audio_engine_set_throttle_mode(false);
+                audio_player_stop_engine();
+                ble_service_notify_str("THROTTLE_REPORT:0\n");
+                ui_manager_set_ui(5);
+                return;
+            }
+            /* PRESS, RELEASE, CLICK, LONG_PRESS — ignored.
+             * Throttle acceleration uses raw GPIO in throttle_process(). */
         }
         if (s_throttle_mode) {
             throttle_process();
@@ -219,7 +273,16 @@ void ui_speed_update(void)
         return;
     }
 
-    /* Normal mode */
+    /* Normal mode
+     * ─────────────────────────────────────────────────────────────
+     * Button behavior:
+     *   CLICK (short press)  → Enter throttle mode (油门模式)
+     *   LONG_PRESS (hold)    → Toggle atomizer (雾化器) on/off
+     *   DOUBLE_CLICK         → Switch to menu/treadmill screen
+     * Key distinction: the encoder driver already separates click
+     * (release within BUTTON_TIMEOUT_MS) from long press (held ≥
+     * LONG_PRESS_MS). Throttle mode uses raw GPIO for acceleration.
+     * ───────────────────────────────────────────────────────────── */
     encoder_event_t evt;
     while (drv_encoder_poll(&evt)) {
         switch (evt.type) {
@@ -229,6 +292,14 @@ void ui_speed_update(void)
             if (g_app_state.current_speed_kmh > 100) g_app_state.current_speed_kmh = 100;
             g_app_state.fan_speed = (uint8_t)g_app_state.current_speed_kmh;
             drv_pwm_set_duty(g_app_state.fan_speed);
+
+            /* Fan power: GPIO10 (humidifier MOS) also powers the fan circuit.
+             * Turn on when speed > 0, off when speed = 0 (unless atomizer is on). */
+            if (g_app_state.current_speed_kmh > 0) {
+                drv_gpio_set_humidifier(true);
+            } else if (g_app_state.wuhuaqi_state == 0) {
+                drv_gpio_set_humidifier(false);
+            }
 
             /* Engine sound: start when speed goes above 0, stop when it hits 0 */
             if (g_app_state.current_speed_kmh > 0) {
@@ -252,7 +323,8 @@ void ui_speed_update(void)
             break;
 
         case ENC_EVT_CLICK:
-            /* Enter throttle mode */
+            /* Short press → Enter throttle mode (油门模式)
+             * Throttle mode: hold button = accelerate, release = decelerate */
             s_throttle_mode = 1;
             g_app_state.wuhuaqi_state_saved = g_app_state.wuhuaqi_state;
             g_app_state.wuhuaqi_state = 2;
@@ -260,20 +332,32 @@ void ui_speed_update(void)
             g_app_state.throttle_initialized = 1;
             drv_gpio_set_humidifier(true);
             audio_engine_set_throttle_mode(true);
-            /* B1: Idle fan push for visible mist flow — starts at 10% when
-             * entering throttle from a stopped state. Gives users instant
-             * visual feedback that throttle mode is active. */
             if (g_app_state.current_speed_kmh == 0) {
                 g_app_state.current_speed_kmh = 10;
                 g_app_state.fan_speed = 10;
                 drv_pwm_set_duty(10);
             }
-            /* Ensure engine sound is running for throttle */
             if (!audio_player_is_playing()) {
                 audio_player_start_engine();
             }
             audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
             ble_service_notify_str("THROTTLE_REPORT:1\n");
+            break;
+
+        case ENC_EVT_LONG_PRESS:
+            /* Long press in normal mode → Toggle atomizer (雾化器)
+             * Only toggles on/off; does NOT enter throttle mode */
+            if (g_app_state.wuhuaqi_state == 0) {
+                /* Turn atomizer ON */
+                g_app_state.wuhuaqi_state = 1;
+                drv_gpio_set_humidifier(true);
+                ble_service_notify_str("ATOMIZER:ON\n");
+            } else if (g_app_state.wuhuaqi_state == 1) {
+                /* Turn atomizer OFF */
+                g_app_state.wuhuaqi_state = 0;
+                drv_gpio_set_humidifier(false);
+                ble_service_notify_str("ATOMIZER:OFF\n");
+            }
             break;
 
         case ENC_EVT_DOUBLE_CLICK:
