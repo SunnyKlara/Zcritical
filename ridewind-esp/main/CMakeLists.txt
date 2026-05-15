@@ -28,6 +28,7 @@ idf_component_register(
         "app/encoder_handler.c"
         "resources/menu_icons.c"
         "resources/ui_images.c"
+        "resources/colored_digits.c"
         "resources/boot_logo_240.c"
     INCLUDE_DIRS
         "."
