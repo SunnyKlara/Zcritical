@@ -1,12 +1,15 @@
 # Critical T1 — Session Handoff
 
-<!-- last-verified: 2026-05-12 -->
+<!-- last-verified: 2026-05-15 -->
 
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 
-## 当前阶段：APP 架构重构 → 真机联调
+## 当前阶段：体验打磨期
 
-固件已完成，APP 协议层已重构完毕。当前卡在 DeviceConnectScreen 瘦身和真机验证之间。
+软硬件功能全部跑通，逻辑正确，能用。用户实测后判断："产品没经过精雕细作，玩起来很多细节别扭"——
+进入打磨阶段，跟 bug 修复是两条并行工作流，不要混。
+
+DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题。
 
 ## 已完成
 
@@ -21,23 +24,73 @@
 
 ## 当前阻塞
 
-- **真机联调未开始** — 协议层完全重写后需要验证 BLE 通信是否正常
-- **DeviceConnectScreen 仍有 ~3500 行** — 待提取 ColorizeRGBDetailView (~700行) 和设备菜单 (~250行)
+- **待用户烧录验证** — 5 个文件已改（风扇PWM修复 + 油门不自动退出 + 按键时序优化 + 按键模式识别），未编译验证（无 ESP-IDF 环境）
+- **DeviceConnectScreen 仍 ~3500 行** — 暂缓，体验问题优先
 
 ## 下一步
 
-1. **P0 真机联调**（见 `DEBUG_PLAN.md` 第 1 轮）
-   - BLE 扫描发现 "T1" → 连接 → 自动状态同步
-   - 基础控制验证：风扇/LED/亮度/雾化器/音量
-   - 断线重连
-2. **P1 继续拆 DeviceConnectScreen**
-   - 提取 ColorizeRGBDetailView Widget
-   - 删除 Screen 中已迁移的旧变量/方法
-   - 提取设备菜单弹窗
-3. **P2 go_router 声明式路由**
-4. **P3 国际化 + CI/CD**
+1. **P0 体验打磨**（新方向）
+   - Round A：用户实玩，记 30-50 条体验问题（产出 `POLISH_PLAN.md` 或类似文件）
+   - Round B：AI 分类（硬件/APP/同步/视听），标位置和改动量
+   - Round C：按"高频 × 低成本"批量改，每批 3-5 条，烧录验证
+2. **P1 修真机 bug**（如果 Round A 中混进了 bug 类问题，导出到 DEBUG_PLAN）
+3. **P2 DeviceConnectScreen 拆分**
+4. **P3 OTA 实现**（main.c 当前返回 NOT_IMPL，上架前必修）
+5. **P4 go_router 声明式路由 + 国际化 + CI/CD**
 
 ## 本次对话决策
+
+- 2026-05-15：方向转向「体验打磨期」
+  - 用户实测后判断：功能跑通但"没经过精雕细作"，玩起来很多细节别扭
+  - 协作模式确立：用户以产品经理身份提需求，AI 深入理解后从专业角度设计实现。用户说了就是确认，不等二次确认
+  - 编译通过，烧录卡在 esptool 连接（用户需按 BOOT 键）
+  - 产品结构梳理：
+    - 软件 4 面板：跑步机(pace mode) / 风扇(running mode) / 主灯(color mode) / RGB调色(RGB)
+    - 硬件 6 界面：Speed / Color / RGB / Bright / Logo / Speed(跑步机)
+  - **Speed 界面设计探讨（待确认）**：
+    - 开机默认雾化器**开**（之前误改为关，需改回）
+    - 按键映射：单击=toggle 普通/油门模式，长按=toggle 雾化器
+    - 油门模式：按住加速，松开怠速（像驾驶）
+    - ✅ 已确认：油门模式下按住只做加速，长按不切雾化器（油门模式忽略所有事件，用原始 GPIO）
+    - ✅ 已确认：油门退出方式 → 旋转编码器退出
+  - **按键模式识别重构**（ui_speed.c）：
+    - 普通模式：CLICK（短按 <250ms）→ 进入油门模式
+    - 普通模式：LONG_PRESS（≥600ms）→ 开/关雾化器（toggle）
+    - 普通模式：DOUBLE_CLICK → 切换到菜单界面
+    - 油门模式：按住（GPIO 直读）→ 加速；松开 → 减速
+    - 油门模式：旋转编码器 → 退出油门模式
+    - 油门模式：双击 → 退出油门 + 切换到菜单界面
+    - 油门模式：速度降到 0 不退出，保持待命（只有旋转/双击退出）
+    - 关键：编码器驱动已有完善的状态机区分 click/long_press，UI 层只需正确响应事件
+  - **油门模式视觉区分**（ui_speed.c + ui_common.c）：
+    - 彩色大数字：油门模式下数字颜色随速度渐变（蓝→黄→红），普通模式白色
+    - 实现方式：`ui_draw_large_digit_tinted` — 遍历位图像素按亮度着色，~0.2ms/帧
+    - 数字下方 4px 彩色进度条作为辅助指示（可能和风速表横线冲突，待实测调整）
+    - 模式切换时强制重绘数字（`s_last_throttle_draw` 脏检测）
+    - 新增文件改动：`ui_common.c`（tinted digit + tinted number 函数）、`ui_common.h`（声明）
+  - **油门模式双击退出**：油门模式下双击 → 停止一切 → 切换到菜单界面
+  - 两个已改 bug：
+    - BUG-A 风扇上电自转：drv_pwm.c 加 GPIO 预拉低（已编译通过）
+    - BUG-B 油门长按失效：ui_speed.c 油门 poll 循环只响应 ROTATE（已编译通过）
+    - ⚠️ 雾化器默认值需改回 1（用户确认默认开）
+
+- 2026-05-15（第二轮）：烧录实测反馈 — 风扇不转 + 按键模式识别问题
+  - **BUG-C 风扇完全不转**：`drv_pwm.c` 中 `gpio_config()` 锁定了 GPIO matrix，LEDC 无法接管
+    - 修复：改用 `gpio_reset_pin()` + `gpio_set_direction()` + `gpio_set_level(0)`，让 LEDC 干净接管
+  - **BUG-D 油门模式速度降 0 自动退出**：CLICK 事件有 400ms 延迟，进入油门时按钮已松开，120ms 内速度从 10 降到 0 就退出了
+    - 修复：`throttle_process()` 中速度降到 0 不再退出油门模式，只停风扇。退出只能通过旋转编码器
+  - **按键时序优化**（board_config.h）：
+    - `BUTTON_TIMEOUT_MS`：400ms → 250ms（单击确认更快）
+    - `LONG_PRESS_MS`：800ms → 600ms（长按响应更快，和单击区分更明显）
+  - 改动文件：`drv_pwm.c`、`ui_speed.c`、`board_config.h`
+  - **BUG-E 风扇 GPIO 40 被 Octal PSRAM 占用**（发现根因）：
+    - `sdkconfig` 中 `CONFIG_SPIRAM_MODE_OCT=y`，Octal PSRAM 占用 GPIO 33-37 + DQS(GPIO 40)
+    - LEDC PWM 信号无法路由到 GPIO 40 → 风扇永远不转
+    - 开雾化器/进油门时风扇转是因为 GPIO 10 拉高（可能 PCB 上有电气关联）
+    - **已排除**：GPIO 40 不被 Octal PSRAM 占用（PSRAM 只用 33-37），GPIO 40 可用
+    - **真正原因**：之前加的 `gpio_config()` / `gpio_reset_pin()` 预处理代码干扰了 LEDC 引脚路由
+    - **修复**：去掉所有 GPIO 预配置，纯 LEDC 初始化（duty=0 即保证上电不转）
+    - 加了 `drv_pwm_set_duty` 调试日志，烧录后可从串口确认 PWM 是否被调用
 
 - 2026-05-12（第三轮）：文档审计 + Git 管理体系建立 + 历史补救提交
   - 审计发现：3400+ 未提交变更，仅 3 个 commit，无分支策略
@@ -69,8 +122,9 @@
 ## 编译状态
 
 ```
-ESP32 固件：idf.py build — ✅ 零错误（2026-04-30 最后验证）
-Flutter APP：flutter analyze — ✅ 通过（2026-04-30 最后验证）
+ESP32 固件：idf.py build — ✅ 零错误（2026-05-15 验证，3 文件改动后编译通过）
+  待烧录验证（esptool 连接失败，用户需按 BOOT 键或检查 COM 口）
+Flutter APP：flutter analyze — ✅ 通过（2026-04-30 最后验证，本次未改 APP）
 协议测试：flutter test test/protocol/ — ✅ 51/51 通过
 ```
 
