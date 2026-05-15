@@ -31,26 +31,27 @@ static uint8_t  s_last_throttle_draw = 0;  /* Was last number draw in throttle m
 static uint8_t s_last_throttle_bar = 0;  /* Last drawn bar width (0=none) */
 
 /* Speed-to-color mapping for throttle mode.
- * Cool-to-warm gradient inspired by Tixing:
- *   0%  = Cool blue-white  (180, 210, 255) — calm, idle
- *   50% = Warm white       (255, 240, 200) — mid acceleration
- *   100% = Hot amber-orange (255, 160, 60)  — full throttle
- * Avoids saturated primary colors for a refined, non-garish look. */
+ * Matches Tixing project exactly:
+ *   0%  = Blue    (0, 180, 255)
+ *   50% = Yellow  (255, 210, 80)
+ *   100% = Red    (255, 40, 30)
+ * The digit bitmaps have anti-aliased edges (gray pixels),
+ * so the tint preserves smooth gradients naturally. */
 static uint16_t speed_color_565(uint8_t percent)
 {
     uint8_t r, g, b;
     if (percent <= 50) {
-        /* Cool blue-white (180,210,255) → Warm white (255,240,200) */
+        /* Blue (0,180,255) → Yellow (255,210,80) */
         uint16_t t = (uint16_t)percent * 2;  /* 0-100 */
-        r = (uint8_t)(180 + (255 - 180) * t / 100);
-        g = (uint8_t)(210 + (240 - 210) * t / 100);
-        b = (uint8_t)(255 + (200 - 255) * t / 100);
+        r = (uint8_t)(0 + 255 * t / 100);
+        g = (uint8_t)(180 + (210 - 180) * t / 100);
+        b = (uint8_t)(255 - (255 - 80) * t / 100);
     } else {
-        /* Warm white (255,240,200) → Hot amber (255,160,60) */
+        /* Yellow (255,210,80) → Red (255,40,30) */
         uint16_t t = (uint16_t)(percent - 50) * 2;  /* 0-100 */
         r = 255;
-        g = (uint8_t)(240 + (160 - 240) * t / 100);
-        b = (uint8_t)(200 + (60 - 200) * t / 100);
+        g = (uint8_t)(210 - (210 - 40) * t / 100);
+        b = (uint8_t)(80 - (80 - 30) * t / 100);
     }
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
