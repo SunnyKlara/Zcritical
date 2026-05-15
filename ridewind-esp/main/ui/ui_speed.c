@@ -114,10 +114,11 @@ static void draw_speed_screen(void)
     if (display_spd != s_last_speed || s_throttle_mode != s_last_throttle_draw) {
         drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
         if (s_throttle_mode) {
-            /* Throttle mode: draw tinted number (color changes with speed) */
-            uint16_t tint = speed_color_565((uint8_t)g_app_state.current_speed_kmh);
-            ui_draw_large_number_tinted_ex(F4_X_QI, F4_Y_QI,
-                                           (uint16_t)display_spd, F4_JIANJU, tint);
+            /* Throttle mode: use pre-rendered colored digits (0-10 steps) */
+            uint8_t ci = (uint8_t)(g_app_state.current_speed_kmh / 10);
+            if (ci > 10) ci = 10;
+            ui_draw_large_number_colored_ex(F4_X_QI, F4_Y_QI,
+                                            (uint16_t)display_spd, F4_JIANJU, ci);
         } else {
             ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
                                           (uint16_t)display_spd, F4_JIANJU);
@@ -147,6 +148,34 @@ static void draw_speed_screen(void)
         ui_draw_f4_led(led_x, F4_SPEED_KMH_Y, led_state);
         s_last_unit = unit;
         s_last_wuhuaqi = wuhuaqi;
+    }
+
+    /* ── Throttle mode color bar (only visible in throttle mode) ── */
+    /* Position: above the wind gauge, below the number area */
+    #define THROTTLE_BAR_X      30
+    #define THROTTLE_BAR_Y      (F4_Y_QI + F4_SPEED_NUM_HIGH + 2)
+    #define THROTTLE_BAR_MAX_W  140
+    #define THROTTLE_BAR_H      3
+
+    if (s_throttle_mode) {
+        uint8_t bar_w = (uint8_t)((uint16_t)g_app_state.current_speed_kmh * THROTTLE_BAR_MAX_W / 100);
+        if (bar_w > THROTTLE_BAR_MAX_W) bar_w = THROTTLE_BAR_MAX_W;
+        uint16_t color = speed_color_565((uint8_t)g_app_state.current_speed_kmh);
+
+        if (bar_w != s_last_throttle_bar) {
+            drv_lcd_fill_rect(THROTTLE_BAR_X, THROTTLE_BAR_Y,
+                              THROTTLE_BAR_MAX_W, THROTTLE_BAR_H, 0x0000);
+            if (bar_w > 0) {
+                drv_lcd_fill_rect(THROTTLE_BAR_X, THROTTLE_BAR_Y,
+                                  bar_w, THROTTLE_BAR_H, color);
+            }
+            s_last_throttle_bar = bar_w;
+        }
+    } else if (s_last_throttle_bar > 0) {
+        /* Exited throttle — clear bar area */
+        drv_lcd_fill_rect(THROTTLE_BAR_X, THROTTLE_BAR_Y,
+                          THROTTLE_BAR_MAX_W, THROTTLE_BAR_H, 0x0000);
+        s_last_throttle_bar = 0;
     }
 }
 

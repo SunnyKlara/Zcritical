@@ -65,6 +65,11 @@ void ui_draw_large_number_right_ex(uint16_t right_x, uint16_t y,
 void ui_draw_large_number_tinted_ex(uint16_t right_x, uint16_t y,
                                      uint16_t num, int8_t jianju, uint16_t tint_color);
 
+/* Pre-rendered colored digits (color_index 0-10, matches Tixing gradient) */
+void ui_draw_large_digit_colored(uint16_t x, uint16_t y, uint8_t digit, uint8_t color_index);
+void ui_draw_large_number_colored_ex(uint16_t right_x, uint16_t y,
+                                      uint16_t num, int8_t jianju, uint8_t color_index);
+
 /**
  * @brief  Draw F4 status indicator LED (12x21 pixel image).
  * @param  x, y   Position

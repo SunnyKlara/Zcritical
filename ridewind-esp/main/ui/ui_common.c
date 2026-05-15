@@ -1,5 +1,6 @@
 #include "ui_common.h"
 #include "ui_images.h"
+#include "colored_digits.h"
 #include "drv_lcd.h"
 #include "app_state.h"
 #include "board_config.h"
@@ -77,43 +78,38 @@ void ui_draw_large_digit(uint16_t x, uint16_t y, uint8_t digit)
                      s_large_digit_data[digit]);
 }
 
-/* ── Tinted digit rendering for throttle mode ── */
+/* ── Pre-rendered colored digit lookup table ── */
 
-/* Static buffer for tinted digit (max 51×53×2 = 5406 bytes) */
-static uint16_t s_tint_buf[51 * 53];
+static const unsigned char * const s_colored_digit_data[COLORED_DIGIT_STEPS][10] = {
+    { gImage_speed_0_c0, gImage_speed_1_c0, gImage_speed_2_c0, gImage_speed_3_c0, gImage_speed_4_c0, gImage_speed_5_c0, gImage_speed_6_c0, gImage_speed_7_c0, gImage_speed_8_c0, gImage_speed_9_c0 },
+    { gImage_speed_0_c1, gImage_speed_1_c1, gImage_speed_2_c1, gImage_speed_3_c1, gImage_speed_4_c1, gImage_speed_5_c1, gImage_speed_6_c1, gImage_speed_7_c1, gImage_speed_8_c1, gImage_speed_9_c1 },
+    { gImage_speed_0_c2, gImage_speed_1_c2, gImage_speed_2_c2, gImage_speed_3_c2, gImage_speed_4_c2, gImage_speed_5_c2, gImage_speed_6_c2, gImage_speed_7_c2, gImage_speed_8_c2, gImage_speed_9_c2 },
+    { gImage_speed_0_c3, gImage_speed_1_c3, gImage_speed_2_c3, gImage_speed_3_c3, gImage_speed_4_c3, gImage_speed_5_c3, gImage_speed_6_c3, gImage_speed_7_c3, gImage_speed_8_c3, gImage_speed_9_c3 },
+    { gImage_speed_0_c4, gImage_speed_1_c4, gImage_speed_2_c4, gImage_speed_3_c4, gImage_speed_4_c4, gImage_speed_5_c4, gImage_speed_6_c4, gImage_speed_7_c4, gImage_speed_8_c4, gImage_speed_9_c4 },
+    { gImage_speed_0_c5, gImage_speed_1_c5, gImage_speed_2_c5, gImage_speed_3_c5, gImage_speed_4_c5, gImage_speed_5_c5, gImage_speed_6_c5, gImage_speed_7_c5, gImage_speed_8_c5, gImage_speed_9_c5 },
+    { gImage_speed_0_c6, gImage_speed_1_c6, gImage_speed_2_c6, gImage_speed_3_c6, gImage_speed_4_c6, gImage_speed_5_c6, gImage_speed_6_c6, gImage_speed_7_c6, gImage_speed_8_c6, gImage_speed_9_c6 },
+    { gImage_speed_0_c7, gImage_speed_1_c7, gImage_speed_2_c7, gImage_speed_3_c7, gImage_speed_4_c7, gImage_speed_5_c7, gImage_speed_6_c7, gImage_speed_7_c7, gImage_speed_8_c7, gImage_speed_9_c7 },
+    { gImage_speed_0_c8, gImage_speed_1_c8, gImage_speed_2_c8, gImage_speed_3_c8, gImage_speed_4_c8, gImage_speed_5_c8, gImage_speed_6_c8, gImage_speed_7_c8, gImage_speed_8_c8, gImage_speed_9_c8 },
+    { gImage_speed_0_c9, gImage_speed_1_c9, gImage_speed_2_c9, gImage_speed_3_c9, gImage_speed_4_c9, gImage_speed_5_c9, gImage_speed_6_c9, gImage_speed_7_c9, gImage_speed_8_c9, gImage_speed_9_c9 },
+    { gImage_speed_0_c10, gImage_speed_1_c10, gImage_speed_2_c10, gImage_speed_3_c10, gImage_speed_4_c10, gImage_speed_5_c10, gImage_speed_6_c10, gImage_speed_7_c10, gImage_speed_8_c10, gImage_speed_9_c10 },
+};
 
 void ui_draw_large_digit_tinted(uint16_t x, uint16_t y, uint8_t digit, uint16_t tint_color)
 {
+    (void)tint_color;  /* Color is now selected via color_index, kept for API compat */
     if (digit > 9) return;
-    uint8_t w = s_large_digit_width[digit];
-    uint16_t h = F4_SPEED_NUM_HIGH;
-    uint32_t pixel_count = (uint32_t)w * h;
-    const uint16_t *src = (const uint16_t *)s_large_digit_data[digit];
+    /* Default to middle color step if called without proper index */
+    ui_blit_f4_image(x, y, s_large_digit_width[digit], F4_SPEED_NUM_HIGH,
+                     s_colored_digit_data[5][digit]);
+}
 
-    /* Extract tint RGB components (5-6-5) */
-    uint8_t tr = (tint_color >> 11) & 0x1F;
-    uint8_t tg = (tint_color >> 5) & 0x3F;
-    uint8_t tb = tint_color & 0x1F;
-
-    /* Tint: for each pixel, use its brightness to scale the tint color.
-     * Original digits are white-on-black, so brightness = max(r,g,b).
-     * Black pixels (0x0000) stay black. White pixels get the tint color. */
-    for (uint32_t i = 0; i < pixel_count; i++) {
-        uint16_t px = src[i];
-        if (px == 0x0000) {
-            s_tint_buf[i] = 0x0000;
-        } else {
-            /* Extract source brightness (use green channel as proxy, 6-bit) */
-            uint8_t sg = (px >> 5) & 0x3F;
-            /* Scale tint by brightness (sg/63) */
-            uint8_t r = (uint8_t)((uint16_t)tr * sg / 63);
-            uint8_t g = (uint8_t)((uint16_t)tg * sg / 63);
-            uint8_t b = (uint8_t)((uint16_t)tb * sg / 63);
-            s_tint_buf[i] = (r << 11) | (g << 5) | b;
-        }
-    }
-
-    drv_lcd_blit_rgb565(x, y, w, h, s_tint_buf);
+/* Draw colored digit using pre-rendered color step index (0-10) */
+void ui_draw_large_digit_colored(uint16_t x, uint16_t y, uint8_t digit, uint8_t color_index)
+{
+    if (digit > 9) return;
+    if (color_index >= COLORED_DIGIT_STEPS) color_index = COLORED_DIGIT_STEPS - 1;
+    ui_blit_f4_image(x, y, s_large_digit_width[digit], F4_SPEED_NUM_HIGH,
+                     s_colored_digit_data[color_index][digit]);
 }
 
 void ui_draw_large_number_right(uint16_t right_x, uint16_t y,
@@ -175,6 +171,14 @@ void ui_draw_large_number_right_ex(uint16_t right_x, uint16_t y,
 void ui_draw_large_number_tinted_ex(uint16_t right_x, uint16_t y,
                                      uint16_t num, int8_t jianju, uint16_t tint_color)
 {
+    (void)tint_color;  /* Not used — color_index version below is preferred */
+    ui_draw_large_number_colored_ex(right_x, y, num, jianju, 5);
+}
+
+/* Draw number with pre-rendered colored digits (color_index 0-10) */
+void ui_draw_large_number_colored_ex(uint16_t right_x, uint16_t y,
+                                      uint16_t num, int8_t jianju, uint8_t color_index)
+{
     uint8_t d_a, d_b, d_c, count;
 
     if (num >= 100) {
@@ -202,17 +206,17 @@ void ui_draw_large_number_tinted_ex(uint16_t right_x, uint16_t y,
         int16_t x3 = (int16_t)right_x - w_a - w_b - w_c - jianju * 3;
         int16_t x2 = (int16_t)right_x - w_b - w_c - jianju * 2;
         int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
-        ui_draw_large_digit_tinted((uint16_t)x3, y, d_a, tint_color);
-        ui_draw_large_digit_tinted((uint16_t)x2, y, d_b, tint_color);
-        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
+        ui_draw_large_digit_colored((uint16_t)x3, y, d_a, color_index);
+        ui_draw_large_digit_colored((uint16_t)x2, y, d_b, color_index);
+        ui_draw_large_digit_colored((uint16_t)x1, y, d_c, color_index);
     } else if (count == 2) {
         int16_t x2 = (int16_t)right_x - w_b - w_c - jianju * 2;
         int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
-        ui_draw_large_digit_tinted((uint16_t)x2, y, d_b, tint_color);
-        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
+        ui_draw_large_digit_colored((uint16_t)x2, y, d_b, color_index);
+        ui_draw_large_digit_colored((uint16_t)x1, y, d_c, color_index);
     } else {
         int16_t x1 = (int16_t)right_x - w_c - jianju * 1;
-        ui_draw_large_digit_tinted((uint16_t)x1, y, d_c, tint_color);
+        ui_draw_large_digit_colored((uint16_t)x1, y, d_c, color_index);
     }
 }
 

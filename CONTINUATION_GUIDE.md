@@ -24,9 +24,8 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 
 ## 当前阻塞
 
-- **待用户烧录验证** — commit `1bb1a74`，颜色改为 Tixing 原版（蓝→黄→红）
-- **⚠️ 风扇/雾化器共用 GPIO 10** — 需用户确认：GPIO 10 拉高后雾化器是否自动喷雾？如果不会（有独立振荡电路），可放心用 GPIO 10 做风扇供电开关
-- **待做**：色条只在油门模式显示（退出时清除），等颜色确认后一起加
+- **待用户烧录验证** — 预渲染彩色数字 + 色条（只在油门模式显示）
+- **⚠️ 风扇问题暂搁** — GPIO 10 拉高时风扇转（即使 PWM=0%），原因待查，先专注油门模式 UI
 - **DeviceConnectScreen 仍 ~3500 行** — 暂缓，体验问题优先
 
 ## 下一步
@@ -65,12 +64,15 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
     - 油门模式：速度降到 0 不退出，保持待命（只有旋转/双击退出）
     - 关键：编码器驱动已有完善的状态机区分 click/long_press，UI 层只需正确响应事件
   - **油门模式视觉区分**（ui_speed.c + ui_common.c）：
-    - 彩色大数字：油门模式下数字颜色随速度渐变（蓝→黄→红），普通模式白色
-    - 实现方式：`ui_draw_large_digit_tinted` — 遍历位图像素按亮度着色，~0.2ms/帧
-    - 数字下方 4px 彩色进度条作为辅助指示（可能和风速表横线冲突，待实测调整）
+    - 预渲染彩色数字贴图（538KB，11 档 × 10 数字），和 Tixing 完全相同的方式
+    - 颜色：蓝(0%) → 黄(50%) → 红(100%)，带 gamma 校正保留抗锯齿层次
+    - 生成脚本：`tools/gen_colored_digits.py`
+    - 色条：140px 宽 × 3px 高，只在油门模式显示，退出时清除
     - 模式切换时强制重绘数字（`s_last_throttle_draw` 脏检测）
-    - 新增文件改动：`ui_common.c`（tinted digit + tinted number 函数）、`ui_common.h`（声明）
+    - 新增文件：`resources/colored_digits.c`、`resources/colored_digits.h`、`tools/gen_colored_digits.py`
+    - 修改文件：`ui_common.c`、`ui_common.h`、`ui_speed.c`、`CMakeLists.txt`
   - **油门模式双击退出**：油门模式下双击 → 停止一切 → 切换到菜单界面
+  - **Git 管理约定**：不自动 commit，只有用户确认"保留这版"时才 commit
   - 两个已改 bug：
     - BUG-A 风扇上电自转：drv_pwm.c 加 GPIO 预拉低（已编译通过）
     - BUG-B 油门长按失效：ui_speed.c 油门 poll 循环只响应 ROTATE（已编译通过）
