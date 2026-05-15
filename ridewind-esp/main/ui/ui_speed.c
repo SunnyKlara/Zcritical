@@ -114,11 +114,12 @@ static void draw_speed_screen(void)
     if (display_spd != s_last_speed || s_throttle_mode != s_last_throttle_draw) {
         drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
         if (s_throttle_mode) {
-            /* Throttle mode: use pre-rendered colored digits (0-10 steps) */
+            /* Throttle mode: use pre-rendered colored digits (0-10 steps)
+             * Use jianju=0 (no overlap) to prevent colored edge artifacts */
             uint8_t ci = (uint8_t)(g_app_state.current_speed_kmh / 10);
             if (ci > 10) ci = 10;
             ui_draw_large_number_colored_ex(F4_X_QI, F4_Y_QI,
-                                            (uint16_t)display_spd, F4_JIANJU, ci);
+                                            (uint16_t)display_spd, 0, ci);
         } else {
             ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
                                           (uint16_t)display_spd, F4_JIANJU);
@@ -151,10 +152,10 @@ static void draw_speed_screen(void)
     }
 
     /* ── Throttle mode color bar (only visible in throttle mode) ── */
-    /* Position: above the wind gauge, below the number area */
-    #define THROTTLE_BAR_X      30
+    /* Position: below number area, can overlap wind gauge in throttle mode */
+    #define THROTTLE_BAR_X      20
     #define THROTTLE_BAR_Y      (F4_Y_QI + F4_SPEED_NUM_HIGH + 2)
-    #define THROTTLE_BAR_MAX_W  140
+    #define THROTTLE_BAR_MAX_W  200
     #define THROTTLE_BAR_H      3
 
     if (s_throttle_mode) {
