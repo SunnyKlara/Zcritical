@@ -115,11 +115,11 @@ static void draw_speed_screen(void)
         drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
         if (s_throttle_mode) {
             /* Throttle mode: use pre-rendered colored digits (0-10 steps)
-             * Use jianju=0 (no overlap) to prevent colored edge artifacts */
+             * Same jianju as normal mode — pixel data is now correct */
             uint8_t ci = (uint8_t)(g_app_state.current_speed_kmh / 10);
             if (ci > 10) ci = 10;
             ui_draw_large_number_colored_ex(F4_X_QI, F4_Y_QI,
-                                            (uint16_t)display_spd, 0, ci);
+                                            (uint16_t)display_spd, F4_JIANJU, ci);
         } else {
             ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
                                           (uint16_t)display_spd, F4_JIANJU);
@@ -196,6 +196,10 @@ static void throttle_process(void)
             if (fan > 100) fan = 100;
             g_app_state.fan_speed = fan;
             drv_pwm_set_duty(fan);
+            /* Start engine sound on first acceleration (speed 0→1) */
+            if (g_app_state.current_speed_kmh == 1 && !audio_player_is_playing()) {
+                audio_player_start_engine();
+            }
             audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
         }
     } else {
@@ -208,11 +212,12 @@ static void throttle_process(void)
             audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
 
             if (g_app_state.current_speed_kmh == 0) {
-                /* Speed hit zero — stay in throttle mode, just idle.
-                 * User can press again to accelerate, or rotate encoder to exit.
-                 * This prevents accidental exit when user releases briefly. */
+                /* Speed hit zero — stop engine sound (silent when parked) */
                 g_app_state.fan_speed = 0;
                 drv_pwm_set_duty(0);
+                if (audio_player_is_playing()) {
+                    audio_player_stop_engine();
+                }
             }
         }
     }
@@ -355,7 +360,8 @@ void ui_speed_update(void)
 
         case ENC_EVT_CLICK:
             /* Short press → Enter throttle mode (油门模式)
-             * Throttle mode: hold button = accelerate, release = decelerate */
+             * Throttle mode: hold button = accelerate, release = decelerate
+             * Engine sound only starts when speed > 0 (like real car: parked = silent) */
             s_throttle_mode = 1;
             g_app_state.wuhuaqi_state_saved = g_app_state.wuhuaqi_state;
             g_app_state.wuhuaqi_state = 2;
@@ -363,15 +369,15 @@ void ui_speed_update(void)
             g_app_state.throttle_initialized = 1;
             drv_gpio_set_humidifier(true);
             audio_engine_set_throttle_mode(true);
-            if (g_app_state.current_speed_kmh == 0) {
-                g_app_state.current_speed_kmh = 10;
-                g_app_state.fan_speed = 10;
-                drv_pwm_set_duty(10);
+            /* Do NOT force speed to 10 or start engine sound here.
+             * Speed stays at 0 (silent) until user presses to accelerate.
+             * Engine sound will start in throttle_process() when speed > 0. */
+            if (g_app_state.current_speed_kmh > 0) {
+                if (!audio_player_is_playing()) {
+                    audio_player_start_engine();
+                }
+                audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
             }
-            if (!audio_player_is_playing()) {
-                audio_player_start_engine();
-            }
-            audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
             ble_service_notify_str("THROTTLE_REPORT:1\n");
             break;
 

@@ -249,6 +249,9 @@ static void load_audio_layers(void)
                 s_layers[i].data = bufs[i];
                 s_layers[i].len = sizes[i];
                 s_layers[i].rpm = BUILTIN_LAYERS[i].rpm;
+                ESP_LOGI(TAG, "  Custom layer %d: %u bytes, first=[%d,%d,%d]",
+                         i, (unsigned)sizes[i],
+                         (int)bufs[i][0], (int)bufs[i][1], (int)bufs[i][2]);
             }
             s_custom_loaded = true;
             ESP_LOGI(TAG, "Custom audio loaded from LittleFS (%d layers)", NUM_LAYERS);
@@ -275,7 +278,21 @@ static void load_audio_layers(void)
 void audio_player_init(void)
 {
     ESP_LOGI(TAG, "Init — %d layers", NUM_LAYERS);
+
+    /* Clear stale custom audio from LittleFS so built-in layers are used.
+     * TODO: Remove this after first successful boot with new audio. */
+    if (storage_audio_count() > 0) {
+        ESP_LOGW(TAG, "Clearing %d stale custom audio files from LittleFS", storage_audio_count());
+        storage_audio_delete_all();
+    }
+
     load_audio_layers();
+    /* Log which layers are active */
+    for (int i = 0; i < NUM_LAYERS; i++) {
+        ESP_LOGI(TAG, "  Layer %d: %u samples, rpm=%u, data[0]=%d",
+                 i, (unsigned)s_layers[i].len, s_layers[i].rpm,
+                 (int)s_layers[i].data[0]);
+    }
 }
 
 void audio_player_reload_layers(void)
@@ -299,6 +316,9 @@ bool audio_player_has_custom_audio(void)
 void audio_player_start_engine(void)
 {
     if (s_playing) return;
+    ESP_LOGI(TAG, "Starting engine sound (layer0: %u samples, layer1: %u, layer2: %u, layer3: %u)",
+             (unsigned)s_layers[0].len, (unsigned)s_layers[1].len,
+             (unsigned)s_layers[2].len, (unsigned)s_layers[3].len);
     audio_engine_pause();
     drv_audio_restart();
 
@@ -314,6 +334,8 @@ void audio_player_start_engine(void)
         ESP_LOGE(TAG, "Task create failed");
         s_playing = false;
         audio_engine_resume();
+    } else {
+        ESP_LOGI(TAG, "Synth task created, master_vol=%d", s_master_vol);
     }
 }
 

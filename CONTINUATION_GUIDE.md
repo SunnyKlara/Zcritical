@@ -21,10 +21,13 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 | 4. APP 重构（部分） | 协议层拆分、Provider 重写、DI 引入 | 51 个协议测试通过 |
 | 4.5 引擎音效 | 4 层可变采样率合成 | idf.py build 零错误 |
 | 5. 自定义音频上传 | BLE 二进制传输 + LittleFS 存储 | idf.py build 零错误 |
+| 6. 真实引擎音频素材 | 用户 MP3 → 22050Hz 8-bit PCM 头文件 | idf.py build 零错误 (2.75MB/3MB) |
 
 ## 当前阻塞
 
+- **待用户烧录验证** — 稳态段音频效果（v2：截取每段最稳定1.5-1.9s + 200ms crossfade）
 - **待用户烧录验证** — 预渲染彩色数字 + 色条（只在油门模式显示）
+- **待用户烧录验证** — 预设色条修复（draw_color_bar 顺序对齐 preset_colors.h）
 - **⚠️ 风扇问题暂搁** — GPIO 10 拉高时风扇转（即使 PWM=0%），原因待查，先专注油门模式 UI
 - **DeviceConnectScreen 仍 ~3500 行** — 暂缓，体验问题优先
 
@@ -40,6 +43,19 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 5. **P4 go_router 声明式路由 + 国际化 + CI/CD**
 
 ## 本次对话决策
+
+- 2026-05-15（音频素材集成）：
+  - 用户提供 4 段真实引擎 MP3 素材（启动加速/刹车/中加速/长加速）
+  - 转换工具：`ridewind-esp/tools/convert_engine_audio.py`（miniaudio 解码 + numpy 处理）
+  - 素材源文件：`ridewind-esp/main/resources/audio_raw/`（MP3 原始文件）
+  - 层映射（待烧录验证后可能调整）：
+    - 启动加速.mp3 → engine_idle (800 RPM, 4.48s, 95KB)
+    - 刹车.mp3 → engine_low (2000 RPM, 4.48s, 95KB)
+    - 中加速.mp3 → engine_mid (4000 RPM, 2.90s, 61KB)
+    - 长加速.mp3 → engine_high (7000 RPM, 8.85s, 189KB)
+  - 总 flash 占用 442KB（固件 2.75MB/3MB 分区，余 256KB）
+  - 编译通过，待烧录验证音效效果
+  - 潜在问题：素材是"动态过程"录音而非"稳态循环"，循环播放可能不够自然，烧录后听效果再调
 
 - 2026-05-15：方向转向「体验打磨期」
   - 用户实测后判断：功能跑通但"没经过精雕细作"，玩起来很多细节别扭
@@ -126,7 +142,7 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 ## 编译状态
 
 ```
-ESP32 固件：idf.py build — ✅ 零错误（2026-05-15 验证，3 文件改动后编译通过）
+ESP32 固件：idf.py build — ✅ 零错误（2026-05-15 验证，ui_preset.c 色条修复后全量编译通过）
   待烧录验证（esptool 连接失败，用户需按 BOOT 键或检查 COM 口）
 Flutter APP：flutter analyze — ✅ 通过（2026-04-30 最后验证，本次未改 APP）
 协议测试：flutter test test/protocol/ — ✅ 51/51 通过
