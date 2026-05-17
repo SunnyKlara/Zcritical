@@ -304,9 +304,9 @@ class _CustomPresetEditorSheetState extends State<CustomPresetEditorSheet> {
 
     return Row(
       children: [
-        tile('主色（左侧灯）', 'main', _mainColor),
+        tile('主色', 'main', _mainColor),
         const SizedBox(width: 10),
-        tile('副色（右侧灯）', 'sec', _secColor),
+        tile('副色', 'sec', _secColor),
       ],
     );
   }

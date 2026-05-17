@@ -501,8 +501,65 @@ class ColorizeController extends ChangeNotifier {
     debugPrint('🎨 已恢复 ${_customPresets.length} 个用户自定义胶囊');
   }
 
-  /// 新增自定义胶囊。返回新胶囊的 customId。
-  Future<String> addCustomPreset({
+  /// 检测一组 RGB 是否与已有胶囊（内置 + 自定义）重复
+  ///
+  /// 返回值:
+  ///   - null  → 不重复
+  ///   - `'preset:N'`  → 与第 N+1 个内置预设重复
+  ///   - `'custom:ID'` → 与指定 id 的自定义胶囊重复
+  ///
+  /// [excludeCustomId] 用于编辑场景，避免与自身比较。
+  /// 比较规则：纯色时只比较 (r1,g1,b1)；渐变时比较两端色 (r1,g1,b1) + (r2,g2,b2)。
+  /// 双方都必须是相同 type 才视为重复。
+  String? findDuplicateCapsule({
+    required String type,
+    required int r1,
+    required int g1,
+    required int b1,
+    required int r2,
+    required int g2,
+    required int b2,
+    String? excludeCustomId,
+  }) {
+    bool sameColor(int a, int b, int c, int x, int y, int z) =>
+        a == x && b == y && c == z;
+
+    // 1. 与内置预设比较
+    for (int i = 0; i < ledPresets.length; i++) {
+      final p = ledPresets[i];
+      final presetIsSolid = p.type == 'solid';
+      if (type == 'solid' && presetIsSolid) {
+        if (sameColor(r1, g1, b1, p.led2R, p.led2G, p.led2B)) {
+          return 'preset:$i';
+        }
+      } else if (type == 'gradient' && !presetIsSolid) {
+        if (sameColor(r1, g1, b1, p.led2R, p.led2G, p.led2B) &&
+            sameColor(r2, g2, b2, p.led3R, p.led3G, p.led3B)) {
+          return 'preset:$i';
+        }
+      }
+    }
+
+    // 2. 与自定义胶囊比较
+    for (final c in _customPresets) {
+      if (c.id == excludeCustomId) continue;
+      if (c.type != type) continue;
+      if (type == 'solid') {
+        if (sameColor(r1, g1, b1, c.r1, c.g1, c.b1)) {
+          return 'custom:${c.id}';
+        }
+      } else {
+        if (sameColor(r1, g1, b1, c.r1, c.g1, c.b1) &&
+            sameColor(r2, g2, b2, c.r2, c.g2, c.b2)) {
+          return 'custom:${c.id}';
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 新增自定义胶囊。返回新胶囊的 customId；若与已有重复则返回 null。
+  Future<String?> addCustomPreset({
     required String type,
     required int r1,
     required int g1,
@@ -511,17 +568,31 @@ class ColorizeController extends ChangeNotifier {
     required int g2,
     required int b2,
   }) async {
+    final r1c = r1.clamp(0, 255);
+    final g1c = g1.clamp(0, 255);
+    final b1c = b1.clamp(0, 255);
+    final r2c = r2.clamp(0, 255);
+    final g2c = g2.clamp(0, 255);
+    final b2c = b2.clamp(0, 255);
+
+    // 重复检测：避免创建与现有胶囊相同颜色
+    final dup = findDuplicateCapsule(
+      type: type,
+      r1: r1c, g1: g1c, b1: b1c,
+      r2: r2c, g2: g2c, b2: b2c,
+    );
+    if (dup != null) {
+      debugPrint('⚠️ 拒绝创建重复胶囊（与 $dup 颜色一致）');
+      return null;
+    }
+
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = 'cp_${now}_${_customPresets.length}';
     final preset = CustomPreset(
       id: id,
       type: type,
-      r1: r1.clamp(0, 255),
-      g1: g1.clamp(0, 255),
-      b1: b1.clamp(0, 255),
-      r2: r2.clamp(0, 255),
-      g2: g2.clamp(0, 255),
-      b2: b2.clamp(0, 255),
+      r1: r1c, g1: g1c, b1: b1c,
+      r2: r2c, g2: g2c, b2: b2c,
       createdAtMs: now,
     );
     _customPresets.add(preset);
@@ -530,14 +601,31 @@ class ColorizeController extends ChangeNotifier {
     return id;
   }
 
-  /// 更新现有自定义胶囊。返回是否成功。
-  Future<bool> updateCustomPreset(String id, CustomPreset updated) async {
+  /// 更新现有自定义胶囊。
+  ///
+  /// 返回值:
+  ///   - 'ok'         → 更新成功
+  ///   - 'not_found'  → id 找不到
+  ///   - 'duplicate'  → 与其它胶囊颜色重复，未保存
+  Future<String> updateCustomPreset(String id, CustomPreset updated) async {
     final i = _customPresets.indexWhere((p) => p.id == id);
-    if (i < 0) return false;
+    if (i < 0) return 'not_found';
+
+    final dup = findDuplicateCapsule(
+      type: updated.type,
+      r1: updated.r1, g1: updated.g1, b1: updated.b1,
+      r2: updated.r2, g2: updated.g2, b2: updated.b2,
+      excludeCustomId: id,
+    );
+    if (dup != null) {
+      debugPrint('⚠️ 拒绝更新（与 $dup 颜色一致）');
+      return 'duplicate';
+    }
+
     _customPresets[i] = updated;
     await _preferenceService.saveCustomPresets(_customPresets);
     notifyListeners();
-    return true;
+    return 'ok';
   }
 
   /// 删除自定义胶囊。返回是否成功。
