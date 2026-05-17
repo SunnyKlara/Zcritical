@@ -34,9 +34,8 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
   Timer? _holdTimer;
   bool _isHolding = false;
 
-  // 怠速：不操作时自动递减到 0
+  // 怠速：不操作时自动递减到 0（松手立即开始）
   Timer? _idleDecayTimer;
-  static const Duration _idleStartDelay = Duration(milliseconds: 600);
   static const Duration _idleTickInterval = Duration(milliseconds: 90);
 
   Rect? _obstacleRect;
@@ -106,15 +105,10 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
     setState(() => _value = 0);
   }
 
-  // ── 怠速（不操作时自动递减到 0）───────────────────
+  // ── 怠速（不操作时自动递减到 0，松手立即开始）─────────
   void _scheduleIdleDecay() {
     _idleDecayTimer?.cancel();
     if (_value <= 0) return;
-    // 先延迟一小会，让用户连击不被打断
-    _idleDecayTimer = Timer(_idleStartDelay, _runIdleDecay);
-  }
-
-  void _runIdleDecay() {
     int tickCount = 0;
     _idleDecayTimer = Timer.periodic(_idleTickInterval, (timer) {
       if (!mounted) {
@@ -168,61 +162,62 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
           _obstacleRect = _computeObstacle(size);
           final fontSize = (size.height * 0.22).clamp(72.0, 130.0);
 
-          return Stack(
-            children: [
-              // ── 束线流线动画背景 ───────────────────────────
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _flowController,
-                  builder: (_, __) => CustomPaint(
-                    painter: StreamlinePainter(
-                      tick: _flowController.value * 3600.0,
-                      intensity: _intensity,
-                      obstacle: _obstacleRect,
+          // 整个面板都是手势热区：单击 / 双击 / 长按都能在任意位置触发
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _bumpOnce,
+            onDoubleTap: _resetValue,
+            onLongPressStart: (_) => _startHold(),
+            onLongPressEnd: (_) => _stopHold(),
+            onLongPressCancel: _stopHold,
+            child: Stack(
+              children: [
+                // ── 束线流线动画背景 ───────────────────────────
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _flowController,
+                      builder: (_, __) => CustomPaint(
+                        painter: StreamlinePainter(
+                          tick: _flowController.value * 3600.0,
+                          intensity: _intensity,
+                          obstacle: _obstacleRect,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // ── 左侧红点（靠左，独立于中央数字）─────────────────
-              Positioned(
-                left: 22,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF0000),
-                      shape: BoxShape.circle,
+                // ── 左侧红点 ────────────────────────────────
+                Positioned(
+                  left: 22,
+                  top: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF0000),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // ── 中央数字（独立居中）─────────────────────────
-              Center(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _bumpOnce,
-                  onDoubleTap: _resetValue,
-                  onLongPressStart: (_) => _startHold(),
-                  onLongPressEnd: (_) => _stopHold(),
-                  onLongPressCancel: _stopHold,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 48,
-                      vertical: 24,
-                    ),
+                // ── 中央翻牌数字 ─────────────────────────────
+                Center(
+                  child: IgnorePointer(
                     child: _FlipDigit(
                       value: _value,
                       fontSize: fontSize,
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
