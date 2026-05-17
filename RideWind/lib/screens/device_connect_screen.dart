@@ -231,6 +231,13 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   /// 💾 恢复用户偏好设置
   Future<void> _restoreUserPreferences() async {
     try {
+      // 🆕 先恢复用户自定义胶囊列表（异步），后续的 selectedColorIndex 才能正确落到自定义胶囊上
+      await _colorize.loadCustomPresets();
+      // selectedColorIndex 的有效上限（不包括末尾的 "+")
+      final int selectableMax =
+          (_colorize.presetCount + _colorize.customPresets.length - 1)
+              .clamp(0, 1 << 30);
+
       // 首先尝试恢复设备特定设置
       final deviceSettings = await _preferenceService.getDeviceSettings(widget.device.id);
       
@@ -238,7 +245,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         // 使用设备特定设置
         if (mounted) {
           setState(() {
-            _colorize.setSelectedColorIndex((deviceSettings['colorPreset'] as int? ?? 0).clamp(0, _ledColorCapsules.length - 1));
+            _colorize.setSelectedColorIndex((deviceSettings['colorPreset'] as int? ?? 0).clamp(0, selectableMax));
             _currentSpeed = (deviceSettings['speed'] as int? ?? 0).clamp(0, _maxSpeed);
             _isAirflowStarted = deviceSettings['atomizer'] as bool? ?? false;
             _colorize.setBrightnessValue((deviceSettings['brightness'] as double? ?? 1.0).clamp(0.0, 1.0));
@@ -253,7 +260,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
         if (mounted) {
           setState(() {
-            _colorize.setSelectedColorIndex(colorPreset.clamp(0, _ledColorCapsules.length - 1));
+            _colorize.setSelectedColorIndex(colorPreset.clamp(0, selectableMax));
             _currentSpeed = speedValue.clamp(0, _maxSpeed);
             _isAirflowStarted = atomizerState;
           });

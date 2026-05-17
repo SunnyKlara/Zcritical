@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/custom_preset.dart';
 
 /// 用户偏好存储服务
 /// 管理用户设置的持久化存储和恢复
@@ -42,6 +43,9 @@ class PreferenceService {
 
   /// SharedPreferences 键：是否有自定义颜色标志位
   static const String _keyHasCustomColors = 'has_custom_colors';
+
+  /// SharedPreferences 键：用户自定义颜色胶囊列表（JSON 数组）
+  static const String _keyUserCustomPresets = 'user_custom_presets';
 
   /// 保存颜色预设索引
   /// 
@@ -272,6 +276,69 @@ class PreferenceService {
       return prefs.getBool(_keyHasCustomColors) ?? false;
     } catch (e) {
       return false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  用户自定义颜色胶囊（CRUD）
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 保存自定义胶囊整个列表（覆盖式）
+  ///
+  /// 列表序列化为 JSON 数组存到 [_keyUserCustomPresets]。
+  /// 如果写入失败会静默处理。
+  Future<void> saveCustomPresets(List<CustomPreset> presets) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json =
+          jsonEncode(presets.map((p) => p.toJson()).toList(growable: false));
+      await prefs.setString(_keyUserCustomPresets, json);
+    } catch (e) {
+      // 写入失败时静默处理
+    }
+  }
+
+  /// 读取用户自定义胶囊列表
+  ///
+  /// 返回按创建时间升序排列的列表；若没有保存过/读取/解析失败均返回空列表。
+  Future<List<CustomPreset>> getCustomPresets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_keyUserCustomPresets);
+      if (json == null || json.isEmpty) return <CustomPreset>[];
+
+      final decoded = jsonDecode(json);
+      if (decoded is! List) return <CustomPreset>[];
+
+      final list = <CustomPreset>[];
+      for (final item in decoded) {
+        if (item is Map<String, dynamic>) {
+          try {
+            list.add(CustomPreset.fromJson(item));
+          } catch (_) {
+            // 单条解析失败时跳过，继续读其它条
+          }
+        }
+      }
+      list.sort((a, b) => a.createdAtMs.compareTo(b.createdAtMs));
+      return list;
+    } catch (e) {
+      // 解析失败时清除损坏数据并返回空列表
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_keyUserCustomPresets);
+      } catch (_) {}
+      return <CustomPreset>[];
+    }
+  }
+
+  /// 清空所有自定义胶囊
+  Future<void> clearCustomPresets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyUserCustomPresets);
+    } catch (e) {
+      // 静默处理
     }
   }
 
