@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+inclusion: fileMatch
+fileMatchPattern: "**/audio_engine.c,**/audio_engine.h,**/audio_player.c,**/drv_audio.c,**/wifi_audio_service.c,**/audio_stream_service.dart,**/audio_transmission_manager.dart"
 ---
 
 <!-- last-verified: 2026-05-12 | status: IMPLEMENTED -->

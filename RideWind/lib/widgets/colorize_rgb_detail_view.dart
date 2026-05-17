@@ -51,6 +51,10 @@ class _ColorizeRGBDetailViewState extends State<ColorizeRGBDetailView> {
       listenable: _colorize,
       builder: (context, _) {
         try {
+          // 🔧 现在 RGB 面板被嵌入到下半部容器中（约 55% 屏高），
+          // 而非原本的全屏覆盖。为防止 LMRB 胶囊或循环速度面板超出容器导致
+          // 黄黑条溢出警告，使用 FittedBox 让胶囊区在空间不足时整体缩放，
+          // 并把底部 padding 收紧。
           return Column(
             children: [
               // 上部分：LMRB 胶囊选择区
@@ -58,9 +62,13 @@ class _ColorizeRGBDetailViewState extends State<ColorizeRGBDetailView> {
                 child: Padding(
                   padding: EdgeInsets.only(top: config.isSmallScreen ? 5 : 10),
                   child: Center(
-                    child: KeyedSubtree(
-                      key: widget.lmrbCapsulesKey,
-                      child: _buildRGBPositionCapsules(config),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: KeyedSubtree(
+                        key: widget.lmrbCapsulesKey,
+                        child: _buildRGBPositionCapsules(config),
+                      ),
                     ),
                   ),
                 ),
@@ -69,7 +77,7 @@ class _ColorizeRGBDetailViewState extends State<ColorizeRGBDetailView> {
               Padding(
                 padding: EdgeInsets.only(
                   bottom: config.safeAreaBottom +
-                      (config.isSmallScreen ? 30 : 45),
+                      (config.isSmallScreen ? 12 : 20),
                 ),
                 child: _buildCycleSpeedPanel(config),
               ),

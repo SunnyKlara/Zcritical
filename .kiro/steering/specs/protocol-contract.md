@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+inclusion: fileMatch
+fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/command_sender.dart,**/ble_service.c,**/ble_service.dart"
 ---
 
 <!-- last-verified: 2026-05-12 | source: CONTINUATION_GUIDE.md §二 + RideWind/PROTOCOL_SPECIFICATION.md -->

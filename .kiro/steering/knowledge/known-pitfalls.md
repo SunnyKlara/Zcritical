@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+inclusion: fileMatch
+fileMatchPattern: "ridewind-esp/**/*.c,ridewind-esp/**/*.h,RideWind/lib/**/*.dart"
 ---
 
 <!-- last-verified: 2026-05-12 | source: code comments + FIX records + architecture analysis -->
