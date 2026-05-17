@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'streamline_painter.dart';
 
-/// 🏃 跑步机控制面板 — 束线流线 + 固定中央数字
+/// 跑步机控制面板 — 束线流线 + 固定中央数字
 ///
 /// 视觉参考：Tixing `pc_tests/test_wind_resistance.py` 的 6 股弧形束线。
 ///
-/// 控制逻辑（先做个最小可看版，方便迭代）：
+/// 控制逻辑（参考油门模式 — 不操作时自动怠速减速）：
 ///   - 中央数字位置固定（不再用滚轮）
-///   - 左侧保留红点指示器
-///   - 数字变化时使用"翻牌式"跳动动画（旧值上滑出 + 新值上滑入）
-///   - 单击中央 → +1（看一次跳动）
-///   - 长按中央 → 连续递增，松手停下（看连续刷新效果）
+///   - 红点靠左，数字仍全屏居中
+///   - 数字变化时使用"翻牌式"跳动动画（旧值上滑出 + 新值下滑入）
+///   - 单击中央 → +1
+///   - 长按中央 → 连续递增，松手停下
 ///   - 双击 → 归零
+///   - 不操作时自动怠速：松手后约隔 0.6s 开始减速，递减到 0 为止
 ///
 /// 滑动入口：device_connect_screen.dart 顶层 PageView 第 0 页（running 左侧）。
 class TreadmillPanelWidget extends StatefulWidget {
@@ -33,6 +34,11 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
   Timer? _holdTimer;
   bool _isHolding = false;
 
+  // 怠速：不操作时自动递减到 0
+  Timer? _idleDecayTimer;
+  static const Duration _idleStartDelay = Duration(milliseconds: 600);
+  static const Duration _idleTickInterval = Duration(milliseconds: 90);
+
   Rect? _obstacleRect;
 
   @override
@@ -48,20 +54,24 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
   void dispose() {
     _flowController.dispose();
     _holdTimer?.cancel();
+    _idleDecayTimer?.cancel();
     super.dispose();
   }
 
-  // ── 交互 ────────────────────────────────────────────────────
+  // ── 交互 ────────────────────────────────────────────
   void _bumpOnce() {
+    _cancelIdleDecay();
     HapticFeedback.selectionClick();
     setState(() {
       _value = (_value + 1).clamp(0, _maxValue);
     });
+    _scheduleIdleDecay();
   }
 
   void _startHold() {
     if (_isHolding) return;
     _isHolding = true;
+    _cancelIdleDecay();
     HapticFeedback.mediumImpact();
     int tickCount = 0;
     // 越按越快：步长从 1 升到 5
@@ -87,11 +97,47 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
     _isHolding = false;
     _holdTimer?.cancel();
     _holdTimer = null;
+    _scheduleIdleDecay();
   }
 
   void _resetValue() {
+    _cancelIdleDecay();
     HapticFeedback.lightImpact();
     setState(() => _value = 0);
+  }
+
+  // ── 怠速（不操作时自动递减到 0）───────────────────
+  void _scheduleIdleDecay() {
+    _idleDecayTimer?.cancel();
+    if (_value <= 0) return;
+    // 先延迟一小会，让用户连击不被打断
+    _idleDecayTimer = Timer(_idleStartDelay, _runIdleDecay);
+  }
+
+  void _runIdleDecay() {
+    int tickCount = 0;
+    _idleDecayTimer = Timer.periodic(_idleTickInterval, (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_isHolding || _value <= 0) {
+        timer.cancel();
+        _idleDecayTimer = null;
+        return;
+      }
+      tickCount++;
+      // 初期温柔，随后平稳
+      final step = tickCount < 6 ? 1 : (tickCount < 18 ? 2 : 3);
+      setState(() {
+        _value = (_value - step).clamp(0, _maxValue);
+      });
+    });
+  }
+
+  void _cancelIdleDecay() {
+    _idleDecayTimer?.cancel();
+    _idleDecayTimer = null;
   }
 
   // ── 束线障碍物：中央数字所在那一块矩形 ──
@@ -138,7 +184,24 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
                 ),
               ),
 
-              // ── 中央数字 + 左侧红点 ────────────────────────
+              // ── 左侧红点（靠左，独立于中央数字）─────────────────
+              Positioned(
+                left: 22,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF0000),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── 中央数字（独立居中）─────────────────────────
               Center(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -149,29 +212,12 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
                   onLongPressCancel: _stopHold,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
+                      horizontal: 48,
                       vertical: 24,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // 红点指示器
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFF0000),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 22),
-                        // 翻牌跳动数字
-                        _FlipDigit(
-                          value: _value,
-                          fontSize: fontSize,
-                        ),
-                      ],
+                    child: _FlipDigit(
+                      value: _value,
+                      fontSize: fontSize,
                     ),
                   ),
                 ),
@@ -215,7 +261,7 @@ class _FlipDigit extends StatelessWidget {
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, anim) {
-        // 新进入：从下方 +30% 高度处滑入；离开：向上滑出
+        // 新进入：从下方 +35% 高度处滑入；离开：向上滑出
         final isIncoming = child.key == ValueKey<int>(value);
         final beginOffset = isIncoming
             ? const Offset(0, 0.35)
