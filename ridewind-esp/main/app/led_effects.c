@@ -484,7 +484,7 @@ static void throttle_fx_wave(uint8_t spd)
     uint32_t t = s_throttle_fx_phase;
 
     #define WAVE_CYCLE    2500
-    #define BASE_BRIGHT   76
+    #define BASE_BRIGHT   38
     #define PEAK_BRIGHT   255
 
     uint8_t wave_phase = (uint8_t)((uint32_t)(t % WAVE_CYCLE) * 255 / WAVE_CYCLE);

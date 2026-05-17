@@ -26,6 +26,11 @@
 #define PIN_ENC_B       18
 #define PIN_ENC_KEY     8      /* Active low */
 
-/* MOS Control */
-#define PIN_HUMIDIFIER  10     /* GPIO on/off */
-#define PIN_FAN         40     /* LEDC PWM */
+/* MOS Control
+ * ⚠️ 重要：硬件文档标注 IO10=雾化器、IO40=风扇，但实测确认是反的！
+ * 实际接线：IO10 = 风扇PWM调速（MOS管控制风扇），IO40 = 雾化器开关
+ * 验证过程：GPIO40 输出 PWM 对风扇无任何影响（正转/反转/0%/100%都一样），
+ * 而 GPIO10 拉高时风扇立即满速转动。交换引脚后风扇可正常 PWM 调速。
+ */
+#define PIN_HUMIDIFIER  40     /* GPIO on/off — 超声波雾化器开关 */
+#define PIN_FAN         10     /* LEDC PWM — 风扇调速 */

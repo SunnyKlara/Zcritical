@@ -22,6 +22,7 @@
 #include "engine_low.h"
 #include "engine_mid.h"
 #include "engine_high.h"
+#include "engine_test_16bit.h"
 
 static const char *TAG = "ENGINE_SND";
 
@@ -130,72 +131,49 @@ static uint16_t smooth_rpm(uint16_t cur, uint16_t tgt)
 /* ── Synth task ── */
 static void synth_task(void *arg)
 {
-    ESP_LOGI(TAG, "4-layer synth started");
+    ESP_LOGI(TAG, "Direct 16-bit playback started (%u samples)", ENGINE_TEST_SAMPLE_COUNT);
 
-    for (int i = 0; i < NUM_LAYERS; i++) s_pos[i] = 0;
-    s_current_rpm = RPM_IDLE;
-    s_fade = 0;
-    s_fading_out = false;
+    /* Simple direct playback of 16-bit PCM test audio.
+     * No variable rate, no crossfade — just raw quality test. */
+    uint32_t pos = 0;
+    int32_t fade = 0;
+    bool fading_out = false;
 
-    const int32_t fade_in_step  = (256 + FADE_IN_BUFS  - 1) / FADE_IN_BUFS;
-    const int32_t fade_out_step = (256 + FADE_OUT_BUFS - 1) / FADE_OUT_BUFS;
+    const int32_t fade_in_step = 4;   /* ~64 buffers to full volume */
+    const int32_t fade_out_step = 9;  /* ~28 buffers to silence */
 
     while (1) {
-        /* RPM */
-        s_current_rpm = smooth_rpm(s_current_rpm, s_target_rpm);
-
-        /* Fade */
-        if (s_stop_request && !s_fading_out) s_fading_out = true;
-        if (s_fading_out) {
-            s_fade -= fade_out_step;
-            if (s_fade <= 0) { s_fade = 0; break; }
-        } else if (s_fade < 256) {
-            s_fade += fade_in_step;
-            if (s_fade > 256) s_fade = 256;
+        if (s_stop_request && !fading_out) fading_out = true;
+        if (fading_out) {
+            fade -= fade_out_step;
+            if (fade <= 0) { fade = 0; break; }
+        } else if (fade < 256) {
+            fade += fade_in_step;
+            if (fade > 256) fade = 256;
         }
 
-        /* Layer blend */
-        int lo, hi;
-        int32_t blend;
-        find_blend(s_current_rpm, &lo, &hi, &blend);
-
-        uint32_t step_lo = calc_step(s_current_rpm, s_layers[lo].rpm);
-        uint32_t step_hi = calc_step(s_current_rpm, s_layers[hi].rpm);
-
-        /* Pre-compute gains: all in 0-256 range.
-         * Final multiply chain: sample(-128..127) * layer_gain(0..256) / 256
-         *   → still -128..127 range, then << 8 → 16-bit, then * vol_gain / 256.
-         * This avoids overflow: max intermediate = 127 * 256 = 32512, fits int16. */
-        int32_t lo_gain = 256 - blend;
-        int32_t hi_gain = blend;
-        int32_t vol_gain = (s_fade * ((int32_t)s_master_vol * 256 / 100)) >> 8;
-
-        /* Fill buffer */
+        /* Fill output buffer from 16-bit source */
         for (int i = 0; i < BUF_FRAMES; i++) {
-            int32_t s_lo = lerp(s_layers[lo].data, s_layers[lo].len, s_pos[lo]);
-            int32_t s_hi = (lo != hi)
-                ? lerp(s_layers[hi].data, s_layers[hi].len, s_pos[hi])
-                : s_lo;
+            int32_t sample;
+            if (pos < ENGINE_TEST_SAMPLE_COUNT) {
+                sample = (int32_t)engine_test_samples[pos];
+                pos++;
+            } else {
+                /* Loop back to start when reaching end */
+                pos = 0;
+                sample = (int32_t)engine_test_samples[pos];
+                pos++;
+            }
 
-            /* Crossfade: result is -128..127 */
-            int32_t mix = (s_lo * lo_gain + s_hi * hi_gain) >> 8;
+            /* Apply fade and volume */
+            int32_t vol_gain = (fade * ((int32_t)s_master_vol * 256 / 100)) >> 8;
+            int32_t out = (sample * vol_gain) >> 8;
 
-            /* To 16-bit: -32768..32512 */
-            int32_t out = mix << 8;
-
-            /* Apply volume (fade × master): 0-256 */
-            out = (out * vol_gain) >> 8;
-
-            /* Clamp */
-            if (out >  32767) out =  32767;
+            if (out > 32767) out = 32767;
             if (out < -32768) out = -32768;
 
-            s_buf[i * 2]     = (int16_t)out;
-            s_buf[i * 2 + 1] = (int16_t)out;
-
-            s_pos[lo] = adv(s_pos[lo], step_lo, s_layers[lo].len);
-            if (lo != hi)
-                s_pos[hi] = adv(s_pos[hi], step_hi, s_layers[hi].len);
+            s_buf[i * 2]     = (int16_t)out;  /* L */
+            s_buf[i * 2 + 1] = (int16_t)out;  /* R */
         }
 
         drv_audio_write(s_buf, BUF_FRAMES);
@@ -208,7 +186,7 @@ static void synth_task(void *arg)
 
     s_playing = false;
     s_task = NULL;
-    ESP_LOGI(TAG, "Synth stopped");
+    ESP_LOGI(TAG, "Playback stopped");
     vTaskDelete(NULL);
 }
 

@@ -28,7 +28,7 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 - **待用户烧录验证** — 稳态段音频效果（v2：截取每段最稳定1.5-1.9s + 200ms crossfade）
 - **✅ 油门模式 UI 完成** — commit `2e88004`，彩色数字+色条显示完美
 - **待用户烧录验证** — 预设色条修复（draw_color_bar 顺序对齐 preset_colors.h）
-- **⚠️ 风扇无法调速（硬件问题确认）** — GPIO 40 PWM 对风扇转速无影响（正转/反转/0%/100% 都一样）。风扇只受 GPIO 10 开关控制，通电即满速。结论：MOS2 管未生效（虚焊/短路/未连接）。待用户检查 PCB 或尝试 GPIO 10 做 PWM 调速方案
+- **待用户烧录验证** — 风扇引脚交换（PIN_FAN=IO10, PIN_HUMIDIFIER=IO40），应能实现 PWM 调速
 - **DeviceConnectScreen 仍 ~3500 行** — 暂缓，体验问题优先
 
 ## 下一步
@@ -188,6 +188,11 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - ⚠️ 注意：当前在 `fw/treadmill-ui` 分支，不是 main
   - 分支状态：main 停在 `a046ebc`，fw/treadmill-ui 在 `393c4b0`（领先 main 3 个提交）
   - 编译通过：idf.py build 零错误
+
+- 2026-05-17（第十六轮）：波浪对比度增强
+  - BASE_BRIGHT 76→38（30%→15%），亮暗起伏更明显
+  - 分支：`fw/treadmill-ui`
+  - 编译通过（⚠️ 分区空间仅剩 4%，后续注意固件体积）
 
 - 2026-05-17（第十四轮）：跑步机界面 Forza Horizon 风格重设计
   - 调研 Forza Horizon 5 速度仪表盘 UI 设计（GitHub 开源复刻项目 + 社区分析）
