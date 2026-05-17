@@ -94,7 +94,8 @@ static float angle_to_arc_pos(float raw_deg)
     if (raw_deg < 0.0f) raw_deg += 360.0f;
     /* 计算相对于起始角的偏移 */
     float rel = raw_deg - ARC_START_DEG;
-    if (rel < 0.0f) rel += 360.0f;
+    if (rel < -0.5f) rel += 360.0f;  /* 容差处理边界 */
+    if (rel < 0.0f) rel = 0.0f;
     return rel;
 }
 
@@ -197,20 +198,67 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
 }
 
 /* ══════ Number Drawing ══════
- * 完全参考 Speed UI (ui_speed.c) 的 draw_speed_screen():
- * - 清除区域: drv_lcd_fill_rect(15, F4_Y_QI, 155-15, F4_SPEED_NUM_HIGH, 0x0000)
- * - 渲染: ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI, display_spd, F4_JIANJU)
- * 跑步机显示 0-20，直接用相同函数和坐标
+ * 数字范围映射：内部 0-20 → 显示 0-340（和 Speed 的 0-100→0-340 一样的视觉范围）
+ * 数字居中显示在弧形内部
  */
 
 static void draw_number(void)
 {
-    /* 精确清除 — 和 Speed 完全一样的区域 */
-    drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
+    /* 映射：内部速度 0-20 → 显示 0-340 */
+    uint16_t display_spd = (uint16_t)(s_treadmill_speed * 17);
 
-    /* 右对齐渲染，和 Speed 完全相同 */
-    ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
-                                  (uint16_t)s_treadmill_speed, F4_JIANJU);
+    /* 计算数字总宽度用于居中 */
+    uint8_t d_h, d_t, d_o, count;
+    if (display_spd >= 100) {
+        d_h = display_spd / 100;
+        d_t = (display_spd % 100) / 10;
+        d_o = display_spd % 10;
+        count = 3;
+    } else if (display_spd >= 10) {
+        d_h = 0;
+        d_t = display_spd / 10;
+        d_o = display_spd % 10;
+        count = 2;
+    } else {
+        d_h = 0;
+        d_t = 0;
+        d_o = display_spd;
+        count = 1;
+    }
+
+    uint8_t w_h = ui_large_digit_width(d_h);
+    uint8_t w_t = ui_large_digit_width(d_t);
+    uint8_t w_o = ui_large_digit_width(d_o);
+
+    int16_t total_w;
+    if (count == 3) {
+        total_w = w_h + w_t + w_o + F4_JIANJU * 2;
+    } else if (count == 2) {
+        total_w = w_t + w_o + F4_JIANJU;
+    } else {
+        total_w = w_o;
+    }
+
+    /* 居中 X 坐标 */
+    int16_t x = (LCD_WIDTH - total_w) / 2;
+
+    /* 精确清除数字区域（居中区域） */
+    drv_lcd_fill_rect(20, F4_Y_QI, 200, F4_SPEED_NUM_HIGH, 0x0000);
+
+    /* 绘制各位数字 */
+    if (count == 3) {
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_h);
+        x += w_h + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t);
+        x += w_t + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
+    } else if (count == 2) {
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t);
+        x += w_t + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
+    } else {
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
+    }
 }
 
 /* ══════ Full Screen ══════ */
