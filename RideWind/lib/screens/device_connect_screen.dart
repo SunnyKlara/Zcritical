@@ -19,6 +19,7 @@ import '../controllers/colorize_controller.dart';
 import '../core/service_locator.dart';
 import '../widgets/colorize_preset_view.dart';
 import '../widgets/colorize_rgb_detail_view.dart';
+import '../widgets/treadmill_panel_widget.dart';
 import 'no_device_screen.dart';
 import 'logo_management_screen.dart';
 import 'audio_management_screen.dart';
@@ -27,9 +28,11 @@ import 'audio_stream_screen.dart';
 
 /// 核心控制页面 — 正在渐进式拆分中
 ///
-/// 包含 2 个模式（PageView 左右滑动切换）：
-///   index=0: Running Mode（速度/油门控制，默认）
-///   index=1: Colorize Mode（LED预设/RGB调色/流水灯）
+/// 包含 4 个模式（PageView 左右滑动切换）：
+///   index=0: Treadmill Panel（跑步机控制面板，束线流线风格 — 默认从 index=1 进入）
+///   index=1: Running Mode（速度/油门控制，默认起始页）
+///   index=2: Colorize Mode（LED预设面板）
+///   index=3: RGB Panel（详细调色）
 ///
 /// 已提取到独立文件：
 ///   - _DeviceConnectConfig → configs/device_connect_config.dart（typedef桥接）
@@ -44,7 +47,8 @@ import 'audio_stream_screen.dart';
 // ║          🔄 控制模式枚举（3个模式）                            ║
 // ╚══════════════════════════════════════════════════════════════╝
 enum ControlMode {
-  running, // Running Mode - 速度/油门控制（默认）
+  treadmill, // Treadmill Panel - 跑步机控制面板（左滑一次）
+  running, // Running Mode - 速度/油门控制（默认起始页）
   colorize, // Colorize Mode - LED颜色预设面板（右滑一次）
   rgb, // RGB Panel - LED 详细调色面板（右滑两次）
 }
@@ -70,7 +74,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   // ╚══════════════════════════════════════════════════════════════╝
 
   // ========== 🏠 页面状态（简化：直接进入模式界面）==========
-  int _currentModeIndex = 0; // 0=running(默认), 1=colorize
+  // 0=treadmill, 1=running(默认起始页), 2=colorize, 3=rgb
+  int _currentModeIndex = 1;
   late PageController _modePageController; // 模式页面滑动控制器
 
   // ========== 🌬️ 雾化器状态 ==========
@@ -133,10 +138,12 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   ControlMode get _currentMode {
     switch (_currentModeIndex) {
       case 0:
-        return ControlMode.running;
+        return ControlMode.treadmill;
       case 1:
-        return ControlMode.colorize;
+        return ControlMode.running;
       case 2:
+        return ControlMode.colorize;
+      case 3:
         return ControlMode.rgb;
       default:
         return ControlMode.running;
@@ -835,10 +842,10 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     ).then((_) {
       // 返回后恢复硬件UI
       if (mounted && btProvider.isConnected && _lastSentHardwareUI == 6) {
-        // 0=running(UI=1), 1=colorize(UI=2), 2=rgb(UI=3)
-        final targetUI = _currentModeIndex == 0
+        // 0=treadmill(UI=1,沿用running), 1=running(UI=1), 2=colorize(UI=2), 3=rgb(UI=3)
+        final targetUI = (_currentModeIndex <= 1)
             ? 1
-            : (_currentModeIndex == 1 ? 2 : 3);
+            : (_currentModeIndex == 2 ? 2 : 3);
         if (targetUI != 6) {
           btProvider.setHardwareUI(targetUI);
           _lastSentHardwareUI = targetUI;
@@ -931,7 +938,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     if (_currentMode == ControlMode.rgb) {
       HapticFeedback.lightImpact();
       _modePageController.animateToPage(
-        1,
+        2,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
       );
@@ -1228,6 +1235,9 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   /// 获取背景图（根据当前模式）
   String _getBackgroundImage() {
     switch (_currentMode) {
+      case ControlMode.treadmill:
+        // 跑步机面板自身是纯黑底 + 束线动画，沿用 running 背景图作为下半部分外框过渡
+        return 'assets/images/running_mode_no_text.png';
       case ControlMode.running:
         return 'assets/images/running_mode_no_text.png';
       case ControlMode.colorize:
@@ -1252,7 +1262,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         HapticFeedback.selectionClick();
         setState(() {
           _currentModeIndex = index;
-          if (index == 1) {
+          if (index == 2) {
             // 进入 Colorize 预设面板：重建颜色 PageController 以对齐当前选中索引
             _colorize.setColorizeState(ColorizeState.preset);
             _colorPageController.dispose();
@@ -1264,14 +1274,20 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           }
         });
         _syncHardwareUIOnModeChange(index);
-        final modeNames = ['Running Mode', 'Colorize Mode', 'RGB Panel'];
+        const modeNames = [
+          'Treadmill Panel',
+          'Running Mode',
+          'Colorize Mode',
+          'RGB Panel',
+        ];
         debugPrint('📄 滑动切换到: ${modeNames[index]}');
 
-        if (index == 1) {
+        if (index == 2) {
           _checkAndShowColorizeModeGuide();
         }
       },
       children: [
+        _buildTreadmillPanelContent(config),
         _buildRunningModeContent(config),
         _buildColorizeModeContent(config),
         _buildRGBContent(config),
@@ -1303,13 +1319,19 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     if (!btProvider.isConnected) return;
 
     switch (modeIndex) {
-      case 0: // Running Mode → 硬件 UI = 1
+      case 0: // Treadmill Panel → 硬件不切换 UI（沿用 Running Mode 的 UI=1）
         if (_lastSentHardwareUI != 1) {
           await btProvider.setHardwareUI(1);
           _lastSentHardwareUI = 1;
         }
         break;
-      case 1: // Colorize Mode → 硬件 UI = 2
+      case 1: // Running Mode → 硬件 UI = 1
+        if (_lastSentHardwareUI != 1) {
+          await btProvider.setHardwareUI(1);
+          _lastSentHardwareUI = 1;
+        }
+        break;
+      case 2: // Colorize Mode → 硬件 UI = 2
         if (_lastSentHardwareUI != 2) {
           await btProvider.setHardwareUI(2);
           _lastSentHardwareUI = 2;
@@ -1319,13 +1341,29 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           }
         }
         break;
-      case 2: // RGB Panel（详细调色）→ 硬件 UI = 3
+      case 3: // RGB Panel（详细调色）→ 硬件 UI = 3
         if (_lastSentHardwareUI != 3) {
           await btProvider.setHardwareUI(3);
           _lastSentHardwareUI = 3;
           _colorize.lastSentHardwareUI = 3;
         }
         break;
+    }
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════════╗
+  // ║  🏃‍♀️ Treadmill Panel 内容（束线流线风格 — UI 骨架）                      ║
+  // ╚════════════════════════════════════════════════════════════════════════╝
+
+  Widget _buildTreadmillPanelContent(_DeviceConnectConfig config) {
+    try {
+      return const TreadmillPanelWidget();
+    } catch (e, stackTrace) {
+      debugPrint('❌ Treadmill Panel 渲染错误: $e');
+      debugPrint('📍 堆栈跟踪: $stackTrace');
+      return const Center(
+        child: Text('加载失败', style: TextStyle(color: Colors.white)),
+      );
     }
   }
 
