@@ -34,6 +34,9 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
   Timer? _holdTimer;
   bool _isHolding = false;
 
+  // 单位：true=公制 km/h, false=英制 mp/h（参考 RunningModeWidget 风格）
+  bool _isMetric = true;
+
   // 怠速：不操作时自动递减到 0（松手立即开始）
   Timer? _idleDecayTimer;
   static const Duration _idleTickInterval = Duration(milliseconds: 90);
@@ -103,6 +106,11 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
     _cancelIdleDecay();
     HapticFeedback.lightImpact();
     setState(() => _value = 0);
+  }
+
+  void _toggleUnit() {
+    HapticFeedback.mediumImpact();
+    setState(() => _isMetric = !_isMetric);
   }
 
   // ── 怠速（不操作时自动递减到 0，松手立即开始）─────────
@@ -213,6 +221,55 @@ class _TreadmillPanelWidgetState extends State<TreadmillPanelWidget>
                     child: _FlipDigit(
                       value: _value,
                       fontSize: fontSize,
+                    ),
+                  ),
+                ),
+
+                // ── 右侧单位（点击切换 km/h ⇄ mp/h）───────────────
+                Positioned(
+                  right: 22,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _toggleUnit,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 8,
+                        ),
+                        child: RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: _isMetric ? 'km' : 'mp',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const TextSpan(
+                                text: '/',
+                                style: TextStyle(
+                                  color: Color(0xFFC94A4A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const TextSpan(
+                                text: 'h',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
