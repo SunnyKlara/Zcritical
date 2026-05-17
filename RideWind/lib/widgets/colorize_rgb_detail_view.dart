@@ -97,7 +97,15 @@ class _ColorizeRGBDetailViewState extends State<ColorizeRGBDetailView> {
   Widget _buildRGBPositionCapsules(DeviceConnectConfig config) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final horizontalPadding = screenWidth * 0.035;
+    // 🛡️ horizontalPadding 在大屏边缘情况会导致 4 胶囊总宽 > 屏宽
+    //    (4 × capsuleWidth + 8 × hPad)，B 胶囊右侧出现 RenderFlex 溢出黄黑条。
+    //    动态 clamp：在自然 0.035 与"刚好不溢出"之间取小，胶囊本身宽度不变，
+    //    只在必要时把间距收紧 1-2px，肉眼不可见。
+    final naturalPad = screenWidth * 0.035;
+    final maxPadByFit =
+        (screenWidth - 4 * config.rgbCapsuleWidth) / 8 - 2; // -2 安全边距
+    final horizontalPadding =
+        naturalPad.clamp(0.0, maxPadByFit > 0 ? maxPadByFit : 0.0);
     final letterFontSize = screenWidth < 360
         ? 20.0
         : (screenWidth > 414 ? 30.0 : 24.0);
