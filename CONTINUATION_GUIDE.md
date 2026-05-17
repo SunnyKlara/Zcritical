@@ -195,6 +195,24 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - 性能注意：全屏弧形绘制用 atan2f 逐像素计算，首次进入可能有 200-400ms 延迟
   - 待 idf.py build 验证编译
 
+- 2026-05-17（第十五轮）：Git 分支规范化整理
+  - 确立分支命名规范：
+    - `main` = 稳定基线，可编译可烧录
+    - `app/xxx` = Flutter APP 功能分支（只改 RideWind/）
+    - `fw/xxx` = ESP32 固件功能分支（只改 ridewind-esp/）
+    - `feat/xxx` = 跨端功能（APP + 固件同时改）
+  - 执行重命名：
+    - `feature/treadmill-ui` → `fw/treadmill-ui`
+    - `feature/wave-effect-tuning` → `fw/wave-effect`
+  - 整理 stash：跑步机 UI 改动提交到 `fw/treadmill-ui`，波浪+音频 WIP 提交到 `fw/wave-effect`
+  - 最终分支结构：
+    - `main` — 稳定基线
+    - `app/colorize-custom-presets` — APP 自定义颜色胶囊
+    - `app/ui-refactor` — APP RGB 面板改进
+    - `fw/treadmill-ui` ★当前 — 固件跑步机 Forza UI
+    - `fw/wave-effect` — 固件波浪灯效 + 音频引擎
+  - 工作区干净，所有改动已提交到对应分支
+
 - 2026-05-15：方向转向「体验打磨期」
   - 用户实测后判断：功能跑通但"没经过精雕细作"，玩起来很多细节别扭
   - 协作模式确立：用户以产品经理身份提需求，AI 深入理解后从专业角度设计实现。用户说了就是确认，不等二次确认
