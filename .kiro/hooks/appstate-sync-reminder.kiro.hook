@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "AppState Sync Reminder",
+  "description": "当 app_state.h 被修改时，提醒检查 Flutter 端的 Provider 是否需要同步更新对应字段",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/app_state.h",
+      "**/app_state.c"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "你刚修改了 AppState（ESP 端的全局状态）。检查：1) 新增/修改的字段是否需要通过 BLE 协议暴露给 Flutter APP？2) 如果是，Flutter 端的 bluetooth_provider.dart 或对应 service 是否需要同步更新？3) protocol-contract.md 是否需要更新？如果不涉及跨端同步（比如只是内部逻辑变量），忽略此提醒。"
+  }
+}
