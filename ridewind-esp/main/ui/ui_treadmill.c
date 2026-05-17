@@ -58,10 +58,7 @@ static uint32_t s_last_tick = 0;
 #define ARC_START_DEG       135.0f
 #define ARC_SWEEP_DEG       270.0f
 
-/* ── Number Layout (same as Speed UI) ── */
-#define NUM_Y               94       /* Same vertical position */
-#define NUM_RIGHT_X         160      /* 右对齐锚点，和 Speed 的 F4_X_QI 一致 */
-#define NUM_JIANJU          (-2)     /* 和 Speed 一致 */
+/* ── Number Layout — 直接使用 Speed UI 的 F4 坐标 (F4_X_QI, F4_Y_QI, F4_JIANJU) ── */
 
 /* ── Indicator ── */
 /* 已移除 — 不需要指示点 */
@@ -86,11 +83,19 @@ static uint16_t arc_color(uint8_t pct)
 
 /* ══════ Arc Drawing ══════ */
 
-static inline float norm_angle(float a)
+/**
+ * 角度归一化：将 atan2 结果转为相对于 ARC_START_DEG 的偏移量
+ * 返回值 [0, 360)，其中 0 = 弧的起点，ARC_SWEEP_DEG = 弧的终点
+ * 超过 ARC_SWEEP_DEG 的像素不属于弧
+ */
+static float angle_to_arc_pos(float raw_deg)
 {
-    while (a < 0.0f) a += 360.0f;
-    while (a >= 360.0f) a -= 360.0f;
-    return a;
+    /* raw_deg 是 atan2 结果 [-180, 180]，先归一到 [0, 360) */
+    if (raw_deg < 0.0f) raw_deg += 360.0f;
+    /* 计算相对于起始角的偏移 */
+    float rel = raw_deg - ARC_START_DEG;
+    if (rel < 0.0f) rel += 360.0f;
+    return rel;
 }
 
 static void draw_arc(uint8_t fill_pct)
@@ -122,9 +127,9 @@ static void draw_arc(uint8_t fill_pct)
             int32_t d_sq = (int32_t)dx * dx + dy_sq;
             if (d_sq < r_in_sq || d_sq > r_out_sq) continue;
 
-            float angle = atan2f((float)dy, (float)dx) * 180.0f / (float)M_PI;
-            float rel = norm_angle(norm_angle(angle) - ARC_START_DEG);
-            if (rel > ARC_SWEEP_DEG) continue;
+            float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
+            float rel = angle_to_arc_pos(raw_deg);
+            if (rel > ARC_SWEEP_DEG + 0.5f) continue;  /* +0.5 容差 */
 
             if (rel <= fill_sweep) {
                 uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
@@ -174,10 +179,12 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
             int32_t d_sq = (int32_t)dx * dx + dy_sq;
             if (d_sq < r_in_sq || d_sq > r_out_sq) continue;
 
-            float angle = atan2f((float)dy, (float)dx) * 180.0f / (float)M_PI;
-            float rel = norm_angle(norm_angle(angle) - ARC_START_DEG);
-            if (rel > ARC_SWEEP_DEG) continue;
-            if (rel < lo || rel > hi) continue;
+            float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
+            float rel = angle_to_arc_pos(raw_deg);
+            if (rel > ARC_SWEEP_DEG + 0.5f) continue;
+
+            /* 只处理变化区域 */
+            if (rel < lo - 0.5f || rel > hi + 0.5f) continue;
 
             if (rel <= new_sw) {
                 uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
@@ -189,20 +196,21 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
     }
 }
 
-/* ══════ Number Drawing (F4 digit bitmaps, centered) ══════
- * 参考 Speed UI: 只清除数字精确区域，避免大面积黑闪
+/* ══════ Number Drawing ══════
+ * 完全参考 Speed UI (ui_speed.c) 的 draw_speed_screen():
+ * - 清除区域: drv_lcd_fill_rect(15, F4_Y_QI, 155-15, F4_SPEED_NUM_HIGH, 0x0000)
+ * - 渲染: ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI, display_spd, F4_JIANJU)
+ * 跑步机显示 0-20，直接用相同函数和坐标
  */
 
 static void draw_number(void)
 {
-    /* 和 Speed UI 一样：只清除数字所在的精确矩形区域 */
-    /* LCD_Fill(15, y_qi, 155, y_qi+speed_num_high) */
-    drv_lcd_fill_rect(15, NUM_Y, 155 - 15, F4_SPEED_NUM_HIGH, COLOR_BG);
+    /* 精确清除 — 和 Speed 完全一样的区域 */
+    drv_lcd_fill_rect(15, F4_Y_QI, 155 - 15, F4_SPEED_NUM_HIGH, 0x0000);
 
-    uint16_t spd = (uint16_t)s_treadmill_speed;
-
-    /* 右对齐渲染，和 Speed 完全相同的布局方式 */
-    ui_draw_large_number_right_ex(NUM_RIGHT_X, NUM_Y, spd, NUM_JIANJU);
+    /* 右对齐渲染，和 Speed 完全相同 */
+    ui_draw_large_number_right_ex(F4_X_QI, F4_Y_QI,
+                                  (uint16_t)s_treadmill_speed, F4_JIANJU);
 }
 
 /* ══════ Full Screen ══════ */
