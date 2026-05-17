@@ -294,10 +294,12 @@ void ui_treadmill_update(void)
 
     encoder_event_t evt;
     while (drv_encoder_poll(&evt)) {
-        if (evt.type == ENC_EVT_DOUBLE_CLICK || evt.type == ENC_EVT_LONG_PRESS) {
+        if (evt.type == ENC_EVT_DOUBLE_CLICK) {
+            /* 双击退出到菜单（长按是加速，不能用来退出） */
             ui_manager_set_ui(5);
             return;
         }
+        /* 其他事件忽略 — 油门模式通过 raw GPIO 检测按住状态 */
     }
 
     throttle_process();
