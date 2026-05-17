@@ -39,8 +39,6 @@ static const char *TAG = "UI_TREAD";
 static uint8_t  s_need_full_redraw = 1;
 static int16_t  s_treadmill_speed = 0;     /* 0-20 integer */
 static int16_t  s_last_drawn_speed = -1;
-static uint8_t  s_last_drawn_running = 0xFF;
-static uint8_t  s_treadmill_running = 0;
 static uint32_t s_last_tick = 0;
 
 /* ── Timing ── */
@@ -51,8 +49,6 @@ static uint32_t s_last_tick = 0;
 /* ── Colors ── */
 #define COLOR_BG            0x0000
 #define COLOR_ARC_BG        0x18E3   /* Very dark gray */
-#define COLOR_DOT_ON        0x07E0   /* Green */
-#define COLOR_DOT_OFF       0x3186   /* Dark gray */
 
 /* ── Arc Geometry ── */
 #define ARC_CX              120
@@ -62,14 +58,13 @@ static uint32_t s_last_tick = 0;
 #define ARC_START_DEG       135.0f
 #define ARC_SWEEP_DEG       270.0f
 
-/* ── Number Layout (centered in arc) ── */
-#define NUM_Y               94       /* Vertically centered */
-#define NUM_JIANJU          (-2)
+/* ── Number Layout (same as Speed UI) ── */
+#define NUM_Y               94       /* Same vertical position */
+#define NUM_RIGHT_X         160      /* 右对齐锚点，和 Speed 的 F4_X_QI 一致 */
+#define NUM_JIANJU          (-2)     /* 和 Speed 一致 */
 
 /* ── Indicator ── */
-#define IND_CX              120
-#define IND_CY              160
-#define IND_R               4
+/* 已移除 — 不需要指示点 */
 
 /* ══════ Arc Gradient Color ══════ */
 static uint16_t arc_color(uint8_t pct)
@@ -194,40 +189,20 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
     }
 }
 
-/* ══════ Number Drawing (F4 digit bitmaps, centered) ══════ */
+/* ══════ Number Drawing (F4 digit bitmaps, centered) ══════
+ * 参考 Speed UI: 只清除数字精确区域，避免大面积黑闪
+ */
 
 static void draw_number(void)
 {
-    /* Clear number area (inside arc) */
-    drv_lcd_fill_rect(40, NUM_Y, 160, F4_SPEED_NUM_HIGH, COLOR_BG);
+    /* 和 Speed UI 一样：只清除数字所在的精确矩形区域 */
+    /* LCD_Fill(15, y_qi, 155, y_qi+speed_num_high) */
+    drv_lcd_fill_rect(15, NUM_Y, 155 - 15, F4_SPEED_NUM_HIGH, COLOR_BG);
 
     uint16_t spd = (uint16_t)s_treadmill_speed;
-    uint8_t d_tens = spd / 10;
-    uint8_t d_ones = spd % 10;
 
-    if (spd >= 10) {
-        uint8_t w_t = ui_large_digit_width(d_tens);
-        uint8_t w_o = ui_large_digit_width(d_ones);
-        int16_t total = w_t + w_o + NUM_JIANJU;
-        int16_t x = (LCD_WIDTH - total) / 2;
-        ui_draw_large_digit((uint16_t)x, NUM_Y, d_tens);
-        x += w_t + NUM_JIANJU;
-        ui_draw_large_digit((uint16_t)x, NUM_Y, d_ones);
-    } else {
-        uint8_t w = ui_large_digit_width(d_ones);
-        int16_t x = (LCD_WIDTH - w) / 2;
-        ui_draw_large_digit((uint16_t)x, NUM_Y, d_ones);
-    }
-}
-
-/* ══════ Indicator ══════ */
-
-static void draw_indicator(void)
-{
-    uint16_t color = s_treadmill_running ? COLOR_DOT_ON : COLOR_DOT_OFF;
-    drv_lcd_fill_rect(IND_CX - IND_R - 1, IND_CY - IND_R - 1,
-                      (IND_R + 1) * 2, (IND_R + 1) * 2, COLOR_BG);
-    drv_lcd_draw_circle(IND_CX, IND_CY, IND_R, color, true);
+    /* 右对齐渲染，和 Speed 完全相同的布局方式 */
+    ui_draw_large_number_right_ex(NUM_RIGHT_X, NUM_Y, spd, NUM_JIANJU);
 }
 
 /* ══════ Full Screen ══════ */
@@ -238,9 +213,7 @@ static void draw_full_screen(void)
     uint8_t pct = (uint8_t)((uint32_t)s_treadmill_speed * 100 / TREAD_MAX_SPEED);
     draw_arc(pct);
     draw_number();
-    draw_indicator();
     s_last_drawn_speed = s_treadmill_speed;
-    s_last_drawn_running = s_treadmill_running;
 }
 
 /* ══════ Throttle ══════ */
@@ -255,7 +228,6 @@ static void throttle_process(void)
             s_last_tick = now;
             if (s_treadmill_speed < TREAD_MAX_SPEED) {
                 s_treadmill_speed++;
-                s_treadmill_running = 1;
                 char buf[32];
                 snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
                 ble_service_notify_str(buf);
@@ -265,7 +237,6 @@ static void throttle_process(void)
         if (elapsed >= TREAD_DECEL_MS && s_treadmill_speed > 0) {
             s_last_tick = now;
             s_treadmill_speed--;
-            if (s_treadmill_speed == 0) s_treadmill_running = 0;
             char buf[32];
             snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
             ble_service_notify_str(buf);
@@ -279,7 +250,6 @@ void ui_treadmill_enter(void)
 {
     s_need_full_redraw = 1;
     s_last_drawn_speed = -1;
-    s_last_drawn_running = 0xFF;
     s_last_tick = xTaskGetTickCount() * portTICK_PERIOD_MS;
     ESP_LOGI(TAG, "Treadmill entered, speed=%d", s_treadmill_speed);
 }
@@ -308,9 +278,5 @@ void ui_treadmill_update(void)
         update_arc_delta(s_last_drawn_speed, s_treadmill_speed);
         draw_number();
         s_last_drawn_speed = s_treadmill_speed;
-    }
-    if (s_treadmill_running != s_last_drawn_running) {
-        draw_indicator();
-        s_last_drawn_running = s_treadmill_running;
     }
 }
