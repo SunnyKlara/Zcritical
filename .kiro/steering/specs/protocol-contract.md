@@ -49,6 +49,7 @@ inclusion: manual
 | 雾化器 | `WUHUA:x\n` | 0/1 | `OK:WUHUA:x\r\n` |
 | UI 切换 | `UI:x\n` | 0-6 | `OK:UI:x\r\n` |
 | 油门模式 | `THROTTLE:x\n` | 0/1 | `OK:THROTTLE:x\r\n` |
+| 油门灯效 | `THROTTLE_FX:x\n` | 1-6 | `OK:THROTTLE_FX:x\r\n` |
 | 速度单位 | `UNIT:x\n` | 0=km/h, 1=mph | `OK:UNIT:x\r\n` |
 | LCD 开关 | `LCD:x\n` | 0/1 | `OK:LCD:x\r\n` |
 

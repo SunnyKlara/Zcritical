@@ -1,10 +1,10 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../configs/device_connect_config.dart';
 import '../controllers/colorize_controller.dart';
 import '../core/service_locator.dart';
 import 'device_connect_helpers.dart';
+import 'throttle_effect_selector.dart';
 
 /// Colorize Preset UI — 颜色胶囊条 + 转盘动画 + 底部按钮
 ///
@@ -17,6 +17,8 @@ class ColorizePresetView extends StatefulWidget {
   final GlobalKey startColoringButtonKey;
   final GlobalKey paletteButtonKey;
   final bool debugMode;
+  /// 🎨 点击调色盘按钮时的回调：导航到 RGB 面板（顶层 PageView 右侧页）
+  final VoidCallback? onPaletteTap;
 
   const ColorizePresetView({
     super.key,
@@ -26,6 +28,7 @@ class ColorizePresetView extends StatefulWidget {
     required this.startColoringButtonKey,
     required this.paletteButtonKey,
     this.debugMode = false,
+    this.onPaletteTap,
   });
 
   @override
@@ -72,16 +75,12 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // "开始涂色" 按钮
+                  // "油门灯效" 按钮（原"开始涂色"）
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
                         HapticFeedback.heavyImpact();
-                        if (_colorize.isSpinning) {
-                          _colorize.setSpinning(false);
-                        } else {
-                          _startSpinAnimation();
-                        }
+                        ThrottleEffectSelector.show(context);
                       },
                       behavior: HitTestBehavior.opaque,
                       child: Container(
@@ -89,19 +88,17 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                         height: config.startColoringButtonTapHeight,
                         decoration: BoxDecoration(
                           color: widget.debugMode
-                              ? (_colorize.isSpinning
-                                    ? Colors.red.withValues(alpha: 0.3)
-                                    : Colors.green.withValues(alpha: 0.3))
+                              ? Colors.green.withValues(alpha: 0.3)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(
                             config.startColoringButtonTapHeight / 2,
                           ),
                         ),
                         child: widget.debugMode
-                            ? Center(
+                            ? const Center(
                                 child: Text(
-                                  _colorize.isSpinning ? '点击停止' : '开始涂色',
-                                  style: const TextStyle(color: Colors.white),
+                                  '油门灯效',
+                                  style: TextStyle(color: Colors.white),
                                 ),
                               )
                             : null,
@@ -113,9 +110,8 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.mediumImpact();
-                      _colorize.setColorizeState(ColorizeState.rgbDetail);
-                      _colorize.lastSentHardwareUI = 3;
-                      // 硬件同步由外部处理
+                      // 🔑 RGB 面板现为独立顶层页，通过回调导航到右侧页
+                      widget.onPaletteTap?.call();
                     },
                     behavior: HitTestBehavior.opaque,
                     child: Container(
@@ -154,7 +150,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
     final double triangleTopOffset = capsuleHeight + 35;
     final double screenWidth = MediaQuery.of(context).size.width;
     final double triangleLeftPosition =
-        screenWidth / 2 - 14 + _colorize.indicatorOffset;
+        screenWidth / 2 - 14;
 
     return SizedBox(
       height: containerHeight,
@@ -162,9 +158,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
         clipBehavior: Clip.none,
         children: [
           AnimatedPositioned(
-            duration: _colorize.isSpinning
-                ? const Duration(milliseconds: 30)
-                : const Duration(milliseconds: 150),
+            duration: const Duration(milliseconds: 150),
             top: triangleTopOffset,
             left: triangleLeftPosition,
             child: CustomPaint(
@@ -185,9 +179,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                 key: widget.colorPageViewKey,
                 controller: widget.colorPageController,
                 padEnds: true,
-                physics: _colorize.isSpinning
-                    ? const NeverScrollableScrollPhysics()
-                    : const BouncingScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 onPageChanged: (index) {
                   _colorize.setSelectedColorIndex(index);
                   HapticFeedback.selectionClick();
@@ -241,7 +233,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
 
     return GestureDetector(
       onTap: () {
-        if (distance != 0 && !_colorize.isSpinning) {
+        if (distance != 0) {
           widget.colorPageController.animateToPage(
             index,
             duration: const Duration(milliseconds: 300),
@@ -251,13 +243,9 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
       },
       child: Center(
         child: Transform.translate(
-          offset: Offset(0, _colorize.isSpinning ? _colorize.bounceOffset : 0),
+          offset: Offset.zero,
           child: Transform.scale(
-            scale: _colorize.isSpinning
-                ? (distance == 0
-                      ? _colorize.bounceScale * 1.15
-                      : _colorize.bounceScale)
-                : scale,
+            scale: distance == 0 ? 1.15 : scale,
             child: Container(
               width: capsuleWidth,
               height: capsuleHeight,
@@ -313,70 +301,5 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
         ),
       ),
     );
-  }
-
-  Future<void> _startSpinAnimation() async {
-    if (_colorize.isSpinning) return;
-
-    _colorize.setSpinning(true);
-    HapticFeedback.heavyImpact();
-
-    final totalItems = _colorize.ledColorCapsules.length;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final maxOffset = screenWidth * 0.5;
-
-    int bounceFrame = 0;
-
-    while (_colorize.isSpinning && mounted) {
-      for (int i = 0; i <= totalItems - 1; i += 3) {
-        if (!_colorize.isSpinning || !mounted ||
-            !widget.colorPageController.hasClients) return;
-
-        final pos = i.clamp(0, totalItems - 1);
-        final progress = pos / (totalItems - 1);
-        final offset = maxOffset - progress * maxOffset * 2;
-
-        bounceFrame++;
-        final bounceY = sin(bounceFrame * 0.8) * 25;
-        final bounceS = 1.0 + sin(bounceFrame * 0.6) * 0.15;
-
-        _colorize.updateSpinAnimationFrame(
-          indicatorOffset: offset,
-          bounceOffset: bounceY,
-          bounceScale: bounceS,
-          selectedIndex: pos,
-        );
-
-        widget.colorPageController.jumpToPage(pos);
-        HapticFeedback.selectionClick();
-        await Future.delayed(const Duration(milliseconds: 35));
-      }
-
-      for (int i = totalItems - 1; i >= 0; i -= 3) {
-        if (!_colorize.isSpinning || !mounted ||
-            !widget.colorPageController.hasClients) return;
-
-        final pos = i.clamp(0, totalItems - 1);
-        final progress = pos / (totalItems - 1);
-        final offset = maxOffset - progress * maxOffset * 2;
-
-        bounceFrame++;
-        final bounceY = sin(bounceFrame * 0.8) * 25;
-        final bounceS = 1.0 + sin(bounceFrame * 0.6) * 0.15;
-
-        _colorize.updateSpinAnimationFrame(
-          indicatorOffset: offset,
-          bounceOffset: bounceY,
-          bounceScale: bounceS,
-          selectedIndex: pos,
-        );
-
-        widget.colorPageController.jumpToPage(pos);
-        HapticFeedback.selectionClick();
-        await Future.delayed(const Duration(milliseconds: 35));
-      }
-    }
-
-    _colorize.setSpinning(false);
   }
 }

@@ -431,6 +431,12 @@ class BluetoothProvider with ChangeNotifier {
     return _cmd.getStreamlightStatus();
   }
 
+  /// 设置油门灯效模式 (1-6)
+  Future<bool> setThrottleEffect(int mode) async {
+    if (!isConnected) return false;
+    return _cmd.setThrottleEffect(mode);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  音量控制
   // ═══════════════════════════════════════════════════════════════

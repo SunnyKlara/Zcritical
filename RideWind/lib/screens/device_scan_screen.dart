@@ -1,15 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/sound_wave_scanner.dart';
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
-import '../services/ble_service.dart';
 import 'device_connect_screen.dart';
-import 'device_list_screen.dart';
-import 'no_device_screen.dart';
 
 class DeviceScanScreen extends StatefulWidget {
   const DeviceScanScreen({super.key});
@@ -21,11 +17,10 @@ class DeviceScanScreen extends StatefulWidget {
 class _DeviceScanScreenState extends State<DeviceScanScreen>
     with TickerProviderStateMixin {
   bool _showDialog = false;
-  bool _isConnecting = false;
+  bool _isError = false; // 未找到 / 连接失败 / 扫描异常
   DeviceModel? _foundDevice;
   String _statusText = '扫描中...';
-  bool _showDebugLog = false;
-  final List<String> _debugLogs = [];
+  String _hintText = '请确保您的设备处于配对模式';
 
   late AnimationController _slideController;
   late AnimationController _blurController;
@@ -77,16 +72,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
     super.dispose();
   }
 
-  /// 添加调试日志并刷新 UI
+  /// 调试日志（仅打印到控制台，不再展示在 UI）
   void _log(String msg) {
     final ts = DateTime.now().toString().substring(11, 19);
-    final line = '[$ts] $msg';
-    debugPrint('🐛 $line');
-    if (mounted) {
-      setState(() {
-        _debugLogs.add(line);
-      });
-    }
+    debugPrint('🐛 [$ts] $msg');
   }
 
   /// 真实的蓝牙扫描流程（带详细日志）
@@ -96,6 +85,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
     try {
       setState(() {
         _statusText = '扫描中...';
+        _hintText = '请确保您的设备处于配对模式';
+        _isError = false;
       });
 
       // 1. 检查蓝牙支持
@@ -140,9 +131,10 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
       // 5. 检查结果
       if (btProvider.devices.isEmpty) {
         _log('❌ 未找到 FFE0 设备');
-        // 不自动返回，让用户看日志
         setState(() {
           _statusText = '未找到设备';
+          _hintText = '请确保您的设备处于配对模式';
+          _isError = true;
         });
         return;
       }
@@ -153,7 +145,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
       _log('🔗 开始连接...');
 
       setState(() {
-        _isConnecting = true;
+        _statusText = '连接中...';
+        _hintText = '正在建立连接，请稍候...';
       });
 
       bool connected = await btProvider.connectToDevice(_foundDevice!);
@@ -163,7 +156,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
         _log('❌ 连接失败');
         setState(() {
           _statusText = '连接失败';
-          _isConnecting = false;
+          _hintText = '请重试或检查设备';
+          _isError = true;
         });
         return;
       }
@@ -173,7 +167,6 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
       if (mounted) {
         setState(() {
           _showDialog = true;
-          _isConnecting = false;
         });
         _slideController.forward();
         _blurController.forward();
@@ -183,8 +176,50 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
       _log('堆栈: ${stack.toString().split('\n').take(3).join(' | ')}');
       setState(() {
         _statusText = '扫描异常';
+        _hintText = '请重试';
+        _isError = true;
       });
     }
+  }
+
+  /// 显示连接排查建议对话框
+  void _showTroubleshootingDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Colors.white70, size: 24),
+            SizedBox(width: 8),
+            Text('连接排查建议',
+                style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _TipRow(icon: Icons.power_settings_new, text: '确认设备已开机并处于配对模式'),
+            SizedBox(height: 12),
+            _TipRow(icon: Icons.bluetooth, text: '检查手机蓝牙是否已开启'),
+            SizedBox(height: 12),
+            _TipRow(icon: Icons.location_on, text: '确认已授予位置权限（蓝牙扫描需要）'),
+            SizedBox(height: 12),
+            _TipRow(icon: Icons.signal_cellular_alt, text: '将手机靠近设备（建议1米内）'),
+            SizedBox(height: 12),
+            _TipRow(icon: Icons.refresh, text: '尝试重启设备后再次扫描'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('知道了', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -196,15 +231,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
         body: Stack(
           children: [
             // 🔧 后备背景层（防止所有内容都透明时显示黑屏）
-            Container(
-              color: const Color(0xFF0D0D0D),
-              child: const Center(
-                child: Text(
-                  '正在加载...',
-                  style: TextStyle(color: Colors.white30, fontSize: 14),
-                ),
-              ),
-            ),
+            Container(color: const Color(0xFF0D0D0D)),
             
             // 扫描界面（始终显示，作为背景）
             AnimatedBuilder(
@@ -243,89 +270,6 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                 position: _slideAnimation,
                 child: _buildDeviceFoundDialog(),
               ),
-            
-            // 🐛 调试日志面板
-            if (_showDebugLog)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 8,
-                left: 8,
-                right: 8,
-                bottom: 80,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(230),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.withAlpha(100)),
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.bug_report, color: Colors.green, size: 18),
-                            const SizedBox(width: 8),
-                            const Text('BLE 调试日志', style: TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.bold)),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: () {
-                                // 复制日志到剪贴板
-                                Clipboard.setData(ClipboardData(text: _debugLogs.join('\n')));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('日志已复制'), duration: Duration(seconds: 1)),
-                                );
-                              },
-                              child: const Icon(Icons.copy, color: Colors.white54, size: 18),
-                            ),
-                            const SizedBox(width: 12),
-                            GestureDetector(
-                              onTap: () => setState(() => _showDebugLog = false),
-                              child: const Icon(Icons.close, color: Colors.white54, size: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(color: Colors.green, height: 1),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(8),
-                          itemCount: _debugLogs.length,
-                          itemBuilder: (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(
-                              _debugLogs[i],
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // 🐛 调试按钮（右下角）
-            Positioned(
-              bottom: 90,
-              right: 16,
-              child: GestureDetector(
-                onTap: () => setState(() => _showDebugLog = !_showDebugLog),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _showDebugLog ? Colors.green : Colors.white.withAlpha(30),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.green.withAlpha(150)),
-                  ),
-                  child: const Icon(Icons.bug_report, color: Colors.white, size: 24),
-                ),
-              ),
-            ),
           ],
         ),
       );
@@ -387,9 +331,9 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
 
             const SizedBox(height: 8),
 
-            // 提示文本
+            // 提示文本（随状态切换文案）
             Text(
-              _isConnecting ? '正在建立连接，请稍候...' : '请确保您的设备处于配对模式',
+              _hintText,
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 20,
@@ -399,56 +343,76 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
 
             const Spacer(),
 
-            // 声波扫描动画
-            const Center(
-              child: SoundWaveScanner(
-                isScanning: true,
-                width: 280,
-                height: 200,
+            // 声波扫描动画（错误态降低不透明度作为视觉淡化）
+            Center(
+              child: Opacity(
+                opacity: _isError ? 0.35 : 1.0,
+                child: SoundWaveScanner(
+                  isScanning: !_isError,
+                  width: 280,
+                  height: 200,
+                ),
               ),
             ),
 
             const Spacer(),
 
-            // 底部按钮
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text(
+            // 排查建议链接（仅错误态显示）
+            if (_isError)
+              Center(
+                child: GestureDetector(
+                  onTap: _showTroubleshootingDialog,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
                       '没有扫描到设备?',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      debugPrint('✅ 跳过扫描按钮被点击 → 返回添加设备页面');
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text(
-                      '跳过扫描',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4DA6FF),
+                        fontSize: 12,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF4DA6FF),
                       ),
                     ),
                   ),
                 ),
-              ],
+              ),
+
+            const SizedBox(height: 8),
+
+            // 底部唯一按钮（宽长条：取消 / 重试）
+            GestureDetector(
+              onTap: () {
+                if (_isError) {
+                  _startScanning();
+                } else {
+                  debugPrint('✅ 取消扫描 → 返回上一页');
+                  Navigator.of(context).pop();
+                }
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  border: Border.all(color: Colors.white24, width: 1),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Text(
+                  _isError ? '重试' : '取消',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha((255 * 0.75).round()),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -568,6 +532,30 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 排查建议条目（图标 + 文字）
+class _TipRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _TipRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.white70, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+          ),
+        ),
+      ],
     );
   }
 }

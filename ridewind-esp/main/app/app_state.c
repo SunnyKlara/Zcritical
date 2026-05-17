@@ -1,4 +1,5 @@
 #include "app_state.h"
+#include "led_effects.h"
 #include <string.h>
 
 app_state_t       g_app_state;
@@ -48,6 +49,7 @@ void app_state_init(void)
     g_app_state.breath_color_index = 1;
     g_app_state.last_reported_speed = -1;
     g_app_state.throttle_frozen_speed = -1;
+    g_app_state.throttle_fx_mode = THROTTLE_FX_WAVE;  /* Default: wave breathing */
 
     /* Boot into menu */
     g_app_state.ui  = 5;

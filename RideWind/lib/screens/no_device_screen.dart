@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'device_scan_screen.dart';
 import 'device_connect_screen.dart';
 import 'device_list_screen.dart';
+import 'settings_screen.dart';
 import '../models/device_model.dart';
 import '../utils/responsive_utils.dart';
 import '../services/feedback_service.dart'; // ✅ 操作反馈服务
@@ -231,13 +232,29 @@ class NoDeviceScreen extends StatelessWidget {
               ),
             ),
 
-            // 用户按钮（透明点击区域 - 保留背景图位置占位）
+            // 设置入口（替代"用户头像"心智模型，使用 Icons.tune）
             Positioned(
               top: backButtonTop,
               right: userButtonRight,
-              child: Container(
-                width: buttonSize,
-                height: buttonSize,
+              child: GestureDetector(
+                onTap: () {
+                  debugPrint('⚙️ 设置按钮被点击 → 跳转 SettingsScreen');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: buttonSize,
+                  height: buttonSize,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.tune,
+                    color: Colors.white.withAlpha((255 * 0.85).round()),
+                    size: ResponsiveUtils.isSmallScreen(context) ? 24 : 26,
+                  ),
+                ),
               ),
             ),
 

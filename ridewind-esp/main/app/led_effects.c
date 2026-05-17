@@ -16,6 +16,12 @@ static uint32_t s_streamlight_tick = 0;
 static uint32_t s_breathing_tick = 0;
 static uint8_t  s_breathing_active = 0;
 static uint8_t  s_streamlight_running = 0;
+static uint8_t  s_throttle_fx_active = 0;
+static uint32_t s_throttle_fx_tick = 0;
+static uint16_t s_throttle_fx_phase = 0;
+
+/* Forward declaration */
+static void throttle_fx_process(void);
 
 void led_effects_init(void)
 {
@@ -259,6 +265,12 @@ led_effect_priority_t led_effects_get_active_priority(void)
 
 void led_effects_process(void)
 {
+    /* Throttle effect takes highest priority when active */
+    if (s_throttle_fx_active) {
+        throttle_fx_process();
+        return;
+    }
+
     led_effect_priority_t prio = led_effects_get_active_priority();
 
     switch (prio) {
@@ -275,4 +287,372 @@ void led_effects_process(void)
         gradient_process();
         break;
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  Throttle LED Effects — 6 speed-reactive modes for throttle mode
+ *  All effects use g_app_state.current_speed_kmh (0-100) as input.
+ *  Hardware: Main strip (6 LEDs, indices 2-7 on phys strip 0)
+ *            Tail strip (3 LEDs, indices 0-2 on phys strip 1)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/* Speed-to-color: blue(0%) → yellow(50%) → red(100%) */
+static void speed_to_rgb(uint8_t percent, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    if (percent > 100) percent = 100;
+    if (percent <= 50) {
+        uint16_t t = (uint16_t)percent * 2;
+        *r = (uint8_t)(0 + 255 * t / 100);
+        *g = (uint8_t)(180 + 30 * t / 100);
+        *b = (uint8_t)(255 - 175 * t / 100);
+    } else {
+        uint16_t t = (uint16_t)(percent - 50) * 2;
+        *r = 255;
+        *g = (uint8_t)(210 - 170 * t / 100);
+        *b = (uint8_t)(80 - 50 * t / 100);
+    }
+}
+
+/* ── Effect 1: Tachometer Fill ──
+ * Speed maps to how many of the 6 Main LEDs are lit.
+ * Color shifts blue→red with speed. Tail flashes at speed-proportional rate. */
+static void throttle_fx_tachometer(uint8_t spd)
+{
+    uint8_t r, g, b;
+    speed_to_rgb(spd, &r, &g, &b);
+
+    /* Main: fill 0-6 LEDs based on speed */
+    uint8_t lit = (uint8_t)((uint16_t)spd * 6 / 100);
+    if (spd > 0 && lit == 0) lit = 1;
+
+    for (int i = 0; i < 6; i++) {
+        if (i < lit) {
+            drv_led_set_pixel(0, LED_MAIN_START + i, r, g, b);
+        } else {
+            drv_led_set_pixel(0, LED_MAIN_START + i, 0, 0, 0);
+        }
+    }
+
+    /* Tail: flash at speed-proportional rate (0=steady, 100=10Hz) */
+    if (spd < 10) {
+        /* Below 10%: tail steady on */
+        for (int i = 0; i < LED_TAIL_COUNT; i++)
+            drv_led_set_pixel(1, LED_TAIL_START + i, r, g, b);
+    } else {
+        /* Flash period: 500ms(spd=10) → 50ms(spd=100) */
+        uint16_t period = 500 - (uint16_t)(spd - 10) * 450 / 90;
+        uint8_t on = (s_throttle_fx_phase % period) < (period / 2);
+        for (int i = 0; i < LED_TAIL_COUNT; i++) {
+            if (on) drv_led_set_pixel(1, LED_TAIL_START + i, r, g, b);
+            else    drv_led_set_pixel(1, LED_TAIL_START + i, 0, 0, 0);
+        }
+    }
+
+    /* Redline flash: all blink at 90%+ */
+    if (spd >= 90) {
+        uint8_t blink = (s_throttle_fx_phase % 80) < 40;
+        if (!blink) {
+            for (int i = 0; i < 6; i++)
+                drv_led_set_pixel(0, LED_MAIN_START + i, 0, 0, 0);
+        }
+    }
+
+    drv_led_refresh();
+}
+
+/* ── Effect 2: Pulse Wave ──
+ * Pulse expands from center (LED 3) outward. Speed controls frequency. */
+static void throttle_fx_pulse(uint8_t spd)
+{
+    uint8_t r, g, b;
+    speed_to_rgb(spd, &r, &g, &b);
+
+    /* Pulse period: 1000ms(spd=0) → 100ms(spd=100) */
+    uint16_t period = (spd == 0) ? 1000 : 1000 - (uint16_t)spd * 900 / 100;
+    if (period < 100) period = 100;
+
+    /* Phase within one pulse cycle (0 to period) */
+    uint16_t phase_in_cycle = s_throttle_fx_phase % period;
+    /* Normalize to 0-3 (expansion radius) */
+    uint8_t radius = (uint8_t)((uint32_t)phase_in_cycle * 4 / period);
+
+    /* Center is LED index 2,3 (middle of 6). Expand outward. */
+    for (int i = 0; i < 6; i++) {
+        int dist = (i < 3) ? (2 - i) : (i - 3);
+        uint8_t brightness;
+        if (dist == radius) {
+            brightness = 255;
+        } else if (radius > 0 && dist == radius - 1) {
+            brightness = 100;
+        } else {
+            brightness = 0;
+        }
+        drv_led_set_pixel(0, LED_MAIN_START + i,
+            (uint8_t)((uint16_t)r * brightness / 255),
+            (uint8_t)((uint16_t)g * brightness / 255),
+            (uint8_t)((uint16_t)b * brightness / 255));
+    }
+
+    /* Tail: sync flash with pulse peak */
+    uint8_t tail_on = (radius >= 2);
+    for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        if (tail_on) drv_led_set_pixel(1, LED_TAIL_START + i, r, g, b);
+        else         drv_led_set_pixel(1, LED_TAIL_START + i, 0, 0, 0);
+    }
+
+    drv_led_refresh();
+}
+
+/* ── Effect 3: Chase ──
+ * Light point runs across Main strip, then jumps to Tail. */
+static void throttle_fx_chase(uint8_t spd)
+{
+    uint8_t r, g, b;
+    speed_to_rgb(spd, &r, &g, &b);
+
+    /* Total positions: 6 (Main) + 3 (Tail) = 9 */
+    uint16_t period = (spd == 0) ? 600 : 600 - (uint16_t)spd * 540 / 100;
+    if (period < 60) period = 60;
+
+    uint8_t pos = (uint8_t)((uint32_t)(s_throttle_fx_phase % period) * 9 / period);
+
+    /* Clear all */
+    for (int i = 0; i < 6; i++)
+        drv_led_set_pixel(0, LED_MAIN_START + i, 0, 0, 0);
+    for (int i = 0; i < LED_TAIL_COUNT; i++)
+        drv_led_set_pixel(1, LED_TAIL_START + i, 0, 0, 0);
+
+    /* Draw head + trail */
+    if (pos < 6) {
+        drv_led_set_pixel(0, LED_MAIN_START + pos, r, g, b);
+        if (pos > 0)
+            drv_led_set_pixel(0, LED_MAIN_START + pos - 1, r/3, g/3, b/3);
+    } else {
+        uint8_t tp = pos - 6;
+        drv_led_set_pixel(1, LED_TAIL_START + tp, r, g, b);
+        if (tp > 0)
+            drv_led_set_pixel(1, LED_TAIL_START + tp - 1, r/3, g/3, b/3);
+        else
+            drv_led_set_pixel(0, LED_MAIN_START + 5, r/3, g/3, b/3);
+    }
+
+    drv_led_refresh();
+}
+
+/* ── Effect 4: Alternate ──
+ * Main and Tail alternate on/off. Speed controls flash rate. */
+static void throttle_fx_alternate(uint8_t spd)
+{
+    uint8_t r, g, b;
+    speed_to_rgb(spd, &r, &g, &b);
+
+    /* Period: 500ms(spd=0, 1Hz) → 33ms(spd=100, 15Hz) */
+    uint16_t period = (spd == 0) ? 500 : 500 - (uint16_t)spd * 467 / 100;
+    if (period < 33) period = 33;
+
+    uint8_t main_on = (s_throttle_fx_phase % period) < (period / 2);
+
+    for (int i = 0; i < 6; i++) {
+        if (main_on) drv_led_set_pixel(0, LED_MAIN_START + i, r, g, b);
+        else         drv_led_set_pixel(0, LED_MAIN_START + i, 0, 0, 0);
+    }
+    for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        if (!main_on) drv_led_set_pixel(1, LED_TAIL_START + i, r, g, b);
+        else          drv_led_set_pixel(1, LED_TAIL_START + i, 0, 0, 0);
+    }
+
+    drv_led_refresh();
+}
+
+/* ── Effect 5: Wave Breathing (Ocean Wave Style) ──
+ *
+ * All LEDs breathe together — like ocean waves, one surge at a time.
+ * 3500ms period, ease-in-out curve, strong contrast (3% → 100%).
+ * Peak holds briefly, trough holds briefly — natural wave rhythm.
+ *
+ * Uses user's preset color from led_colors[]. */
+static void throttle_fx_wave(uint8_t spd)
+{
+    (void)spd;
+
+    /* Use Main strip preset color */
+    uint8_t r = g_app_state.led_colors[0][0];
+    uint8_t g = g_app_state.led_colors[0][1];
+    uint8_t b = g_app_state.led_colors[0][2];
+
+    /* Tail preset color */
+    uint8_t tr = g_app_state.led_colors[3][0];
+    uint8_t tg = g_app_state.led_colors[3][1];
+    uint8_t tb = g_app_state.led_colors[3][2];
+
+    #define WAVE_PERIOD_MS    3500
+    #define WAVE_MIN_BRIGHT   8     /* ~3% — very dim but not dead */
+
+    /* Phase: 0 to WAVE_PERIOD_MS, wrapping */
+    uint16_t phase = s_throttle_fx_phase % WAVE_PERIOD_MS;
+
+    /* Normalize to 0-255 for brightness calculation */
+    /* Wave shape: ease-in-out with peak/trough hold
+     *
+     * Timeline (3500ms total):
+     *   0-300ms:    trough hold (stay dim)
+     *   300-1400ms: rise (ease-in: slow start, fast middle)
+     *   1400-2100ms: peak hold (stay bright)
+     *   2100-3200ms: fall (ease-out: fast start, slow end)
+     *   3200-3500ms: trough hold (stay dim)
+     */
+    uint8_t brightness;
+
+    if (phase < 300) {
+        /* Trough hold */
+        brightness = WAVE_MIN_BRIGHT;
+    } else if (phase < 1400) {
+        /* Rise: 300→1400 (1100ms), ease-in (quadratic) */
+        uint32_t t = phase - 300;  /* 0 to 1100 */
+        /* Quadratic ease-in: (t/1100)^2 mapped to 0-255 */
+        uint32_t norm = t * 255 / 1100;  /* 0-255 */
+        uint8_t raw = (uint8_t)(norm * norm / 255);  /* quadratic */
+        brightness = WAVE_MIN_BRIGHT + (uint8_t)((uint16_t)raw * (255 - WAVE_MIN_BRIGHT) / 255);
+    } else if (phase < 2100) {
+        /* Peak hold */
+        brightness = 255;
+    } else if (phase < 3200) {
+        /* Fall: 2100→3200 (1100ms), ease-out (inverse quadratic) */
+        uint32_t t = phase - 2100;  /* 0 to 1100 */
+        uint32_t norm = t * 255 / 1100;  /* 0-255 */
+        /* Ease-out: 1 - (1-t)^2 inverted → starts fast, ends slow */
+        uint8_t inv = 255 - (uint8_t)norm;
+        uint8_t raw = (uint8_t)((uint16_t)inv * inv / 255);  /* high at start, low at end */
+        brightness = WAVE_MIN_BRIGHT + (uint8_t)((uint16_t)raw * (255 - WAVE_MIN_BRIGHT) / 255);
+    } else {
+        /* Trough hold */
+        brightness = WAVE_MIN_BRIGHT;
+    }
+
+    /* Apply to ALL Main LEDs simultaneously */
+    for (int i = 0; i < 6; i++) {
+        drv_led_set_pixel(0, LED_MAIN_START + i,
+            (uint8_t)((uint16_t)r * brightness / 255),
+            (uint8_t)((uint16_t)g * brightness / 255),
+            (uint8_t)((uint16_t)b * brightness / 255));
+    }
+
+    /* Tail: same brightness, same rhythm (all together) */
+    for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        drv_led_set_pixel(1, LED_TAIL_START + i,
+            (uint8_t)((uint16_t)tr * brightness / 255),
+            (uint8_t)((uint16_t)tg * brightness / 255),
+            (uint8_t)((uint16_t)tb * brightness / 255));
+    }
+
+    drv_led_refresh();
+
+    #undef WAVE_PERIOD_MS
+    #undef WAVE_MIN_BRIGHT
+}
+
+/* ── Effect 6: Lightning ──
+ * Random white flashes. Higher speed = more frequent. */
+static void throttle_fx_lightning(uint8_t spd)
+{
+    uint8_t r, g, b;
+    speed_to_rgb(spd, &r, &g, &b);
+
+    static uint8_t s_flash_countdown = 0;
+    static uint8_t s_flash_duration = 0;
+
+    if (s_flash_duration > 0) {
+        s_flash_duration--;
+        for (int i = 0; i < 6; i++)
+            drv_led_set_pixel(0, LED_MAIN_START + i, 255, 255, 255);
+        for (int i = 0; i < LED_TAIL_COUNT; i++)
+            drv_led_set_pixel(1, LED_TAIL_START + i, 255, 255, 255);
+    } else {
+        uint8_t dim = 40 + spd / 4;
+        for (int i = 0; i < 6; i++)
+            drv_led_set_pixel(0, LED_MAIN_START + i,
+                (uint8_t)((uint16_t)r * dim / 255),
+                (uint8_t)((uint16_t)g * dim / 255),
+                (uint8_t)((uint16_t)b * dim / 255));
+        for (int i = 0; i < LED_TAIL_COUNT; i++)
+            drv_led_set_pixel(1, LED_TAIL_START + i,
+                (uint8_t)((uint16_t)r * dim / 255),
+                (uint8_t)((uint16_t)g * dim / 255),
+                (uint8_t)((uint16_t)b * dim / 255));
+
+        if (s_flash_countdown == 0) {
+            uint8_t max_interval = (spd == 0) ? 250 : (uint8_t)(250 - spd * 240 / 100);
+            if (max_interval < 10) max_interval = 10;
+            s_flash_countdown = (uint8_t)((s_throttle_fx_phase * 7 + 13) % max_interval) + 3;
+        } else {
+            s_flash_countdown--;
+            if (s_flash_countdown == 0) {
+                s_flash_duration = 2 + (s_throttle_fx_phase & 0x03);
+            }
+        }
+    }
+
+    drv_led_refresh();
+}
+
+/* ── Throttle FX dispatcher ── */
+
+static void throttle_fx_process(void)
+{
+    uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    if (now - s_throttle_fx_tick < 20) return;  /* 50fps */
+    s_throttle_fx_tick = now;
+    s_throttle_fx_phase += 20;
+
+    uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
+    if (spd > 100) spd = 100;
+
+    switch (g_app_state.throttle_fx_mode) {
+    case THROTTLE_FX_TACHOMETER: throttle_fx_tachometer(spd); break;
+    case THROTTLE_FX_PULSE:      throttle_fx_pulse(spd);      break;
+    case THROTTLE_FX_CHASE:      throttle_fx_chase(spd);      break;
+    case THROTTLE_FX_ALTERNATE:  throttle_fx_alternate(spd);  break;
+    case THROTTLE_FX_WAVE:       throttle_fx_wave(spd);       break;
+    case THROTTLE_FX_LIGHTNING:  throttle_fx_lightning(spd);  break;
+    default:                     throttle_fx_alternate(spd);  break;
+    }
+}
+
+/* ── Throttle FX public API ── */
+
+void led_effects_throttle_start(void)
+{
+    s_throttle_fx_active = 1;
+    s_throttle_fx_tick = 0;
+    s_throttle_fx_phase = 0;
+}
+
+void led_effects_throttle_stop(void)
+{
+    s_throttle_fx_active = 0;
+    /* Restore static colors */
+    for (int i = 0; i < 4; i++) {
+        drv_led_set_strip_color((led_strip_id_t)i,
+            g_app_state.led_colors[i][0],
+            g_app_state.led_colors[i][1],
+            g_app_state.led_colors[i][2]);
+    }
+    drv_led_refresh();
+}
+
+void led_effects_set_throttle_mode(uint8_t mode)
+{
+    if (mode >= 1 && mode <= 6) {
+        g_app_state.throttle_fx_mode = mode;
+    }
+}
+
+uint8_t led_effects_get_throttle_mode(void)
+{
+    return g_app_state.throttle_fx_mode;
+}
+
+bool led_effects_throttle_active(void)
+{
+    return s_throttle_fx_active != 0;
 }
