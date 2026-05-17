@@ -172,18 +172,33 @@ class ColorizeController extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════
 
   /// 硬件预设报告回调（由 presetReportStream 驱动）
+  ///
+  /// 🔒 守护逻辑：如果当前选中的是自定义胶囊（[_selectedColorIndex] >= presetCount），
+  /// 说明用户的意图是自定义色，硬件刚才报告的预设值不该覆盖 app 状态。
+  /// 此时反向同步：把当前自定义胶囊重新铺到硬件，让硬件回归用户的选择。
   void onPresetReport(int preset) {
     final appIndex = preset - 1;
-    if (appIndex >= 0 && appIndex < ledColorCapsules.length) {
-      debugPrint('🎨 收到硬件预设报告: $preset -> APP索引: $appIndex');
-      _isReceivingPresetReport = true;
-      _selectedColorIndex = appIndex;
-      applyPresetToLocalColors(appIndex);
-      notifyListeners();
-      Future.delayed(const Duration(milliseconds: 150), () {
-        _isReceivingPresetReport = false;
-      });
+    if (appIndex < 0 || appIndex >= ledColorCapsules.length) return;
+
+    if (_selectedColorIndex >= presetCount &&
+        _selectedColorIndex < presetCount + _customPresets.length) {
+      // 当前选中的是自定义胶囊 → 不接受硬件预设覆盖，反过来把自定义色重发
+      final customIndex = _selectedColorIndex - presetCount;
+      final preset = _customPresets[customIndex];
+      debugPrint(
+          '🛡️ 硬件预设报告 $appIndex 与 app 自定义选择不符，反向同步自定义色到硬件');
+      syncCustomToHardware(preset);
+      return;
     }
+
+    debugPrint('🎨 收到硬件预设报告: $preset -> APP索引: $appIndex');
+    _isReceivingPresetReport = true;
+    _selectedColorIndex = appIndex;
+    applyPresetToLocalColors(appIndex);
+    notifyListeners();
+    Future.delayed(const Duration(milliseconds: 150), () {
+      _isReceivingPresetReport = false;
+    });
   }
 
   /// 硬件流水灯状态报告回调
@@ -285,10 +300,9 @@ class ColorizeController extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 50));
     }
 
-    // 节流：和预设同步共用一个时间窗
-    final now = DateTime.now();
-    if (now.difference(_lastPresetSyncTime).inMilliseconds < 80) return;
-    _lastPresetSyncTime = now;
+    // ⚠️ 不节流 LED 命令：4 条 await 串行 BLE 写已天然限速（~120ms/批），
+    //   如果再叠节流，重连/反向同步/快速选择时会被吞掉，导致硬件不响应。
+    _lastPresetSyncTime = DateTime.now();
 
     // 连发 4 条 LED:strip:r:g:b
     await _btProvider.setLEDColor(1, preset.r1, preset.g1, preset.b1); // M

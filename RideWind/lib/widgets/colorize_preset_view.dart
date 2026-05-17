@@ -548,8 +548,26 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                         TextStyle(color: Colors.redAccent)),
                 onTap: () async {
                   Navigator.of(ctx).pop();
+                  final wasSelected =
+                      _colorize.allCapsules[_colorize.selectedColorIndex]
+                              ['customId'] ==
+                          customId;
                   await _colorize.removeCustomPreset(customId);
                   HapticFeedback.heavyImpact();
+                  // 删除后，让 PageView 跟随 controller 当前页（可能因列表收缩偏移）
+                  // 并把硬件 LED 同步到新的选中胶囊，避免硬件停留在已删除颜色
+                  if (mounted) {
+                    final newIdx = _colorize.selectedColorIndex;
+                    widget.colorPageController.animateToPage(
+                      newIdx,
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                    );
+                    if (wasSelected) {
+                      _colorize.syncCapsuleToHardware(newIdx);
+                      _colorize.saveColorPreset(newIdx);
+                    }
+                  }
                 },
               ),
               const SizedBox(height: 8),
