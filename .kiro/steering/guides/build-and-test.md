@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+inclusion: fileMatch
+fileMatchPattern: "ridewind-esp/**/*.c,ridewind-esp/**/*.h,RideWind/lib/**/*.dart,**/CMakeLists.txt,**/pubspec.yaml"
 ---
 
 # 构建与测试速查
