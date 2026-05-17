@@ -412,7 +412,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
   Future<void> _openCreateCustomSheet() async {
     final result = await CustomPresetEditorSheet.show(context);
     if (result == null) return;
-    // 创建并保存
+    // 创建并保存（带重复检测）
     final id = await _colorize.addCustomPreset(
       type: result.type,
       r1: result.r1,
@@ -422,6 +422,10 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
       g2: result.g2,
       b2: result.b2,
     );
+    if (id == null) {
+      _showDuplicateToast();
+      return;
+    }
     // 自动滚动到新增的自定义胶囊位置
     final newIndex = _colorize.customPresets.indexWhere((p) => p.id == id);
     if (newIndex >= 0) {
@@ -437,6 +441,34 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
         _colorize.syncCapsuleToHardware(absIndex);
       }
     }
+  }
+
+  /// 重复颜色时的提示
+  void _showDuplicateToast() {
+    if (!mounted) return;
+    HapticFeedback.heavyImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '这个颜色已经存在啦，换一个吧',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF333333),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
   }
 
   /// 长按自定义胶囊的菜单（编辑/删除）
@@ -479,7 +511,7 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                     initial: preset,
                   );
                   if (updated == null) return;
-                  await _colorize.updateCustomPreset(
+                  final status = await _colorize.updateCustomPreset(
                     customId,
                     preset.copyWith(
                       type: updated.type,
@@ -491,6 +523,11 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
                       b2: updated.b2,
                     ),
                   );
+                  if (status == 'duplicate') {
+                    _showDuplicateToast();
+                    return;
+                  }
+                  if (status != 'ok') return;
                   // 如果正显示这个胶囊则重新同步硬件
                   final newIndex = _colorize.customPresets
                       .indexWhere((p) => p.id == customId);
