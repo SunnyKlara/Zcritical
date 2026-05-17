@@ -181,6 +181,14 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - 分支：`feature/wave-effect-tuning`
   - 编译通过：idf.py build 零错误
 
+- 2026-05-17（第十五轮）：波浪效果恢复 + 方向确认
+  - 发现之前的提交丢失了确认版代码（文件里还是旧版）
+  - 重新写入确认版：连续正弦波左→右，底亮30%，峰值100%，2.5s周期
+  - 提交：`393c4b0` on `fw/treadmill-ui` 分支
+  - ⚠️ 注意：当前在 `fw/treadmill-ui` 分支，不是 main
+  - 分支状态：main 停在 `a046ebc`，fw/treadmill-ui 在 `393c4b0`（领先 main 3 个提交）
+  - 编译通过：idf.py build 零错误
+
 - 2026-05-17（第十四轮）：跑步机界面 Forza Horizon 风格重设计
   - 调研 Forza Horizon 5 速度仪表盘 UI 设计（GitHub 开源复刻项目 + 社区分析）
   - `ui_treadmill.c` 完全重写：
@@ -212,6 +220,17 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
     - `fw/treadmill-ui` ★当前 — 固件跑步机 Forza UI
     - `fw/wave-effect` — 固件波浪灯效 + 音频引擎
   - 工作区干净，所有改动已提交到对应分支
+
+- 2026-05-17（第十六轮）：跑步机 UI v2 精致化
+  - 数字：font_8x16 像素字体 → F4 大号预渲染贴图（53px高，抗锯齿，和 Speed 界面一致）
+  - 弧线：8px 厚 + 刻度线 → 4px 薄弧，无刻度，更 Forza 极简
+  - 去掉所有文字："km/h"、"RUNNING/STOPPED"、提示文字全部删除
+  - 状态指示：大字 → 小圆点（绿=运行，灰=待机）
+  - 整体：弧 + 数字 + 点，三元素极简设计
+  - 小数点用 6x6 白色方块（baseline 对齐）
+  - 分支：`fw/treadmill-ui`，commit `f6d73a7`
+  - 待 idf.py build 验证编译
+  - 后续方向：弧线圆角末端、数字颜色渐变、专属背景底图、菜单图标设计
 
 - 2026-05-15：方向转向「体验打磨期」
   - 用户实测后判断：功能跑通但"没经过精雕细作"，玩起来很多细节别扭
