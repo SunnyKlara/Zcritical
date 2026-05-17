@@ -116,13 +116,8 @@ class _ColorizeRGBDetailViewState extends State<ColorizeRGBDetailView> {
       children: ['L', 'M', 'R', 'B'].map((pos) {
         final isSelected = _colorize.selectedLightPosition == pos;
         return GestureDetector(
+          // 🔑 单击 = 选中灯区 + 打开详细调色面板（原长按行为合并到单击）
           onTap: () async {
-            HapticFeedback.lightImpact();
-            _colorize.stopCycleAnimation();
-            _colorize.setSelectedLightPosition(pos);
-            _colorize.syncLEDColor();
-          },
-          onLongPress: () async {
             HapticFeedback.mediumImpact();
             _colorize.stopCycleAnimation();
             _colorize.setSelectedLightPosition(pos);

@@ -628,13 +628,13 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         icon: Icons.highlight,
         gestureType: GestureType.tap,
       ),
-      // Step 5: 长按打开详细调色面板
+      // Step 5: 单击打开详细调色面板
       GuideStep(
         targetKey: _lmrbCapsulesKey,
         title: '详细调色',
-        description: '长按打开详细调色面板',
+        description: '点击灯区打开详细调色面板',
         icon: Icons.color_lens,
-        gestureType: GestureType.longPress,
+        gestureType: GestureType.tap,
       ),
       // Step 6: 拖动调节颜色值
       GuideStep(

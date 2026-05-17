@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "ESP Build Feedback",
+  "description": "用户编译 ESP 固件后手动触发，提醒 AI 读取终端输出来检查编译结果并修复错误",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "用户刚编译了 ESP 固件。请读取 #Terminal 中的编译输出，检查是否有错误或警告。如果有错误，分析原因并直接修复代码。如果编译成功，确认并继续下一步工作。"
+  }
+}

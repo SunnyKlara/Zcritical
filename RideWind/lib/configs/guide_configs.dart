@@ -87,7 +87,7 @@ final GuideConfiguration runningModeGuide = GuideConfiguration(
 final GlobalKey colorizeModeColorPresetsKey = GlobalKey(debugLabel: 'colorizeModeColorPresets');
 
 /// RGB 详细调色区域的 GlobalKey
-/// 用于高亮显示长按进入详细调色的区域
+/// 用于高亮显示点击进入详细调色的区域
 final GlobalKey colorizeModeRgbDetailKey = GlobalKey(debugLabel: 'colorizeModeRgbDetail');
 
 /// 亮度调节滑块的 GlobalKey
@@ -98,7 +98,7 @@ final GlobalKey colorizeModeBrightnessKey = GlobalKey(debugLabel: 'colorizeModeB
 /// 
 /// 包含三个引导步骤：
 /// 1. 颜色预设 - 左右滑动选择预设颜色方案
-/// 2. 详细调色 - 长按预设进入 RGB 详细调色模式
+/// 2. 详细调色 - 点击灯区进入 RGB 详细调色模式
 /// 3. 亮度调节 - 拖动滑块调节整体亮度
 /// 
 /// Requirements: 3.2
@@ -115,7 +115,7 @@ final GuideConfiguration colorizeModeGuide = GuideConfiguration(
     GuideStep(
       targetKey: colorizeModeRgbDetailKey,
       title: '详细调色',
-      description: '长按预设进入 RGB 详细调色模式',
+      description: '点击灯区进入 RGB 详细调色模式',
       icon: Icons.palette,
       position: TooltipPosition.bottom,
     ),

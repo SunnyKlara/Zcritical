@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "New ESP File Registration",
+  "description": "当在 ridewind-esp 目录下创建新的 .c 或 .h 文件时，提醒检查 CMakeLists.txt 注册和架构层级归属",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "ridewind-esp/**/*.c",
+      "ridewind-esp/**/*.h"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "你刚在 ridewind-esp 中创建了新文件。必须检查：1) 如果是 .c 文件，是否已添加到 ridewind-esp/main/CMakeLists.txt 的 SRCS 列表中？2) 文件所在目录是否符合架构分层（drivers 放硬件抽象、services 放业务逻辑、app 放应用状态、ui 放界面渲染）？3) 对应的 .h 文件是否需要同步创建？如果遗漏了 CMakeLists 注册，立即补上。"
+  }
+}
