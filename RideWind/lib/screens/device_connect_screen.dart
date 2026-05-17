@@ -188,6 +188,22 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         _saveDeviceSettings();
         _navigatedOnDisconnect = true;
         _showDisconnectDialog();
+      } else if (connected && mounted) {
+        // 🔁 重连成功：把当前选中的胶囊（含自定义色）重新铺到硬件，
+        //     防止 ESP32 复位后硬件 LED 与 app 选中不一致。
+        //     强制清空 _lastSentHardwareUI 让 setHardwareUI 重新发一次，
+        //     ColorizeController 内部也会重发，串行 4 条 LED 命令。
+        _lastSentHardwareUI = -1;
+        _colorize.lastSentHardwareUI = -1;
+        // 只在 Colorize 模式下立即重发；其它模式由模式切换时再触发
+        if (_currentMode == ControlMode.colorize ||
+            _currentMode == ControlMode.rgb) {
+          // 给 BLE/硬件一点稳态时间再发命令
+          Future.delayed(const Duration(milliseconds: 250), () {
+            if (!mounted) return;
+            _colorize.syncCapsuleToHardware(_colorize.selectedColorIndex);
+          });
+        }
       }
     });
 
@@ -195,17 +211,29 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     _presetReportSub = btProvider.presetReportStream.listen((preset) {
       if (!mounted) return;
       final appIndex = preset - 1;
-      if (appIndex >= 0 && appIndex < _ledColorCapsules.length) {
-        // 委托给 Controller 处理状态更新
-        _colorize.onPresetReport(preset);
-        // Screen 只负责 PageView 动画
-        if (_colorPageController.hasClients) {
-          _colorPageController.animateToPage(
-            appIndex,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
+      if (appIndex < 0 || appIndex >= _ledColorCapsules.length) return;
+
+      // 🔒 如果当前选中的是自定义胶囊，Controller 会反向把自定义色重发回硬件，
+      //     此时不要把 PageView 滚到 preset 索引，保持显示在用户选的自定义上。
+      final wasCustom = _colorize.selectedColorIndex >= _colorize.presetCount &&
+          _colorize.selectedColorIndex <
+              _colorize.presetCount + _colorize.customPresets.length;
+
+      // 委托给 Controller 处理状态更新
+      _colorize.onPresetReport(preset);
+
+      if (wasCustom) {
+        // Controller 已经反向同步硬件，UI 维持原位
+        return;
+      }
+
+      // Screen 只负责 PageView 动画
+      if (_colorPageController.hasClients) {
+        _colorPageController.animateToPage(
+          appIndex,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
     });
 
@@ -942,10 +970,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeInOut,
       );
-      // 仅在没有自定义颜色时才同步预设到硬件，避免覆盖用户自定义的 RGB 值
-      if (!_colorize.hasCustomColors) {
-        _colorize.syncPresetToHardware(_colorize.selectedColorIndex);
-      }
+      // 智能分发：preset / custom 自动走对应硬件通道
+      _colorize.syncCapsuleToHardware(_colorize.selectedColorIndex);
       return;
     }
 
@@ -1320,11 +1346,10 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         if (_lastSentHardwareUI != 2) {
           await btProvider.setHardwareUI(2);
           _lastSentHardwareUI = 2;
-          // 🎨 进入Colorize模式时，将本地保存的预设同步到硬件
-          if (!_colorize.hasCustomColors) {
-            _colorize.syncPresetToHardware(_colorize.selectedColorIndex);
-          }
         }
+        // 🎨 不管 preset 还是 custom，都通过智能分发同步到硬件
+        // （preset → PRESET:n+1, custom → 4×LED:strip:r:g:b）
+        _colorize.syncCapsuleToHardware(_colorize.selectedColorIndex);
         break;
       case 2: // RGB Panel（详细调色）→ 硬件 UI = 3
         if (_lastSentHardwareUI != 3) {
