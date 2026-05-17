@@ -33,6 +33,7 @@ typedef enum {
     CMD_OTA_END,
     CMD_VOLUME,
     CMD_GET_VOLUME,
+    CMD_THROTTLE_FX,    /* THROTTLE_FX:mode (1-6) */
     CMD_WIFI,           /* WIFI:ssid:password */
     CMD_WIFI_SCAN,      /* WIFI_SCAN */
     CMD_AUDIO_START,    /* AUDIO_START:layer:size:crc32 */

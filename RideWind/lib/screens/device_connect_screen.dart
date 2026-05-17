@@ -45,7 +45,8 @@ import 'audio_stream_screen.dart';
 // ╚══════════════════════════════════════════════════════════════╝
 enum ControlMode {
   running, // Running Mode - 速度/油门控制（默认）
-  colorize, // Colorize Mode - LED颜色控制（右滑进入）
+  colorize, // Colorize Mode - LED颜色预设面板（右滑一次）
+  rgb, // RGB Panel - LED 详细调色面板（右滑两次）
 }
 
 // 🎨 ColorizeState 枚举已移至 controllers/colorize_controller.dart
@@ -135,6 +136,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         return ControlMode.running;
       case 1:
         return ControlMode.colorize;
+      case 2:
+        return ControlMode.rgb;
       default:
         return ControlMode.running;
     }
@@ -419,14 +422,14 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     if (!mounted) return;
 
     if (type == GuideType.runningMode) {
-      // 先切到 Running Mode 页面
-      _modePageController.animateToPage(1,
+      // 先切到 Running Mode 页面（index 0）
+      _modePageController.animateToPage(0,
           duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) _showRunningModeGuide();
     } else if (type == GuideType.colorizeMode) {
-      // 先切到 Colorize Mode 页面
-      _modePageController.animateToPage(2,
+      // 先切到 Colorize Mode 页面（index 1）
+      _modePageController.animateToPage(1,
           duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) _showColorizeModeGuide();
@@ -832,8 +835,10 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     ).then((_) {
       // 返回后恢复硬件UI
       if (mounted && btProvider.isConnected && _lastSentHardwareUI == 6) {
-        // 0=running(UI=1), 1=colorize(UI=2)
-        final targetUI = _currentModeIndex == 0 ? 1 : 2;
+        // 0=running(UI=1), 1=colorize(UI=2), 2=rgb(UI=3)
+        final targetUI = _currentModeIndex == 0
+            ? 1
+            : (_currentModeIndex == 1 ? 2 : 3);
         if (targetUI != 6) {
           btProvider.setHardwareUI(targetUI);
           _lastSentHardwareUI = targetUI;
@@ -922,18 +927,19 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   Future<void> _handleBackNavigation() async {
     debugPrint('\n🔘 ========== 返回按钮被点击！==========');
 
-    // 优先级 1: Colorize 模式内的返回逻辑
-    if (_currentMode == ControlMode.colorize) {
-      if (_colorize.colorizeState == ColorizeState.rgbDetail) {
-        HapticFeedback.lightImpact();
-        _colorize.setColorizeState(ColorizeState.preset);
-        setState(() {}); // 触发 UI 重建
-        // 仅在没有自定义颜色时才同步预设到硬件，避免覆盖用户自定义的 RGB 值
-        if (!_colorize.hasCustomColors) {
-          _colorize.syncPresetToHardware(_colorize.selectedColorIndex);
-        }
-        return;
+    // 优先级 1：在 RGB 面板上 → 滑回 Colorize 预设面板
+    if (_currentMode == ControlMode.rgb) {
+      HapticFeedback.lightImpact();
+      _modePageController.animateToPage(
+        1,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+      );
+      // 仅在没有自定义颜色时才同步预设到硬件，避免覆盖用户自定义的 RGB 值
+      if (!_colorize.hasCustomColors) {
+        _colorize.syncPresetToHardware(_colorize.selectedColorIndex);
       }
+      return;
     }
 
     // 优先级 2: 返回到已有的 NoDeviceScreen（pop 回栈中已有页面，避免栈累积）
@@ -1154,7 +1160,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         ),
 
         // ========== 📋 菜单按钮 ==========
-        if (!(_currentMode == ControlMode.colorize && _colorize.colorizeState == ColorizeState.rgbDetail))
+        if (_currentMode != ControlMode.rgb)
           Positioned(
             top: config.menuButtonTop,
             right: config.menuButtonRight,
@@ -1197,9 +1203,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             ),
           ),
 
-        // ========== 🎨 RGB 详细调节面板 ==========
-        if (_currentMode == ControlMode.colorize &&
-            _colorize.colorizeState == ColorizeState.rgbDetail)
+        // ========== 🎨 RGB 详细调节面板（仅在 RGB 顶层页上变为可见）==========
+        if (_currentMode == ControlMode.rgb)
           Positioned.fill(
             child: ListenableBuilder(
               listenable: _colorize,
@@ -1220,18 +1225,15 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     );
   }
 
-  /// 获取背景图（根据当前模式和状态）
+  /// 获取背景图（根据当前模式）
   String _getBackgroundImage() {
     switch (_currentMode) {
       case ControlMode.running:
         return 'assets/images/running_mode_no_text.png';
       case ControlMode.colorize:
-        switch (_colorize.colorizeState) {
-          case ColorizeState.preset:
-            return 'assets/images/colorize_mode_no_text.png';
-          case ColorizeState.rgbDetail:
-            return 'assets/images/rgb_settings_clean.png';
-        }
+        return 'assets/images/colorize_mode_no_text.png';
+      case ControlMode.rgb:
+        return 'assets/images/rgb_settings_clean.png';
     }
   }
 
@@ -1250,9 +1252,9 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         HapticFeedback.selectionClick();
         setState(() {
           _currentModeIndex = index;
-          if (index == 2) {
+          if (index == 1) {
+            // 进入 Colorize 预设面板：重建颜色 PageController 以对齐当前选中索引
             _colorize.setColorizeState(ColorizeState.preset);
-            // 重建 PageController 确保 initialPage 对齐当前选中的颜色索引
             _colorPageController.dispose();
             _colorPageController = PageController(
               initialPage: _colorize.selectedColorIndex,
@@ -1262,18 +1264,37 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           }
         });
         _syncHardwareUIOnModeChange(index);
-        final modeNames = ['Dev Test', 'Running Mode', 'Colorize Mode'];
+        final modeNames = ['Running Mode', 'Colorize Mode', 'RGB Panel'];
         debugPrint('📄 滑动切换到: ${modeNames[index]}');
-        
-        if (index == 2) {
+
+        if (index == 1) {
           _checkAndShowColorizeModeGuide();
         }
       },
       children: [
         _buildRunningModeContent(config),
         _buildColorizeModeContent(config),
+        _buildRGBContent(config),
       ],
     );
+  }
+
+  /// 🎨 RGB 面板（顶层 PageView 第 3 页，原 Colorize 内部 rgbDetail 状态拆分出来）
+  Widget _buildRGBContent(_DeviceConnectConfig config) {
+    try {
+      return ColorizeRGBDetailView(
+        lmrbCapsulesKey: _lmrbCapsulesKey,
+        rgbSlidersKey: _rgbSlidersKey,
+        brightnessBarKey: _brightnessBarKey,
+        debugMode: _debugMode,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ RGB 面板渲染错误: $e');
+      debugPrint('📍 堆栈跟踪: $stackTrace');
+      return const Center(
+        child: Text('加载失败', style: TextStyle(color: Colors.white)),
+      );
+    }
   }
 
   /// 🔑 模式切换时同步硬件UI
@@ -1282,24 +1303,27 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     if (!btProvider.isConnected) return;
 
     switch (modeIndex) {
-      case 0: // Dev Test Mode - 不改变硬件UI
-        debugPrint('🧪 进入开发测试模式，保持当前硬件UI');
-        break;
-      case 1: // Running Mode
+      case 0: // Running Mode → 硬件 UI = 1
         if (_lastSentHardwareUI != 1) {
           await btProvider.setHardwareUI(1);
           _lastSentHardwareUI = 1;
         }
         break;
-      case 2: // Colorize Mode
+      case 1: // Colorize Mode → 硬件 UI = 2
         if (_lastSentHardwareUI != 2) {
           await btProvider.setHardwareUI(2);
           _lastSentHardwareUI = 2;
-          // 🎨 进入Colorize模式时，将本地保存的预设同步到硬件，而非从硬件查询
-          // 这样可以保持用户上次选择的颜色预设
+          // 🎨 进入Colorize模式时，将本地保存的预设同步到硬件
           if (!_colorize.hasCustomColors) {
             _colorize.syncPresetToHardware(_colorize.selectedColorIndex);
           }
+        }
+        break;
+      case 2: // RGB Panel（详细调色）→ 硬件 UI = 3
+        if (_lastSentHardwareUI != 3) {
+          await btProvider.setHardwareUI(3);
+          _lastSentHardwareUI = 3;
+          _colorize.lastSentHardwareUI = 3;
         }
         break;
     }
@@ -1429,24 +1453,23 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
   Widget _buildColorizeModeContent(_DeviceConnectConfig config) {
     try {
-      switch (_colorize.colorizeState) {
-        case ColorizeState.preset:
-          return ColorizePresetView(
-            colorPageController: _colorPageController,
-            colorPageViewKey: _colorPageViewKey,
-            colorCapsuleStripKey: _colorCapsuleStripKey,
-            startColoringButtonKey: _startColoringButtonKey,
-            paletteButtonKey: _paletteButtonKey,
-            debugMode: _debugMode,
+      // 🔑 RGB 面板已拆分为顶层 PageView 第 3 页，这里只展示预设面板
+      return ColorizePresetView(
+        colorPageController: _colorPageController,
+        colorPageViewKey: _colorPageViewKey,
+        colorCapsuleStripKey: _colorCapsuleStripKey,
+        startColoringButtonKey: _startColoringButtonKey,
+        paletteButtonKey: _paletteButtonKey,
+        debugMode: _debugMode,
+        onPaletteTap: () {
+          // 导航到右侧 RGB 面板
+          _modePageController.animateToPage(
+            2,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOut,
           );
-        case ColorizeState.rgbDetail:
-          return ColorizeRGBDetailView(
-            lmrbCapsulesKey: _lmrbCapsulesKey,
-            rgbSlidersKey: _rgbSlidersKey,
-            brightnessBarKey: _brightnessBarKey,
-            debugMode: _debugMode,
-          );
-      }
+        },
+      );
     } catch (e, stackTrace) {
       debugPrint('❌ Colorize Mode 渲染错误: $e');
       debugPrint('📍 堆栈跟踪: $stackTrace');

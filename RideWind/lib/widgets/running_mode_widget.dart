@@ -1015,7 +1015,11 @@ class RunningModeWidgetState extends State<RunningModeWidget>
           top: 0,
           left: 0,
           right: 0,
-          bottom: 0,  /* D9 fix: fill entire area, no black gap at bottom */
+          // 🔑 关键修复：滚轮区域必须在紧急停止按钮上方结束，
+          // 否则底部渐变黑框（0xFF0D0D0D）会延伸到按钮区域并被看到。
+          // 之前的 "D9 fix: bottom: 0" 让滚轮在整个容器内居中，
+          // 导致渲染下沉 bottomButtonAreaHeight/2，与紧急停止按钮重叠。
+          bottom: config.bottomButtonAreaHeight,
           child: Center(
             child: SizedBox(
               height: wheelHeight,

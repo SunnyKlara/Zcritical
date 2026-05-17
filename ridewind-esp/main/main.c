@@ -427,6 +427,13 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         ble_service_notify_str("OK:THROTTLE\r\n");
         break;
 
+    /* ── THROTTLE_FX:mode ── */
+    case CMD_THROTTLE_FX:
+        led_effects_set_throttle_mode(cmd->param.u8_val);
+        snprintf(resp, sizeof(resp), "OK:THROTTLE_FX:%d\r\n", cmd->param.u8_val);
+        ble_service_notify_str(resp);
+        break;
+
     /* ── STREAMLIGHT:x ── */
     case CMD_STREAMLIGHT: {
         g_app_state.streamlight_active = cmd->param.u8_val;

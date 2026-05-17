@@ -10,6 +10,7 @@
 #include "ble_service.h"
 #include "audio_engine.h"
 #include "audio_player.h"
+#include "led_effects.h"
 #include "board_config.h"
 #include <stdio.h>
 
@@ -231,6 +232,9 @@ void ui_speed_enter(void)
     s_last_wuhuaqi = 0xFF;
     s_throttle_mode = 0;
 
+    /* Start wave breathing effect using current preset colors */
+    led_effects_throttle_start();
+
     /* Only start engine sound if speed is already non-zero */
     if (g_app_state.current_speed_kmh > 0) {
         audio_player_start_engine();
@@ -294,6 +298,7 @@ void ui_speed_update(void)
                 if (g_app_state.wuhuaqi_state == 0)
                     drv_gpio_set_humidifier(false);
                 audio_engine_set_throttle_mode(false);
+                led_effects_throttle_stop();
                 audio_player_stop_engine();
                 ble_service_notify_str("THROTTLE_REPORT:0\n");
                 ui_manager_set_ui(5);
@@ -399,6 +404,7 @@ void ui_speed_update(void)
 
         case ENC_EVT_DOUBLE_CLICK:
             audio_player_stop_engine();
+            led_effects_throttle_stop();
             ui_manager_set_ui(5);
             return;
 

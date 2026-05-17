@@ -28,7 +28,7 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 - **待用户烧录验证** — 稳态段音频效果（v2：截取每段最稳定1.5-1.9s + 200ms crossfade）
 - **✅ 油门模式 UI 完成** — commit `2e88004`，彩色数字+色条显示完美
 - **待用户烧录验证** — 预设色条修复（draw_color_bar 顺序对齐 preset_colors.h）
-- **⚠️ 风扇问题暂搁** — GPIO 10 拉高时风扇转（即使 PWM=0%），原因待查
+- **⚠️ 风扇无法调速（硬件问题确认）** — GPIO 40 PWM 对风扇转速无影响（正转/反转/0%/100% 都一样）。风扇只受 GPIO 10 开关控制，通电即满速。结论：MOS2 管未生效（虚焊/短路/未连接）。待用户检查 PCB 或尝试 GPIO 10 做 PWM 调速方案
 - **DeviceConnectScreen 仍 ~3500 行** — 暂缓，体验问题优先
 
 ## 下一步
@@ -56,6 +56,94 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - 总 flash 占用 442KB（固件 2.75MB/3MB 分区，余 256KB）
   - 编译通过，待烧录验证音效效果
   - 潜在问题：素材是"动态过程"录音而非"稳态循环"，循环播放可能不够自然，烧录后听效果再调
+
+- 2026-05-16：预设颜色 LCD 色条 vs LED 灯珠不匹配修复
+  - 根因：`preset_colors.h` 的预设排列顺序和 `draw_color_bar()` 的 case 顺序不一致
+  - `draw_color_bar()` 是设计意图（LCD 色条为准），`preset_colors.h` 是旧排列
+  - 修复：重排 `preset_colors.h` 对齐 `draw_color_bar()` 的 case 1-14 顺序
+  - 同步更新 `RideWind/lib/data/led_presets.dart` 保持 APP 端一致
+  - 修改文件：`preset_colors.h`、`led_presets.dart`、`ui_preset.c`（draw_color_bar 恢复原始）
+  - 编译通过：idf.py build 零错误
+
+- 2026-05-16：油门模式 LED 灯效系统实现（6 种速度响应效果）
+  - 硬件布局确认：Main 6 颗 + Tail 3 颗（Left/Right 4 颗已去掉降成本）
+  - 设计决策：效果选择通过 APP 弹窗，硬件端只执行
+  - 实现 6 种效果：转速条填充 / 脉冲波 / 追逐流光 / Main↔Tail交替 / 波浪呼吸 / 闪电
+  - 所有效果共用速度→颜色映射：蓝(0%) → 黄(50%) → 红(100%)
+  - 进入油门模式自动激活，退出自动恢复静态色
+  - 默认效果：交替闪烁(mode=4)
+  - 协议预留：`THROTTLE_EFFECT:mode` (1-6)，尚未加入 protocol.c
+  - 修改文件：`led_effects.h`、`led_effects.c`、`app_state.h`、`app_state.c`、`ui_speed.c`
+  - 编译通过：idf.py build 零错误
+  - 下一步：1) 烧录验证效果 2) 加入 BLE 协议命令 3) APP 端弹窗 UI
+
+- 2026-05-17：油门灯效 BLE 协议 + APP 弹窗 UI 完成
+  - ESP32: `protocol.h` 加 `CMD_THROTTLE_FX`，`protocol.c` 加解析 `THROTTLE_FX:1-6`，`main.c` 加命令处理
+  - Flutter: `command_sender.dart` 加 `setThrottleEffect()`，`bluetooth_provider.dart` 暴露方法
+  - 新建 `widgets/throttle_effect_selector.dart` — 底部弹窗 6 选项 UI
+  - 使用方式：`ThrottleEffectSelector.show(context, currentMode: 4)` 接入任意按钮
+  - 编译通过：idf.py build 零错误
+  - 待接入：需要把弹窗调用接入到 Color 界面的"涂色"按钮
+  - 待验证：flutter analyze（本次未运行）
+
+- 2026-05-17（第二轮）：弹窗接入 Color 界面 + 删除转盘动画
+  - `colorize_preset_view.dart`：删除"开始涂色"转盘逻辑，改为点击弹出 `ThrottleEffectSelector`
+  - 删除 `_startSpinAnimation()` 方法、`dart:math` import、所有 `isSpinning`/`bounceOffset`/`indicatorOffset` 引用
+  - 按钮现在点击直接弹出 6 效果选择底部弹窗
+  - ESP32 编译通过：idf.py build 零错误
+  - Flutter 待验证：flutter analyze 未运行（需要用户本地验证）
+
+- 2026-05-17（第三轮）：波浪呼吸效果应用到 Speed 界面
+  - 设计决策变更：
+    - 油门模式下的速度响应灯效暂不使用，只用波浪呼吸
+    - 波浪呼吸在整个 Speed 界面（普通+油门模式）持续运行
+    - 颜色使用用户在 Color 界面选定的预设色（不随速度变色）
+    - 固定 1.5 秒波浪周期（不随速度加快）
+  - 修改：
+    - `ui_speed.c`：`ui_speed_enter()` 启动波浪，双击退出时停止；油门进入/退出不再单独控制灯效
+    - `led_effects.c`：波浪效果改用 `led_colors[]` 预设色，固定周期
+    - `app_state.c`：默认模式改为 WAVE(5)
+  - 编译通过：idf.py build 零错误
+  - 后续方向：优化波浪效果的节奏、幅度、过渡曲线
+
+- 2026-05-17（第四轮）：波浪呼吸效果优化
+  - 亮度曲线：三角波 → 余弦二次逼近（丝滑无折角）
+  - Gamma 2.0 校正：暗部细节更丰富，符合人眼感知
+  - 最低亮度：0% → 15%（灯永远不全灭，保持连续感）
+  - 相位间距：42 → 60（波浪有方向感，跑出灯带边缘）
+  - 周期：1500ms → 2000ms（更优雅从容）
+  - 尾灯：独立呼吸 → 跟随 Main 延迟 300ms（波传播感）
+  - 编译通过：idf.py build 零错误
+  - 待烧录验证效果
+
+- 2026-05-17（第五轮）：波浪效果对比度修复
+  - 问题：gamma 双重压缩 + 最低亮度 15% 导致波浪不明显
+  - 修复：最低亮度 38→12 (5%)，去掉 gamma 压缩，余弦直接映射
+  - 编译通过：idf.py build 零错误
+
+- 2026-05-17（第六轮）：LED 偶发闪烁修复（RMT DMA）
+  - 问题：波浪呼吸过程中偶尔某颗灯珠闪其他颜色
+  - 根因：RMT 传输被 BLE/音频中断打断，导致 WS2812 收到错误数据
+  - 修复：`drv_led.c` 两个 RMT 配置 `.flags.with_dma = false` → `true`
+  - DMA 模式下硬件自动发送，CPU 不参与，不受中断影响
+  - 编译通过：idf.py build 零错误
+  - 待烧录验证闪烁是否消失
+
+- 2026-05-17（第七轮）：波浪效果完全重写（海浪风格）
+  - 核心分歧解决：用户要的是"所有灯同时明暗起伏"，不是"每颗灯不同相位的空间波"
+  - 新设计：
+    - 所有 Main+Tail 灯同步变化
+    - 3500ms 周期（从容）
+    - 波谷 3%（极暗但不灭），波峰 100%
+    - 波峰停留 700ms，波谷停留 600ms（像浪打到顶悬停再退）
+    - ease-in 上升（慢→快），ease-out 下降（快→慢）
+  - 编译通过：idf.py build 零错误
+
+- 2026-05-17（第八轮）：DMA 回退 + 闪烁问题待解
+  - DMA 模式导致 RMT 通道不足（ESP32-S3 RMT TX 通道有限，两个灯带用 DMA 超出）
+  - 回退：`.flags.with_dma = false`（恢复正常启动）
+  - LED 偶发闪烁问题暂搁，后续用降低刷新率或提升任务优先级解决
+  - 编译通过：idf.py build 零错误
 
 - 2026-05-15：方向转向「体验打磨期」
   - 用户实测后判断：功能跑通但"没经过精雕细作"，玩起来很多细节别扭
@@ -142,9 +230,9 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 ## 编译状态
 
 ```
-ESP32 固件：idf.py build — ✅ 零错误（2026-05-15 验证，ui_preset.c 色条修复后全量编译通过）
-  待烧录验证（esptool 连接失败，用户需按 BOOT 键或检查 COM 口）
-Flutter APP：flutter analyze — ✅ 通过（2026-04-30 最后验证，本次未改 APP）
+ESP32 固件：idf.py build — ✅ 零错误（2026-05-16 验证，油门灯效 6 模式实现后编译通过）
+  待烧录验证
+Flutter APP：flutter analyze — 待验证（led_presets.dart 顺序重排）
 协议测试：flutter test test/protocol/ — ✅ 51/51 通过
 ```
 

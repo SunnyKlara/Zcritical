@@ -92,6 +92,9 @@ typedef struct {
     /* ── Speed reporting ── */
     int16_t  last_reported_speed;
 
+    /* ── Throttle LED effect ── */
+    uint8_t  throttle_fx_mode;      /* 1-6, see throttle_fx_mode_t */
+
 } app_state_t;
 
 extern app_state_t       g_app_state;
