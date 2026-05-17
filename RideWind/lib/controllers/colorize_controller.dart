@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../data/custom_preset.dart';
 import '../data/led_presets.dart';
 import '../providers/bluetooth_provider.dart';
 import '../services/preference_service.dart';
@@ -56,8 +57,42 @@ class ColorizeController extends ChangeNotifier {
   DateTime _lastPresetSyncTime = DateTime.now();
   bool _isReceivingPresetReport = false;
 
-  // ── 预设数据 ──
+  // ── 内置预设 + 用户自定义 ──
+  /// 内置 14 个预设（与 ESP32 preset_colors.h 对齐）
   List<Map<String, dynamic>> get ledColorCapsules => ledPresetMaps;
+
+  /// 用户自定义胶囊列表（运行时缓存，启动时从 SharedPreferences 恢复）
+  final List<CustomPreset> _customPresets = [];
+  List<CustomPreset> get customPresets => List.unmodifiable(_customPresets);
+
+  /// 合并后的胶囊列表（UI 使用）：内置预设 + 自定义 + 末尾 "+" 占位
+  ///
+  /// 每个 item 多了一个 `kind` 字段:
+  ///   - 'preset'  → 内置预设
+  ///   - 'custom'  → 用户自定义（含 customId）
+  ///   - 'plus'    → 末尾占位的"加号"按钮
+  ///
+  /// 索引语义:
+  ///   [0 .. ledPresets.length-1]                       → 预设
+  ///   [ledPresets.length .. ledPresets.length+customs-1] → 自定义
+  ///   [last]                                            → "+" 加号
+  List<Map<String, dynamic>> get allCapsules {
+    final list = <Map<String, dynamic>>[];
+    for (final m in ledColorCapsules) {
+      list.add({...m, 'kind': 'preset'});
+    }
+    for (final c in _customPresets) {
+      list.add(c.toCapsuleMap());
+    }
+    list.add({'kind': 'plus'});
+    return list;
+  }
+
+  /// 内置预设数量（用于索引边界判断）
+  int get presetCount => ledColorCapsules.length;
+
+  /// "+" 按钮在 allCapsules 中的索引
+  int get plusButtonIndex => presetCount + _customPresets.length;
 
   // ── Getters ──
   ColorizeState get colorizeState => _colorizeState;
@@ -158,6 +193,26 @@ class ColorizeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 智能分发同步：根据 allCapsules[index] 的 kind 决定走哪条硬件链路
+  ///
+  /// - 'preset' → [syncPresetToHardware]
+  /// - 'custom' → [syncCustomToHardware]
+  /// - 'plus'   → 不发硬件指令
+  Future<void> syncCapsuleToHardware(int index) async {
+    final caps = allCapsules;
+    if (index < 0 || index >= caps.length) return;
+    final kind = caps[index]['kind'];
+    if (kind == 'preset') {
+      await syncPresetToHardware(index);
+    } else if (kind == 'custom') {
+      final customIndex = index - presetCount;
+      if (customIndex >= 0 && customIndex < _customPresets.length) {
+        await syncCustomToHardware(_customPresets[customIndex]);
+      }
+    }
+    // 'plus' → no-op
+  }
+
   Future<void> syncPresetToHardware(int index) async {
     if (_isReceivingPresetReport) {
       debugPrint('🔄 跳过发送预设（正在接收硬件报告）');
@@ -183,6 +238,65 @@ class ColorizeController extends ChangeNotifier {
     int presetCommandValue = index + 1;
     await _btProvider.setLEDPreset(presetCommandValue);
     debugPrint('📤 发送预设指令: PRESET:$presetCommandValue');
+  }
+
+  /// 把用户自定义胶囊的颜色铺到 4 条灯带
+  ///
+  /// 通过 `LED:strip:r:g:b` 协议直接控制硬件，等价于预设的视觉效果：
+  ///   - strip 1 (M 中) = 主色
+  ///   - strip 2 (L 左) = 主色
+  ///   - strip 3 (R 右) = 副色（纯色时与主色相同）
+  ///   - strip 4 (B 后) = 副色
+  ///
+  /// 同步前会先把硬件 UI 切到 2（配色预设页），让 LCD 显示预设页面而非 RGB 页。
+  Future<void> syncCustomToHardware(CustomPreset preset) async {
+    // 自定义胶囊的颜色 = 用户当前生效色，记入本地 RGB 缓存
+    _redValues['L'] = preset.r1;
+    _greenValues['L'] = preset.g1;
+    _blueValues['L'] = preset.b1;
+    _redValues['M'] = preset.r1;
+    _greenValues['M'] = preset.g1;
+    _blueValues['M'] = preset.b1;
+    _redValues['R'] = preset.r2;
+    _greenValues['R'] = preset.g2;
+    _blueValues['R'] = preset.b2;
+    _redValues['B'] = preset.r2;
+    _greenValues['B'] = preset.g2;
+    _blueValues['B'] = preset.b2;
+
+    // 标记为自定义色（用于其他逻辑判断），同时把当前 RGB 缓存持久化
+    _hasCustomColors = true;
+    _preferenceService.saveHasCustomColors(true);
+    _preferenceService.saveCustomRGBColors({
+      'L': {'r': preset.r1, 'g': preset.g1, 'b': preset.b1},
+      'M': {'r': preset.r1, 'g': preset.g1, 'b': preset.b1},
+      'R': {'r': preset.r2, 'g': preset.g2, 'b': preset.b2},
+      'B': {'r': preset.r2, 'g': preset.g2, 'b': preset.b2},
+    });
+
+    notifyListeners();
+
+    if (!_btProvider.isConnected) return;
+
+    // 硬件 UI 保持在配色预设页（避免跳到 RGB 调色页）
+    if (_lastSentHardwareUI != 2) {
+      await _btProvider.setHardwareUI(2);
+      _lastSentHardwareUI = 2;
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    // 节流：和预设同步共用一个时间窗
+    final now = DateTime.now();
+    if (now.difference(_lastPresetSyncTime).inMilliseconds < 80) return;
+    _lastPresetSyncTime = now;
+
+    // 连发 4 条 LED:strip:r:g:b
+    await _btProvider.setLEDColor(1, preset.r1, preset.g1, preset.b1); // M
+    await _btProvider.setLEDColor(2, preset.r1, preset.g1, preset.b1); // L
+    await _btProvider.setLEDColor(3, preset.r2, preset.g2, preset.b2); // R
+    await _btProvider.setLEDColor(4, preset.r2, preset.g2, preset.b2); // B
+    debugPrint(
+        '📤 自定义胶囊 ${preset.id} → LED main(${preset.r1},${preset.g1},${preset.b1}) sec(${preset.r2},${preset.g2},${preset.b2})');
   }
 
   void applyPresetToLocalColors(int index) {
@@ -371,6 +485,82 @@ class ColorizeController extends ChangeNotifier {
 
   void saveColorPreset(int index) {
     _preferenceService.saveColorPreset(index);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  自定义胶囊 CRUD（带持久化）
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 启动时调用，从 SharedPreferences 恢复自定义胶囊列表
+  Future<void> loadCustomPresets() async {
+    final list = await _preferenceService.getCustomPresets();
+    _customPresets
+      ..clear()
+      ..addAll(list);
+    notifyListeners();
+    debugPrint('🎨 已恢复 ${_customPresets.length} 个用户自定义胶囊');
+  }
+
+  /// 新增自定义胶囊。返回新胶囊的 customId。
+  Future<String> addCustomPreset({
+    required String type,
+    required int r1,
+    required int g1,
+    required int b1,
+    required int r2,
+    required int g2,
+    required int b2,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = 'cp_${now}_${_customPresets.length}';
+    final preset = CustomPreset(
+      id: id,
+      type: type,
+      r1: r1.clamp(0, 255),
+      g1: g1.clamp(0, 255),
+      b1: b1.clamp(0, 255),
+      r2: r2.clamp(0, 255),
+      g2: g2.clamp(0, 255),
+      b2: b2.clamp(0, 255),
+      createdAtMs: now,
+    );
+    _customPresets.add(preset);
+    await _preferenceService.saveCustomPresets(_customPresets);
+    notifyListeners();
+    return id;
+  }
+
+  /// 更新现有自定义胶囊。返回是否成功。
+  Future<bool> updateCustomPreset(String id, CustomPreset updated) async {
+    final i = _customPresets.indexWhere((p) => p.id == id);
+    if (i < 0) return false;
+    _customPresets[i] = updated;
+    await _preferenceService.saveCustomPresets(_customPresets);
+    notifyListeners();
+    return true;
+  }
+
+  /// 删除自定义胶囊。返回是否成功。
+  Future<bool> removeCustomPreset(String id) async {
+    final i = _customPresets.indexWhere((p) => p.id == id);
+    if (i < 0) return false;
+    _customPresets.removeAt(i);
+    await _preferenceService.saveCustomPresets(_customPresets);
+    // 如果当前选中索引被影响，回退到第一个预设
+    final removedAbsIndex = presetCount + i;
+    if (_selectedColorIndex == removedAbsIndex) {
+      _selectedColorIndex = 0;
+    } else if (_selectedColorIndex > removedAbsIndex) {
+      _selectedColorIndex -= 1;
+    }
+    notifyListeners();
+    return true;
+  }
+
+  /// 通过 customId 查找
+  CustomPreset? findCustomPreset(String id) {
+    final i = _customPresets.indexWhere((p) => p.id == id);
+    return i < 0 ? null : _customPresets[i];
   }
 
   // ═══════════════════════════════════════════════════════════════
