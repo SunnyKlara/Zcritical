@@ -81,24 +81,28 @@ static uint16_t arc_color(uint8_t pct)
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
-/* ══════ Arc Drawing ══════ */
-
-/**
- * 角度归一化：将 atan2 结果转为相对于 ARC_START_DEG 的偏移量
- * 返回值 [0, 360)，其中 0 = 弧的起点，ARC_SWEEP_DEG = 弧的终点
- * 超过 ARC_SWEEP_DEG 的像素不属于弧
+/* ══════ Arc Drawing (scanline-buffered, 丝滑刷新) ══════
+ * 参考 Speed 色条和 ui_draw_gradient_bar 的方式：
+ * 每行计算所有弧线像素颜色，打包成行缓冲，一次 blit 写入
+ * 这样每行只需 1 次 SPI 事务，比逐像素快 5-10 倍
  */
+
+/* 行缓冲：最大一行 240 像素 × 2 字节 */
+static uint8_t s_arc_line_buf[480];
+
 static float angle_to_arc_pos(float raw_deg)
 {
-    /* raw_deg 是 atan2 结果 [-180, 180]，先归一到 [0, 360) */
     if (raw_deg < 0.0f) raw_deg += 360.0f;
-    /* 计算相对于起始角的偏移 */
     float rel = raw_deg - ARC_START_DEG;
-    if (rel < -0.5f) rel += 360.0f;  /* 容差处理边界 */
+    if (rel < -0.5f) rel += 360.0f;
     if (rel < 0.0f) rel = 0.0f;
     return rel;
 }
 
+/**
+ * @brief 绘制完整弧线（首次进入时调用）
+ *        使用行缓冲 blit，一行一次 SPI
+ */
 static void draw_arc(uint8_t fill_pct)
 {
     if (fill_pct > 100) fill_pct = 100;
@@ -123,6 +127,8 @@ static void draw_arc(uint8_t fill_pct)
         if (px_s < 0) px_s = 0;
         if (px_e >= LCD_WIDTH) px_e = LCD_WIDTH - 1;
 
+        /* 扫描这一行，收集弧线像素到缓冲 */
+        int16_t line_start = -1, line_end = -1;
         for (int16_t px = px_s; px <= px_e; px++) {
             int16_t dx = px - ARC_CX;
             int32_t d_sq = (int32_t)dx * dx + dy_sq;
@@ -130,18 +136,40 @@ static void draw_arc(uint8_t fill_pct)
 
             float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
             float rel = angle_to_arc_pos(raw_deg);
-            if (rel > ARC_SWEEP_DEG + 0.5f) continue;  /* +0.5 容差 */
+            if (rel > ARC_SWEEP_DEG + 0.5f) continue;
 
+            /* 记录行范围 */
+            if (line_start < 0) line_start = px;
+            line_end = px;
+
+            /* 计算颜色 */
+            uint16_t color;
             if (rel <= fill_sweep) {
                 uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
-                drv_lcd_fill_rect(px, py, 1, 1, arc_color(pos));
+                color = arc_color(pos);
             } else {
-                drv_lcd_fill_rect(px, py, 1, 1, COLOR_ARC_BG);
+                color = COLOR_ARC_BG;
             }
+
+            /* 写入行缓冲（大端序，GC9A01 需要） */
+            int16_t idx = (px - px_s) * 2;
+            s_arc_line_buf[idx]     = color >> 8;
+            s_arc_line_buf[idx + 1] = color & 0xFF;
+        }
+
+        /* 一次 blit 写入这行所有弧线像素 */
+        if (line_start >= 0 && line_end >= line_start) {
+            int16_t offset = (line_start - px_s) * 2;
+            int16_t w = line_end - line_start + 1;
+            drv_lcd_blit_rgb565(line_start, py, w, 1,
+                                (const uint16_t *)(s_arc_line_buf + offset));
         }
     }
 }
 
+/**
+ * @brief 局部弧线更新（速度变化时）— 同样用行缓冲
+ */
 static void update_arc_delta(int16_t old_spd, int16_t new_spd)
 {
     uint8_t old_pct = (old_spd <= 0) ? 0 : (uint8_t)((uint32_t)old_spd * 100 / TREAD_MAX_SPEED);
@@ -175,6 +203,8 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
         if (px_s < 0) px_s = 0;
         if (px_e >= LCD_WIDTH) px_e = LCD_WIDTH - 1;
 
+        int16_t line_start = -1, line_end = -1;
+
         for (int16_t px = px_s; px <= px_e; px++) {
             int16_t dx = px - ARC_CX;
             int32_t d_sq = (int32_t)dx * dx + dy_sq;
@@ -184,15 +214,30 @@ static void update_arc_delta(int16_t old_spd, int16_t new_spd)
             float rel = angle_to_arc_pos(raw_deg);
             if (rel > ARC_SWEEP_DEG + 0.5f) continue;
 
-            /* 只处理变化区域 */
+            /* 只处理变化区域内的像素 */
             if (rel < lo - 0.5f || rel > hi + 0.5f) continue;
 
+            if (line_start < 0) line_start = px;
+            line_end = px;
+
+            uint16_t color;
             if (rel <= new_sw) {
                 uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
-                drv_lcd_fill_rect(px, py, 1, 1, arc_color(pos));
+                color = arc_color(pos);
             } else {
-                drv_lcd_fill_rect(px, py, 1, 1, COLOR_ARC_BG);
+                color = COLOR_ARC_BG;
             }
+
+            int16_t idx = (px - px_s) * 2;
+            s_arc_line_buf[idx]     = color >> 8;
+            s_arc_line_buf[idx + 1] = color & 0xFF;
+        }
+
+        if (line_start >= 0 && line_end >= line_start) {
+            int16_t offset = (line_start - px_s) * 2;
+            int16_t w = line_end - line_start + 1;
+            drv_lcd_blit_rgb565(line_start, py, w, 1,
+                                (const uint16_t *)(s_arc_line_buf + offset));
         }
     }
 }
