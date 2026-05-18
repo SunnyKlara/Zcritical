@@ -396,16 +396,23 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                 height: 52,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(20),
-                  border: Border.all(color: Colors.white24, width: 1),
+                  // 统一设计：白底黑字主按钮风格
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withAlpha(40),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
                 child: Text(
                   _isError ? '重试' : '取消',
-                  style: TextStyle(
-                    color: Colors.white.withAlpha((255 * 0.75).round()),
+                  style: const TextStyle(
+                    color: Colors.black,
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 1,
                   ),
                 ),
