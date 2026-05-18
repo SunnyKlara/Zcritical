@@ -229,6 +229,19 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - 回退方式：`git checkout fw/treadmill-panel`
   - 编译通过（⚠️ 分区空间仅剩 4%）
 
+- 2026-05-18：临界区方案崩溃修复
+  - portENTER_CRITICAL 包裹 led_strip_refresh 导致多核死锁（led_strip_refresh 内部阻塞）
+  - 移除临界区方案，仅保留降刷新率(30fps)防炸灯
+  - 潮汐层次感(8s呼吸叠加)保留
+  - 提交：`75e226a` on `fw/wave-experiment`
+  - 编译通过，待烧录验证
+
+- 2026-05-18：实验验证反馈
+  - 炸灯频率降低（30fps有效但未根治，根因是3.3V信号完整性）
+  - 波浪+潮汐层次感方向正确
+  - 后续软件可尝试：进一步降到20fps / 提升LED任务优先级
+  - 彻底解决：硬件加 74HCT245 电平转换
+
 - 2026-05-17（第十四轮）：跑步机界面 Forza Horizon 风格重设计
   - 调研 Forza Horizon 5 速度仪表盘 UI 设计（GitHub 开源复刻项目 + 社区分析）
   - `ui_treadmill.c` 完全重写：
