@@ -483,21 +483,27 @@ static void throttle_fx_wave(uint8_t spd)
 
     uint32_t t = s_throttle_fx_phase;
 
-    #define WAVE_CYCLE    2500
-    #define BASE_BRIGHT   38
+    /* Wind-reactive: speed 0=calm, 100=storm */
+    uint8_t wind = (uint8_t)g_app_state.current_speed_kmh;
+    if (wind > 100) wind = 100;
+
+    uint16_t wave_cycle = 2500 - (uint16_t)wind * 17;   /* 2500→800ms */
+    uint8_t base_bright = (uint8_t)(38 - wind * 38 / 100);  /* 38→0 */
+    uint8_t phase_step = 25 + (uint8_t)(wind * 30 / 100);   /* 25→55 */
+    uint16_t tidal_cycle = 8000 - (uint16_t)wind * 50;  /* 8000→3000ms */
+
     #define PEAK_BRIGHT   255
-    #define TIDAL_CYCLE   8000
 
-    uint8_t wave_phase = (uint8_t)((uint32_t)(t % WAVE_CYCLE) * 255 / WAVE_CYCLE);
+    uint8_t wave_phase = (uint8_t)((uint32_t)(t % wave_cycle) * 255 / wave_cycle);
 
-    /* Tidal overlay: base brightness slowly oscillates 15%→30%→15% */
-    uint8_t tidal_phase = (uint8_t)((uint32_t)(t % TIDAL_CYCLE) * 255 / TIDAL_CYCLE);
+    /* Tidal overlay */
+    uint8_t tidal_phase = (uint8_t)((uint32_t)(t % tidal_cycle) * 255 / tidal_cycle);
     uint8_t tidal_raw = (tidal_phase < 128) ? tidal_phase * 2 : (255 - tidal_phase) * 2;
-    uint8_t tidal_base = BASE_BRIGHT + (uint8_t)((uint16_t)tidal_raw * 38 / 255);
+    uint8_t tidal_base = base_bright + (uint8_t)((uint16_t)tidal_raw * base_bright / 255);
 
     /* Main strip: wide wave moves left to right */
     for (int i = 0; i < 6; i++) {
-        uint8_t led_phase = wave_phase + (uint8_t)(i * 25);  /* 宽波 */
+        uint8_t led_phase = wave_phase + (uint8_t)(i * phase_step);
 
         uint8_t raw;
         if (led_phase < 128) {
@@ -516,7 +522,7 @@ static void throttle_fx_wave(uint8_t spd)
 
     /* Tail: same wave, slightly behind */
     for (int i = 0; i < LED_TAIL_COUNT; i++) {
-        uint8_t led_phase = wave_phase + (uint8_t)((2 - i) * 25) - 60;
+        uint8_t led_phase = wave_phase + (uint8_t)((2 - i) * phase_step) - 60;
 
         uint8_t raw;
         if (led_phase < 128) {
@@ -533,10 +539,7 @@ static void throttle_fx_wave(uint8_t spd)
             (uint8_t)((uint16_t)tb * brightness / 255));
     }
 
-    #undef WAVE_CYCLE
-    #undef BASE_BRIGHT
     #undef PEAK_BRIGHT
-    #undef TIDAL_CYCLE
 
     drv_led_refresh();
 }
