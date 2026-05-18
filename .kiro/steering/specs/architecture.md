@@ -1,5 +1,6 @@
 ---
-inclusion: manual
+inclusion: fileMatch
+fileMatchPattern: "ridewind-esp/**/*.c,ridewind-esp/**/*.h"
 ---
 
 <!-- last-verified: 2026-05-12 | verified-by: deep code read of all source files -->
