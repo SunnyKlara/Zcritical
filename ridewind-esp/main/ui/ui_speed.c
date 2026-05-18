@@ -334,14 +334,6 @@ void ui_speed_update(void)
             g_app_state.fan_speed = (uint8_t)g_app_state.current_speed_kmh;
             drv_pwm_set_duty(g_app_state.fan_speed);
 
-            /* Fan power: GPIO10 (humidifier MOS) also powers the fan circuit.
-             * Turn on when speed > 0, off when speed = 0 (unless atomizer is on). */
-            if (g_app_state.current_speed_kmh > 0) {
-                drv_gpio_set_humidifier(true);
-            } else if (g_app_state.wuhuaqi_state == 0) {
-                drv_gpio_set_humidifier(false);
-            }
-
             /* Engine sound: start when speed goes above 0, stop when it hits 0 */
             if (g_app_state.current_speed_kmh > 0) {
                 if (!audio_player_is_playing()) {

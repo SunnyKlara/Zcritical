@@ -711,15 +711,28 @@ class ColorizeController extends ChangeNotifier {
   }
 
   /// 删除自定义胶囊。返回是否成功。
+  ///
+  /// 索引调整策略（视觉上"留在原位置"）：
+  /// - 若选中的就是被删的：保持索引不变 → 让原本排在后面的胶囊递补
+  ///   * 边界：若递补后越界（原本是最后一个 custom，旁边就是"+"），
+  ///     退 1 格到上一个有效胶囊（上一个 custom 或最后一个预设）
+  /// - 若选中的在被删的右侧：索引 -1，因为列表整体左移
+  /// - 若选中的在被删的左侧：完全不受影响
   Future<bool> removeCustomPreset(String id) async {
     final i = _customPresets.indexWhere((p) => p.id == id);
     if (i < 0) return false;
     _customPresets.removeAt(i);
     await _preferenceService.saveCustomPresets(_customPresets);
-    // 如果当前选中索引被影响，回退到第一个预设
+
     final removedAbsIndex = presetCount + i;
+    final newCount = presetCount + _customPresets.length; // 删除后有效胶囊数（不含末尾"+"）
+
     if (_selectedColorIndex == removedAbsIndex) {
-      _selectedColorIndex = 0;
+      // 留在原位置（递补效果）；越界则退到最后一个有效胶囊
+      if (_selectedColorIndex >= newCount) {
+        _selectedColorIndex = newCount - 1;
+      }
+      // else: 保持不变
     } else if (_selectedColorIndex > removedAbsIndex) {
       _selectedColorIndex -= 1;
     }
