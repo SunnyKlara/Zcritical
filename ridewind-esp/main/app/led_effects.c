@@ -592,9 +592,9 @@ static void throttle_fx_lightning(uint8_t spd)
 static void throttle_fx_process(void)
 {
     uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    if (now - s_throttle_fx_tick < 33) return;  /* 30fps — 降低刷新率减少炸灯 */
+    if (now - s_throttle_fx_tick < 50) return;  /* 20fps — 进一步降低炸灯概率 */
     s_throttle_fx_tick = now;
-    s_throttle_fx_phase += 33;
+    s_throttle_fx_phase += 50;
 
     uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
     if (spd > 100) spd = 100;
