@@ -313,6 +313,57 @@ class ColorizeController extends ChangeNotifier {
         '📤 自定义胶囊 ${preset.id} → LED main(${preset.r1},${preset.g1},${preset.b1}) sec(${preset.r2},${preset.g2},${preset.b2})');
   }
 
+  /// 重连后主动把"用户意图"重发给硬件（不依赖硬件回报）
+  ///
+  /// 触发时机：BLE 断→连边沿（由 [_onConnectionChanged] 调用）。
+  ///
+  /// 解决三个潜在问题：
+  /// 1. ESP32 复位后，灯效从默认色跳到用户色之间的错色窗口
+  /// 2. "预设胶囊 + RGB 调色"组合被硬件 PRESET 报告反向覆盖
+  /// 3. 硬件 PRESET 报告丢包时反向同步守卫永远不触发
+  ///
+  /// 三种场景：
+  /// - 自定义胶囊  → 走 [syncCapsuleToHardware]（连发 4 条 LED:strip）
+  /// - 预设 + 自定义 RGB → 按 4 通道实际颜色重发 LED:strip（保留用户调色）
+  /// - 纯预设       → 走 [syncCapsuleToHardware]（PRESET:n）
+  Future<void> reapplyCurrentSelection() async {
+    if (!_btProvider.isConnected) return;
+
+    final isCustomCapsule = _selectedColorIndex >= presetCount &&
+        _selectedColorIndex < presetCount + _customPresets.length;
+
+    if (isCustomCapsule) {
+      // Case A: 自定义胶囊
+      await syncCapsuleToHardware(_selectedColorIndex);
+    } else if (_hasCustomColors && _selectedColorIndex < presetCount) {
+      // Case B: 预设胶囊 + RGB 调色叠加 → 按 4 通道实际颜色重发
+      // 先把硬件 LCD 切回配色预设页（与 syncCustomToHardware 一致）
+      if (_lastSentHardwareUI != 2) {
+        await _btProvider.setHardwareUI(2);
+        _lastSentHardwareUI = 2;
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      const posMap = {'M': 1, 'L': 2, 'R': 3, 'B': 4};
+      for (final entry in posMap.entries) {
+        final pos = entry.key;
+        final strip = entry.value;
+        await _btProvider.setLEDColor(
+          strip,
+          _redValues[pos]!.clamp(0, 255),
+          _greenValues[pos]!.clamp(0, 255),
+          _blueValues[pos]!.clamp(0, 255),
+        );
+      }
+      debugPrint('🔁 重连重发 RGB 调色 (预设$_selectedColorIndex + 自定义色)');
+    } else {
+      // Case C: 纯预设
+      await syncCapsuleToHardware(_selectedColorIndex);
+    }
+
+    debugPrint(
+        '🔁 重连后主动重发用户意图: idx=$_selectedColorIndex, hasCustom=$_hasCustomColors, isCustomCapsule=$isCustomCapsule');
+  }
+
   void applyPresetToLocalColors(int index) {
     if (index < 0 || index >= ledColorCapsules.length) return;
 
