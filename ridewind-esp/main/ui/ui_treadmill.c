@@ -18,52 +18,111 @@
 
 /**
  * @file ui_treadmill.c
- * @brief UI8 — Treadmill control (Forza arc + F4 digits + throttle mode)
+ * @brief UI8 — Treadmill (Forza arc + F4 digits + throttle)
  *
- * Visual:
- *   - 270° thin arc gauge (Forza Horizon style, gradient white→red)
- *   - Large F4 digit bitmaps centered inside arc (integer 0-20)
- *   - No text, no labels, no decimal
- *   - Running indicator: green dot below number
- *
- * Controls (throttle mode, same as Speed UI):
- *   Hold button:    Accelerate (0→20)
- *   Release:        Decelerate (→0)
- *   Double click:   Return to menu
- *   Long press:     Return to menu
+ * 性能优化方案：预计算弧线像素查找表
+ * - 启动时一次性计算所有弧线像素的坐标和角度百分比
+ * - 更新时只需遍历变化范围的像素，用行缓冲批量 blit
+ * - 数字不清除再画，直接覆盖（贴图自带黑色背景）
  */
 
 static const char *TAG = "UI_TREAD";
 
 /* ── State ── */
 static uint8_t  s_need_full_redraw = 1;
-static int16_t  s_treadmill_speed = 0;     /* 0-20 integer */
+static uint8_t  s_lut_built = 0;
+static int16_t  s_treadmill_speed = 0;
 static int16_t  s_last_drawn_speed = -1;
 static uint32_t s_last_tick = 0;
 
-/* ── Timing ── */
+/* ── Config ── */
 #define TREAD_ACCEL_MS      150
 #define TREAD_DECEL_MS      100
 #define TREAD_MAX_SPEED     20
 
 /* ── Colors ── */
 #define COLOR_BG            0x0000
-#define COLOR_ARC_BG        0x18E3   /* Very dark gray */
+#define COLOR_ARC_BG        0x18E3
 
 /* ── Arc Geometry ── */
 #define ARC_CX              120
 #define ARC_CY              120
 #define ARC_R_OUTER         108
-#define ARC_R_INNER         104      /* 4px thickness */
+#define ARC_R_INNER         104
 #define ARC_START_DEG       135.0f
 #define ARC_SWEEP_DEG       270.0f
 
-/* ── Number Layout — 直接使用 Speed UI 的 F4 坐标 (F4_X_QI, F4_Y_QI, F4_JIANJU) ── */
+/* ══════ 预计算弧线像素查找表 ══════
+ * 弧线 4px 厚, 半径 104-108, 270°
+ * 估算像素数: 2π×106×(270/360)×4 ≈ 2000 像素
+ * 每个像素存: x(uint8), y(uint8), pct(uint8) = 3 字节
+ * 总 RAM: ~6KB
+ */
+#define ARC_LUT_MAX     2500
 
-/* ── Indicator ── */
-/* 已移除 — 不需要指示点 */
+typedef struct {
+    uint8_t x;
+    uint8_t y;
+    uint8_t pct;   /* 0-100: 在弧线中的位置百分比 */
+} arc_pixel_t;
 
-/* ══════ Arc Gradient Color ══════ */
+static arc_pixel_t s_arc_lut[ARC_LUT_MAX];
+static uint16_t    s_arc_lut_count = 0;
+
+/* 按行排序后的行索引 */
+#define ARC_ROW_COUNT   (ARC_R_OUTER * 2 + 1)
+static uint16_t s_row_start[ARC_ROW_COUNT];
+static uint16_t s_row_end[ARC_ROW_COUNT];
+
+static void build_arc_lut(void)
+{
+    s_arc_lut_count = 0;
+    int32_t r_out_sq = (int32_t)ARC_R_OUTER * ARC_R_OUTER;
+    int32_t r_in_sq  = (int32_t)ARC_R_INNER * ARC_R_INNER;
+
+    memset(s_row_start, 0xFF, sizeof(s_row_start));
+    memset(s_row_end, 0, sizeof(s_row_end));
+
+    for (int16_t py = ARC_CY - ARC_R_OUTER; py <= ARC_CY + ARC_R_OUTER; py++) {
+        if (py < 0 || py >= LCD_HEIGHT) continue;
+        int16_t dy = py - ARC_CY;
+        int32_t dy_sq = (int32_t)dy * dy;
+
+        for (int16_t px = ARC_CX - ARC_R_OUTER; px <= ARC_CX + ARC_R_OUTER; px++) {
+            if (px < 0 || px >= LCD_WIDTH) continue;
+            int16_t dx = px - ARC_CX;
+            int32_t d_sq = (int32_t)dx * dx + dy_sq;
+            if (d_sq < r_in_sq || d_sq > r_out_sq) continue;
+
+            float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
+            if (raw_deg < 0.0f) raw_deg += 360.0f;
+            float rel = raw_deg - ARC_START_DEG;
+            if (rel < -0.5f) rel += 360.0f;
+            if (rel < 0.0f) rel = 0.0f;
+            if (rel > ARC_SWEEP_DEG + 0.5f) continue;
+
+            uint8_t pct = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
+            if (pct > 100) pct = 100;
+
+            if (s_arc_lut_count >= ARC_LUT_MAX) break;
+
+            s_arc_lut[s_arc_lut_count].x = (uint8_t)px;
+            s_arc_lut[s_arc_lut_count].y = (uint8_t)py;
+            s_arc_lut[s_arc_lut_count].pct = pct;
+
+            uint16_t row = py - (ARC_CY - ARC_R_OUTER);
+            if (s_row_start[row] == 0xFFFF) s_row_start[row] = s_arc_lut_count;
+            s_row_end[row] = s_arc_lut_count;
+
+            s_arc_lut_count++;
+        }
+        if (s_arc_lut_count >= ARC_LUT_MAX) break;
+    }
+
+    ESP_LOGI(TAG, "Arc LUT built: %d pixels", s_arc_lut_count);
+}
+
+/* ══════ Arc Color ══════ */
 static uint16_t arc_color(uint8_t pct)
 {
     uint8_t r, g, b;
@@ -81,225 +140,116 @@ static uint16_t arc_color(uint8_t pct)
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
-/* ══════ Arc Drawing (scanline-buffered, 丝滑刷新) ══════
- * 参考 Speed 色条和 ui_draw_gradient_bar 的方式：
- * 每行计算所有弧线像素颜色，打包成行缓冲，一次 blit 写入
- * 这样每行只需 1 次 SPI 事务，比逐像素快 5-10 倍
- */
+/* ══════ Arc Rendering (LUT-based) ══════ */
 
-/* 行缓冲：最大一行 240 像素 × 2 字节 */
-static uint8_t s_arc_line_buf[480];
+static uint8_t s_line_buf[480];
 
-static float angle_to_arc_pos(float raw_deg)
+static void draw_arc_full(uint8_t fill_pct)
 {
-    if (raw_deg < 0.0f) raw_deg += 360.0f;
-    float rel = raw_deg - ARC_START_DEG;
-    if (rel < -0.5f) rel += 360.0f;
-    if (rel < 0.0f) rel = 0.0f;
-    return rel;
-}
+    for (uint16_t row = 0; row < ARC_ROW_COUNT; row++) {
+        if (s_row_start[row] == 0xFFFF) continue;
 
-/**
- * @brief 绘制完整弧线（首次进入时调用）
- *        使用行缓冲 blit，一行一次 SPI
- */
-static void draw_arc(uint8_t fill_pct)
-{
-    if (fill_pct > 100) fill_pct = 100;
-    float fill_sweep = ARC_SWEEP_DEG * fill_pct / 100.0f;
-    int32_t r_out_sq = (int32_t)ARC_R_OUTER * ARC_R_OUTER;
-    int32_t r_in_sq  = (int32_t)ARC_R_INNER * ARC_R_INNER;
+        uint16_t start = s_row_start[row];
+        uint16_t end   = s_row_end[row];
+        uint8_t  py    = s_arc_lut[start].y;
+        uint8_t  x_min = s_arc_lut[start].x;
+        uint8_t  x_max = s_arc_lut[start].x;
 
-    int16_t scan_min = ARC_CY - ARC_R_OUTER;
-    int16_t scan_max = ARC_CY + ARC_R_OUTER;
-    if (scan_min < 0) scan_min = 0;
-    if (scan_max >= LCD_HEIGHT) scan_max = LCD_HEIGHT - 1;
-
-    for (int16_t py = scan_min; py <= scan_max; py++) {
-        int16_t dy = py - ARC_CY;
-        int32_t dy_sq = (int32_t)dy * dy;
-        int32_t x_range = r_out_sq - dy_sq;
-        if (x_range < 0) continue;
-
-        int16_t dx_max = (int16_t)sqrtf((float)x_range);
-        int16_t px_s = ARC_CX - dx_max;
-        int16_t px_e = ARC_CX + dx_max;
-        if (px_s < 0) px_s = 0;
-        if (px_e >= LCD_WIDTH) px_e = LCD_WIDTH - 1;
-
-        /* 扫描这一行，收集弧线像素到缓冲 */
-        int16_t line_start = -1, line_end = -1;
-        for (int16_t px = px_s; px <= px_e; px++) {
-            int16_t dx = px - ARC_CX;
-            int32_t d_sq = (int32_t)dx * dx + dy_sq;
-            if (d_sq < r_in_sq || d_sq > r_out_sq) continue;
-
-            float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
-            float rel = angle_to_arc_pos(raw_deg);
-            if (rel > ARC_SWEEP_DEG + 0.5f) continue;
-
-            /* 记录行范围 */
-            if (line_start < 0) line_start = px;
-            line_end = px;
-
-            /* 计算颜色 */
-            uint16_t color;
-            if (rel <= fill_sweep) {
-                uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
-                color = arc_color(pos);
-            } else {
-                color = COLOR_ARC_BG;
-            }
-
-            /* 写入行缓冲（大端序，GC9A01 需要） */
-            int16_t idx = (px - px_s) * 2;
-            s_arc_line_buf[idx]     = color >> 8;
-            s_arc_line_buf[idx + 1] = color & 0xFF;
+        for (uint16_t i = start; i <= end; i++) {
+            if (s_arc_lut[i].x < x_min) x_min = s_arc_lut[i].x;
+            if (s_arc_lut[i].x > x_max) x_max = s_arc_lut[i].x;
         }
 
-        /* 一次 blit 写入这行所有弧线像素 */
-        if (line_start >= 0 && line_end >= line_start) {
-            int16_t offset = (line_start - px_s) * 2;
-            int16_t w = line_end - line_start + 1;
-            drv_lcd_blit_rgb565(line_start, py, w, 1,
-                                (const uint16_t *)(s_arc_line_buf + offset));
+        uint16_t w = x_max - x_min + 1;
+        memset(s_line_buf, 0, w * 2);
+
+        for (uint16_t i = start; i <= end; i++) {
+            uint16_t color = (s_arc_lut[i].pct <= fill_pct)
+                           ? arc_color(s_arc_lut[i].pct) : COLOR_ARC_BG;
+            uint16_t idx = (s_arc_lut[i].x - x_min) * 2;
+            s_line_buf[idx]     = color >> 8;
+            s_line_buf[idx + 1] = color & 0xFF;
         }
+
+        drv_lcd_blit_rgb565(x_min, py, w, 1, (const uint16_t *)s_line_buf);
     }
 }
 
-/**
- * @brief 局部弧线更新（速度变化时）— 同样用行缓冲
- */
-static void update_arc_delta(int16_t old_spd, int16_t new_spd)
+static void update_arc_fast(uint8_t old_pct, uint8_t new_pct)
 {
-    uint8_t old_pct = (old_spd <= 0) ? 0 : (uint8_t)((uint32_t)old_spd * 100 / TREAD_MAX_SPEED);
-    uint8_t new_pct = (uint8_t)((uint32_t)new_spd * 100 / TREAD_MAX_SPEED);
-    if (old_pct > 100) old_pct = 100;
-    if (new_pct > 100) new_pct = 100;
-    if (old_pct == new_pct) return;
+    uint8_t lo = (new_pct > old_pct) ? old_pct : new_pct;
+    uint8_t hi = (new_pct > old_pct) ? new_pct : old_pct;
 
-    float old_sw = ARC_SWEEP_DEG * old_pct / 100.0f;
-    float new_sw = ARC_SWEEP_DEG * new_pct / 100.0f;
-    float lo = (new_pct > old_pct) ? old_sw : new_sw;
-    float hi = (new_pct > old_pct) ? new_sw : old_sw;
+    for (uint16_t row = 0; row < ARC_ROW_COUNT; row++) {
+        if (s_row_start[row] == 0xFFFF) continue;
 
-    int32_t r_out_sq = (int32_t)ARC_R_OUTER * ARC_R_OUTER;
-    int32_t r_in_sq  = (int32_t)ARC_R_INNER * ARC_R_INNER;
+        uint16_t start = s_row_start[row];
+        uint16_t end   = s_row_end[row];
 
-    int16_t scan_min = ARC_CY - ARC_R_OUTER;
-    int16_t scan_max = ARC_CY + ARC_R_OUTER;
-    if (scan_min < 0) scan_min = 0;
-    if (scan_max >= LCD_HEIGHT) scan_max = LCD_HEIGHT - 1;
+        uint8_t has_change = 0;
+        uint8_t x_min = 255, x_max = 0;
 
-    for (int16_t py = scan_min; py <= scan_max; py++) {
-        int16_t dy = py - ARC_CY;
-        int32_t dy_sq = (int32_t)dy * dy;
-        int32_t x_range = r_out_sq - dy_sq;
-        if (x_range < 0) continue;
-
-        int16_t dx_max = (int16_t)sqrtf((float)x_range);
-        int16_t px_s = ARC_CX - dx_max;
-        int16_t px_e = ARC_CX + dx_max;
-        if (px_s < 0) px_s = 0;
-        if (px_e >= LCD_WIDTH) px_e = LCD_WIDTH - 1;
-
-        int16_t line_start = -1, line_end = -1;
-
-        for (int16_t px = px_s; px <= px_e; px++) {
-            int16_t dx = px - ARC_CX;
-            int32_t d_sq = (int32_t)dx * dx + dy_sq;
-            if (d_sq < r_in_sq || d_sq > r_out_sq) continue;
-
-            float raw_deg = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
-            float rel = angle_to_arc_pos(raw_deg);
-            if (rel > ARC_SWEEP_DEG + 0.5f) continue;
-
-            /* 只处理变化区域内的像素 */
-            if (rel < lo - 0.5f || rel > hi + 0.5f) continue;
-
-            if (line_start < 0) line_start = px;
-            line_end = px;
-
-            uint16_t color;
-            if (rel <= new_sw) {
-                uint8_t pos = (uint8_t)(rel * 100.0f / ARC_SWEEP_DEG);
-                color = arc_color(pos);
-            } else {
-                color = COLOR_ARC_BG;
+        for (uint16_t i = start; i <= end; i++) {
+            if (s_arc_lut[i].pct >= lo && s_arc_lut[i].pct <= hi) {
+                has_change = 1;
+                if (s_arc_lut[i].x < x_min) x_min = s_arc_lut[i].x;
+                if (s_arc_lut[i].x > x_max) x_max = s_arc_lut[i].x;
             }
-
-            int16_t idx = (px - px_s) * 2;
-            s_arc_line_buf[idx]     = color >> 8;
-            s_arc_line_buf[idx + 1] = color & 0xFF;
         }
 
-        if (line_start >= 0 && line_end >= line_start) {
-            int16_t offset = (line_start - px_s) * 2;
-            int16_t w = line_end - line_start + 1;
-            drv_lcd_blit_rgb565(line_start, py, w, 1,
-                                (const uint16_t *)(s_arc_line_buf + offset));
+        if (!has_change) continue;
+
+        uint8_t py = s_arc_lut[start].y;
+        uint16_t w = x_max - x_min + 1;
+        memset(s_line_buf, 0, w * 2);
+
+        for (uint16_t i = start; i <= end; i++) {
+            if (s_arc_lut[i].x < x_min || s_arc_lut[i].x > x_max) continue;
+            uint16_t color = (s_arc_lut[i].pct <= new_pct)
+                           ? arc_color(s_arc_lut[i].pct) : COLOR_ARC_BG;
+            uint16_t idx = (s_arc_lut[i].x - x_min) * 2;
+            s_line_buf[idx]     = color >> 8;
+            s_line_buf[idx + 1] = color & 0xFF;
         }
+
+        drv_lcd_blit_rgb565(x_min, py, w, 1, (const uint16_t *)s_line_buf);
     }
 }
 
-/* ══════ Number Drawing ══════
- * 数字范围映射：内部 0-20 → 显示 0-340（和 Speed 的 0-100→0-340 一样的视觉范围）
- * 数字居中显示在弧形内部
- */
+/* ══════ Number Drawing ══════ */
 
 static void draw_number(void)
 {
-    /* 映射：内部速度 0-20 → 显示 0-340 */
     uint16_t display_spd = (uint16_t)(s_treadmill_speed * 17);
 
-    /* 计算数字总宽度用于居中 */
+    /* 缩小清除区域，避免覆盖弧线 */
+    drv_lcd_fill_rect(50, F4_Y_QI, 140, F4_SPEED_NUM_HIGH, 0x0000);
+
     uint8_t d_h, d_t, d_o, count;
     if (display_spd >= 100) {
-        d_h = display_spd / 100;
-        d_t = (display_spd % 100) / 10;
-        d_o = display_spd % 10;
-        count = 3;
+        d_h = display_spd / 100; d_t = (display_spd % 100) / 10; d_o = display_spd % 10; count = 3;
     } else if (display_spd >= 10) {
-        d_h = 0;
-        d_t = display_spd / 10;
-        d_o = display_spd % 10;
-        count = 2;
+        d_h = 0; d_t = display_spd / 10; d_o = display_spd % 10; count = 2;
     } else {
-        d_h = 0;
-        d_t = 0;
-        d_o = display_spd;
-        count = 1;
+        d_h = 0; d_t = 0; d_o = display_spd; count = 1;
     }
 
     uint8_t w_h = ui_large_digit_width(d_h);
     uint8_t w_t = ui_large_digit_width(d_t);
     uint8_t w_o = ui_large_digit_width(d_o);
 
-    int16_t total_w;
-    if (count == 3) {
-        total_w = w_h + w_t + w_o + F4_JIANJU * 2;
-    } else if (count == 2) {
-        total_w = w_t + w_o + F4_JIANJU;
-    } else {
-        total_w = w_o;
-    }
+    int16_t total_w = (count == 3) ? (w_h + w_t + w_o + F4_JIANJU * 2)
+                    : (count == 2) ? (w_t + w_o + F4_JIANJU)
+                    : w_o;
 
-    /* 居中 X 坐标 */
     int16_t x = (LCD_WIDTH - total_w) / 2;
 
-    /* 精确清除数字区域（居中区域） */
-    drv_lcd_fill_rect(20, F4_Y_QI, 200, F4_SPEED_NUM_HIGH, 0x0000);
-
-    /* 绘制各位数字 */
     if (count == 3) {
-        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_h);
-        x += w_h + F4_JIANJU;
-        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t);
-        x += w_t + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_h); x += w_h + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t); x += w_t + F4_JIANJU;
         ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
     } else if (count == 2) {
-        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t);
-        x += w_t + F4_JIANJU;
+        ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_t); x += w_t + F4_JIANJU;
         ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
     } else {
         ui_draw_large_digit((uint16_t)x, F4_Y_QI, d_o);
@@ -312,7 +262,7 @@ static void draw_full_screen(void)
 {
     drv_lcd_clear(COLOR_BG);
     uint8_t pct = (uint8_t)((uint32_t)s_treadmill_speed * 100 / TREAD_MAX_SPEED);
-    draw_arc(pct);
+    draw_arc_full(pct);
     draw_number();
     s_last_drawn_speed = s_treadmill_speed;
 }
@@ -349,6 +299,10 @@ static void throttle_process(void)
 
 void ui_treadmill_enter(void)
 {
+    if (!s_lut_built) {
+        build_arc_lut();
+        s_lut_built = 1;
+    }
     s_need_full_redraw = 1;
     s_last_drawn_speed = -1;
     s_last_tick = xTaskGetTickCount() * portTICK_PERIOD_MS;
@@ -366,17 +320,17 @@ void ui_treadmill_update(void)
     encoder_event_t evt;
     while (drv_encoder_poll(&evt)) {
         if (evt.type == ENC_EVT_DOUBLE_CLICK) {
-            /* 双击退出到菜单（长按是加速，不能用来退出） */
             ui_manager_set_ui(5);
             return;
         }
-        /* 其他事件忽略 — 油门模式通过 raw GPIO 检测按住状态 */
     }
 
     throttle_process();
 
     if (s_treadmill_speed != s_last_drawn_speed) {
-        update_arc_delta(s_last_drawn_speed, s_treadmill_speed);
+        uint8_t old_pct = (s_last_drawn_speed <= 0) ? 0 : (uint8_t)((uint32_t)s_last_drawn_speed * 100 / TREAD_MAX_SPEED);
+        uint8_t new_pct = (uint8_t)((uint32_t)s_treadmill_speed * 100 / TREAD_MAX_SPEED);
+        update_arc_fast(old_pct, new_pct);
         draw_number();
         s_last_drawn_speed = s_treadmill_speed;
     }

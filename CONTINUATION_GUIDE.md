@@ -1,8 +1,9 @@
 # Critical T1 — Session Handoff
 
-<!-- last-verified: 2026-05-15 -->
+<!-- last-verified: 2026-05-18 -->
 
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
+> 软件战略 / 学习路径思考：`#SOFTWARE-STRATEGY.md`（manual inclusion，焦虑或战略讨论时再调）。
 
 ## 当前阶段：体验打磨期
 
@@ -44,6 +45,16 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 5. **P4 go_router 声明式路由 + 国际化 + CI/CD**
 
 ## 本次对话决策
+
+- 2026-05-18（战略文档建立）：
+  - 用户提出"作为软件总负责人，需要思考的全维度问题"——不是产品定位，是软件版图
+  - 沉淀两组维度清单到 `.kiro/steering/SOFTWARE-STRATEGY.md`（manual inclusion）：
+    - Part A：产品演进 12 维度（A1 代码可持续性 / A2 协议债务 / A3 可观测性 / A4 发布回滚 / A5 依赖供应链 / A6 安全 / A7 合规 / A8 可测试性 / A9 组织 / A10 成本 / A11 体验一致性 / A12 知识沉淀）
+    - Part B：公司软件版图 16 维度（B1 平台形态 / B2 技术栈统一 / B3 账号身份 / B4 数据所在地 / B5 渠道策略 / B6 CMS / B7 SEO / B8 支付 / B9 CRM / B10 数据分析 / B11 触达 / B12 客服 / B13 微信生态 / B14 国际化 / B15 自动化 / B16 能力边界）
+    - Part C：分四阶段学习路径（0-3m / 3-9m / 9-18m / 18m+）
+    - Part D：当前状态自检表（红黄绿，已按目前项目状态填一版）
+  - 协作原则：不为学技术而学，按产品下一步需求驱动学习
+  - 后续会话讨论战略问题时用 `#SOFTWARE-STRATEGY.md` 调入
 
 - 2026-05-15（音频素材集成）：
   - 用户提供 4 段真实引擎 MP3 素材（启动加速/刹车/中加速/长加速）
@@ -199,6 +210,13 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - commit 消息用中文
   - 详细描述修改内容（参数变化、原因、影响）
   - 提交：`c972608` on `fw/treadmill-panel`
+
+- 2026-05-18：Git commit 规范落地
+  - 新建 `.kiro/steering/commit-convention.md`（auto inclusion）
+  - 格式：`类型(模块): 中文标题` + A/B/C 分点正文
+  - 类型全中文：新增/修复/优化/调参/重构/文档
+  - 模块：固件/APP/全局
+  - 参考 APP 端 `app/colorize-custom-presets` 分支的 commit 风格
 
 - 2026-05-17（第十四轮）：跑步机界面 Forza Horizon 风格重设计
   - 调研 Forza Horizon 5 速度仪表盘 UI 设计（GitHub 开源复刻项目 + 社区分析）
