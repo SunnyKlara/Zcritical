@@ -57,6 +57,13 @@ class ColorizeController extends ChangeNotifier {
   DateTime _lastPresetSyncTime = DateTime.now();
   bool _isReceivingPresetReport = false;
 
+  // ── 重连恢复 ──
+  StreamSubscription<bool>? _connSub;
+  bool _wasConnected = false;
+  /// 重连后等待 BluetoothProvider._syncHardwareStateOnReconnect 跑完再重发
+  /// （那边一连串 query 大约耗时 ~900ms，留 1000ms 安全边距）
+  static const Duration _reapplyDelay = Duration(milliseconds: 1000);
+
   // ── 内置预设 + 用户自定义 ──
   /// 内置 14 个预设（与 ESP32 preset_colors.h 对齐）
   List<Map<String, dynamic>> get ledColorCapsules => ledPresetMaps;
@@ -118,6 +125,24 @@ class ColorizeController extends ChangeNotifier {
 
   ColorizeController(this._btProvider) {
     rgbValueFocusNode.addListener(_onRGBValueFocusChanged);
+    _wasConnected = _btProvider.isConnected;
+    _connSub = _btProvider.connectionStream.listen(_onConnectionChanged);
+  }
+
+  /// BLE 连接状态变化回调
+  ///
+  /// 仅在 false→true 边沿（重连/首连成功）触发重发。
+  /// 延迟 [_reapplyDelay] 让 BluetoothProvider 的硬件状态查询先完成，
+  /// 避免命令撞车。
+  Future<void> _onConnectionChanged(bool connected) async {
+    if (connected && !_wasConnected) {
+      _wasConnected = true;
+      await Future.delayed(_reapplyDelay);
+      if (!_btProvider.isConnected) return; // 期间又断了
+      await reapplyCurrentSelection();
+    } else if (!connected) {
+      _wasConnected = false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -758,6 +783,7 @@ class ColorizeController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _connSub?.cancel();
     _cycleTimer?.cancel();
     rgbValueController.dispose();
     rgbValueFocusNode.dispose();
