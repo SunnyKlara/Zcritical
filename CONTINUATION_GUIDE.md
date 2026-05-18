@@ -218,6 +218,17 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - 模块：固件/APP/全局
   - 参考 APP 端 `app/colorize-custom-presets` 分支的 commit 风格
 
+- 2026-05-18：波浪效果v2实验分支
+  - 确认版打 tag：`wave-v1-confirmed` on `fw/treadmill-panel`
+  - 新建实验分支：`fw/wave-experiment`（当前所在）
+  - 优化内容：
+    - 防炸灯A：刷新率50fps→30fps（20ms→33ms间隔）
+    - 防炸灯C：drv_led_refresh加portENTER_CRITICAL临界区保护RMT传输
+    - 波浪层次：叠加8s潮汐周期，底亮在15%↔30%缓慢变化
+  - 提交：`910ea81` on `fw/wave-experiment`
+  - 回退方式：`git checkout fw/treadmill-panel`
+  - 编译通过（⚠️ 分区空间仅剩 4%）
+
 - 2026-05-17（第十四轮）：跑步机界面 Forza Horizon 风格重设计
   - 调研 Forza Horizon 5 速度仪表盘 UI 设计（GitHub 开源复刻项目 + 社区分析）
   - `ui_treadmill.c` 完全重写：

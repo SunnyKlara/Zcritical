@@ -2,14 +2,9 @@
 #include "pin_config.h"
 #include "led_strip.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include <string.h>
 
 static const char *TAG = "drv_led";
-
-/* Critical section spinlock for RMT transmission protection */
-static portMUX_TYPE s_led_mux = portMUX_INITIALIZER_UNLOCKED;
 
 /* RMT LED strip handles */
 static led_strip_handle_t s_strip1;  /* IO41, 10 LEDs */
@@ -114,11 +109,9 @@ void drv_led_refresh(void)
         led_strip_set_pixel(s_strip2, i, r, g, b);
     }
 
-    /* Critical section: protect RMT transmission from interrupt interference */
-    portENTER_CRITICAL(&s_led_mux);
+    /* Refresh both strips (RMT transmission) */
     led_strip_refresh(s_strip1);
     led_strip_refresh(s_strip2);
-    portEXIT_CRITICAL(&s_led_mux);
 }
 
 void drv_led_clear(void)
