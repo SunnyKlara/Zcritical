@@ -955,6 +955,7 @@ static void main_task(void *arg)
         /* Phase 6: UI state machine + LED effects */
         ui_manager_update();
         led_effects_process();
+        drv_pwm_update();  /* Smooth fan speed ramping */
 
         /* Feed watchdog — LCD SPI operations can take a while */
         vTaskDelay(pdMS_TO_TICKS(MAIN_TASK_PERIOD_MS));

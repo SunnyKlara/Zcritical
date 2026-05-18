@@ -1,10 +1,13 @@
 /**
  * @file audio_player.c
- * @brief 4-layer variable-rate engine sound synthesizer.
+ * @brief 5-layer 16-bit variable-rate engine sound synthesizer.
  *
- * 4 layers at different RPM points, only 2 adjacent layers active at once.
- * Variable playback rate (pitch follows RPM), crossfade between layers.
- * Non-linear RPM inertia. I2S blocking write is the master clock.
+ * 5 layers at different RPM points (gear-based), 2 adjacent layers
+ * active at once with crossfade. Variable playback rate (pitch follows RPM).
+ * Non-linear RPM inertia. I2S blocking write at 44100Hz is the master clock.
+ *
+ * Key fix: all audio data is 44100Hz 16-bit, matching the I2S output rate.
+ * Previous version used 22050Hz 8-bit data played at 44100Hz = double speed = bad.
  */
 
 #include "audio_player.h"
@@ -18,38 +21,30 @@
 #include "freertos/task.h"
 #include <string.h>
 
-#include "engine_idle.h"
-#include "engine_low.h"
-#include "engine_mid.h"
-#include "engine_high.h"
+#include "engine_layers_16bit.h"
 
 static const char *TAG = "ENGINE_SND";
 
 /* ── Layer table ── */
-#define NUM_LAYERS 4
-typedef struct { const int8_t *data; uint32_t len; uint16_t rpm; } layer_t;
+#define NUM_LAYERS ENGINE_NUM_LAYERS
+typedef struct { const int16_t *data; uint32_t len; uint16_t rpm; } layer_t;
 
-/* Built-in (flash) layers — used as fallback */
 static const layer_t BUILTIN_LAYERS[NUM_LAYERS] = {
-    { engine_idle_samples, ENGINE_IDLE_SAMPLE_COUNT, 800  },
-    { engine_low_samples,  ENGINE_LOW_SAMPLE_COUNT,  2000 },
-    { engine_mid_samples,  ENGINE_MID_SAMPLE_COUNT,  4000 },
-    { engine_high_samples, ENGINE_HIGH_SAMPLE_COUNT, 7000 },
+    { engine_layer_0, ENGINE_LAYER_0_COUNT, ENGINE_LAYER_0_RPM },
+    { engine_layer_1, ENGINE_LAYER_1_COUNT, ENGINE_LAYER_1_RPM },
+    { engine_layer_2, ENGINE_LAYER_2_COUNT, ENGINE_LAYER_2_RPM },
+    { engine_layer_3, ENGINE_LAYER_3_COUNT, ENGINE_LAYER_3_RPM },
+    { engine_layer_4, ENGINE_LAYER_4_COUNT, ENGINE_LAYER_4_RPM },
 };
 
-/* Active layers — points to either built-in or PSRAM-loaded custom audio */
 static layer_t s_layers[NUM_LAYERS];
 
-/* PSRAM buffers for custom audio (freed on reload) */
-static int8_t *s_custom_buf[NUM_LAYERS] = {NULL, NULL, NULL, NULL};
-static bool s_custom_loaded = false;
-
 /* ── Tuning ── */
-#define RPM_IDLE        800
+#define RPM_IDLE        1600
 #define RPM_MAX         8000
-#define BUF_FRAMES      512
-#define FADE_IN_BUFS    70
-#define FADE_OUT_BUFS   30
+#define BUF_FRAMES      256
+#define FADE_IN_BUFS    50
+#define FADE_OUT_BUFS   20
 #define FP_SHIFT        16
 #define FP_ONE          (1u << FP_SHIFT)
 
@@ -68,12 +63,12 @@ static int16_t  s_buf[BUF_FRAMES * 2];
 
 /* ── Helpers ── */
 
-static inline int32_t lerp(const int8_t *d, uint32_t len, uint32_t pos)
+static inline int32_t lerp16(const int16_t *d, uint32_t len, uint32_t pos)
 {
     uint32_t i = (pos >> FP_SHIFT) % len;
     uint32_t j = (i + 1) % len;
     int32_t  f = pos & (FP_ONE - 1);
-    return d[i] + (((int32_t)(d[j] - d[i]) * f) >> FP_SHIFT);
+    return (int32_t)d[i] + (((int32_t)(d[j] - d[i]) * f) >> FP_SHIFT);
 }
 
 static inline uint32_t adv(uint32_t pos, uint32_t step, uint32_t len)
@@ -85,15 +80,12 @@ static inline uint32_t adv(uint32_t pos, uint32_t step, uint32_t len)
     return pos;
 }
 
-/* RPM → step for a given layer. Native pitch when rpm == layer_rpm. */
 static uint32_t calc_step(uint16_t rpm, uint16_t layer_rpm)
 {
     if (layer_rpm == 0) layer_rpm = 1;
-    /* At native pitch: step = 22050/44100 = 0.5 in FP */
-    return ((uint32_t)rpm * (FP_ONE / 2)) / layer_rpm;
+    return ((uint32_t)rpm * FP_ONE) / layer_rpm;
 }
 
-/* Find which 2 layers to blend, return blend 0-256 */
 static void find_blend(uint16_t rpm, int *lo, int *hi, int32_t *mix)
 {
     if (rpm <= s_layers[0].rpm) { *lo = *hi = 0; *mix = 0; return; }
@@ -108,18 +100,15 @@ static void find_blend(uint16_t rpm, int *lo, int *hi, int32_t *mix)
     *lo = *hi = NUM_LAYERS - 1; *mix = 0;
 }
 
-/* Non-linear RPM smoothing */
 static uint16_t smooth_rpm(uint16_t cur, uint16_t tgt)
 {
     if (cur < tgt) {
-        /* Accel: faster at higher RPM */
-        int32_t rate = 100 + ((int32_t)(cur - RPM_IDLE) * 100 / (RPM_MAX - RPM_IDLE));
+        int32_t rate = 80 + ((int32_t)(cur - RPM_IDLE) * 120 / (RPM_MAX - RPM_IDLE));
         int32_t d = tgt - cur;
         cur += (d > rate) ? rate : d;
     } else if (cur > tgt) {
-        /* Decel: slow flywheel decay */
         int32_t d = cur - tgt;
-        int32_t rate = (d > 1500) ? 200 : 50;
+        int32_t rate = (d > 1500) ? 150 : 40;
         cur -= (d > rate) ? rate : d;
     }
     if (cur < RPM_IDLE) cur = RPM_IDLE;
@@ -130,7 +119,7 @@ static uint16_t smooth_rpm(uint16_t cur, uint16_t tgt)
 /* ── Synth task ── */
 static void synth_task(void *arg)
 {
-    ESP_LOGI(TAG, "4-layer synth started");
+    ESP_LOGI(TAG, "5-layer 16-bit synth started (44100Hz)");
 
     for (int i = 0; i < NUM_LAYERS; i++) s_pos[i] = 0;
     s_current_rpm = RPM_IDLE;
@@ -141,10 +130,8 @@ static void synth_task(void *arg)
     const int32_t fade_out_step = (256 + FADE_OUT_BUFS - 1) / FADE_OUT_BUFS;
 
     while (1) {
-        /* RPM */
         s_current_rpm = smooth_rpm(s_current_rpm, s_target_rpm);
 
-        /* Fade */
         if (s_stop_request && !s_fading_out) s_fading_out = true;
         if (s_fading_out) {
             s_fade -= fade_out_step;
@@ -154,7 +141,6 @@ static void synth_task(void *arg)
             if (s_fade > 256) s_fade = 256;
         }
 
-        /* Layer blend */
         int lo, hi;
         int32_t blend;
         find_blend(s_current_rpm, &lo, &hi, &blend);
@@ -162,32 +148,20 @@ static void synth_task(void *arg)
         uint32_t step_lo = calc_step(s_current_rpm, s_layers[lo].rpm);
         uint32_t step_hi = calc_step(s_current_rpm, s_layers[hi].rpm);
 
-        /* Pre-compute gains: all in 0-256 range.
-         * Final multiply chain: sample(-128..127) * layer_gain(0..256) / 256
-         *   → still -128..127 range, then << 8 → 16-bit, then * vol_gain / 256.
-         * This avoids overflow: max intermediate = 127 * 256 = 32512, fits int16. */
         int32_t lo_gain = 256 - blend;
         int32_t hi_gain = blend;
         int32_t vol_gain = (s_fade * ((int32_t)s_master_vol * 256 / 100)) >> 8;
 
-        /* Fill buffer */
         for (int i = 0; i < BUF_FRAMES; i++) {
-            int32_t s_lo = lerp(s_layers[lo].data, s_layers[lo].len, s_pos[lo]);
+            int32_t s_lo = lerp16(s_layers[lo].data, s_layers[lo].len, s_pos[lo]);
             int32_t s_hi = (lo != hi)
-                ? lerp(s_layers[hi].data, s_layers[hi].len, s_pos[hi])
+                ? lerp16(s_layers[hi].data, s_layers[hi].len, s_pos[hi])
                 : s_lo;
 
-            /* Crossfade: result is -128..127 */
             int32_t mix = (s_lo * lo_gain + s_hi * hi_gain) >> 8;
+            int32_t out = (mix * vol_gain) >> 8;
 
-            /* To 16-bit: -32768..32512 */
-            int32_t out = mix << 8;
-
-            /* Apply volume (fade × master): 0-256 */
-            out = (out * vol_gain) >> 8;
-
-            /* Clamp */
-            if (out >  32767) out =  32767;
+            if (out > 32767) out = 32767;
             if (out < -32768) out = -32768;
 
             s_buf[i * 2]     = (int16_t)out;
@@ -201,7 +175,6 @@ static void synth_task(void *arg)
         drv_audio_write(s_buf, BUF_FRAMES);
     }
 
-    /* Silence flush */
     memset(s_buf, 0, sizeof(s_buf));
     for (int i = 0; i < 4; i++) drv_audio_write(s_buf, BUF_FRAMES);
     drv_audio_stop();
@@ -214,115 +187,32 @@ static void synth_task(void *arg)
 
 /* ── Public API ── */
 
-/**
- * Load audio layers: try LittleFS custom audio first, fall back to built-in.
- * Custom audio must have all 4 layers present to be used.
- */
-static void load_audio_layers(void)
-{
-    /* Free any previously loaded custom buffers */
-    for (int i = 0; i < NUM_LAYERS; i++) {
-        if (s_custom_buf[i]) {
-            free(s_custom_buf[i]);
-            s_custom_buf[i] = NULL;
-        }
-    }
-    s_custom_loaded = false;
-
-    /* Check if all 4 custom layers exist in LittleFS */
-    uint8_t custom_count = storage_audio_count();
-    if (custom_count == AUDIO_LAYER_COUNT) {
-        bool all_ok = true;
-        int8_t *bufs[NUM_LAYERS] = {NULL};
-        uint32_t sizes[NUM_LAYERS] = {0};
-
-        for (int i = 0; i < NUM_LAYERS; i++) {
-            if (!storage_audio_read(i, &bufs[i], &sizes[i])) {
-                all_ok = false;
-                break;
-            }
-        }
-
-        if (all_ok) {
-            for (int i = 0; i < NUM_LAYERS; i++) {
-                s_custom_buf[i] = bufs[i];
-                s_layers[i].data = bufs[i];
-                s_layers[i].len = sizes[i];
-                s_layers[i].rpm = BUILTIN_LAYERS[i].rpm;
-                ESP_LOGI(TAG, "  Custom layer %d: %u bytes, first=[%d,%d,%d]",
-                         i, (unsigned)sizes[i],
-                         (int)bufs[i][0], (int)bufs[i][1], (int)bufs[i][2]);
-            }
-            s_custom_loaded = true;
-            ESP_LOGI(TAG, "Custom audio loaded from LittleFS (%d layers)", NUM_LAYERS);
-            return;
-        }
-
-        /* Cleanup partial loads */
-        for (int i = 0; i < NUM_LAYERS; i++) {
-            if (bufs[i]) free(bufs[i]);
-        }
-        ESP_LOGW(TAG, "Custom audio incomplete, using built-in");
-    } else if (custom_count > 0) {
-        ESP_LOGW(TAG, "Only %d/%d custom layers found, using built-in", custom_count, AUDIO_LAYER_COUNT);
-    }
-
-    /* Use built-in layers */
-    for (int i = 0; i < NUM_LAYERS; i++) {
-        s_layers[i].data = BUILTIN_LAYERS[i].data;
-        s_layers[i].len = BUILTIN_LAYERS[i].len;
-        s_layers[i].rpm = BUILTIN_LAYERS[i].rpm;
-    }
-}
-
 void audio_player_init(void)
 {
-    ESP_LOGI(TAG, "Init — %d layers", NUM_LAYERS);
+    ESP_LOGI(TAG, "Init — %d layers, 16-bit 44100Hz", NUM_LAYERS);
 
-    /* Clear stale custom audio from LittleFS so built-in layers are used.
-     * TODO: Remove this after first successful boot with new audio. */
     if (storage_audio_count() > 0) {
-        ESP_LOGW(TAG, "Clearing %d stale custom audio files from LittleFS", storage_audio_count());
+        ESP_LOGW(TAG, "Clearing stale custom audio from LittleFS");
         storage_audio_delete_all();
     }
 
-    load_audio_layers();
-    /* Log which layers are active */
     for (int i = 0; i < NUM_LAYERS; i++) {
-        ESP_LOGI(TAG, "  Layer %d: %u samples, rpm=%u, data[0]=%d",
-                 i, (unsigned)s_layers[i].len, s_layers[i].rpm,
-                 (int)s_layers[i].data[0]);
+        s_layers[i] = BUILTIN_LAYERS[i];
+        ESP_LOGI(TAG, "  Layer %d: %u samples, rpm=%u",
+                 i, (unsigned)s_layers[i].len, s_layers[i].rpm);
     }
 }
 
-void audio_player_reload_layers(void)
-{
-    bool was_playing = s_playing;
-    if (was_playing) {
-        audio_player_stop_engine();
-    }
-    load_audio_layers();
-    ESP_LOGI(TAG, "Layers reloaded (custom=%d)", s_custom_loaded);
-    if (was_playing) {
-        audio_player_start_engine();
-    }
-}
-
-bool audio_player_has_custom_audio(void)
-{
-    return s_custom_loaded;
-}
+void audio_player_reload_layers(void) { audio_player_init(); }
+bool audio_player_has_custom_audio(void) { return false; }
 
 void audio_player_start_engine(void)
 {
     if (s_playing) return;
-    ESP_LOGI(TAG, "Starting engine sound (layer0: %u samples, layer1: %u, layer2: %u, layer3: %u)",
-             (unsigned)s_layers[0].len, (unsigned)s_layers[1].len,
-             (unsigned)s_layers[2].len, (unsigned)s_layers[3].len);
+    ESP_LOGI(TAG, "Starting engine (5-layer 16-bit)");
     audio_engine_pause();
     drv_audio_restart();
 
-    /* Flush DMA to prevent startup pop */
     memset(s_buf, 0, sizeof(s_buf));
     for (int i = 0; i < 4; i++) drv_audio_write(s_buf, BUF_FRAMES);
 
@@ -334,8 +224,6 @@ void audio_player_start_engine(void)
         ESP_LOGE(TAG, "Task create failed");
         s_playing = false;
         audio_engine_resume();
-    } else {
-        ESP_LOGI(TAG, "Synth task created, master_vol=%d", s_master_vol);
     }
 }
 

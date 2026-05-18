@@ -25,7 +25,12 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 
 ## 当前阻塞
 
-- **⚠️ 音频重构待执行** — 根因已定位：22050Hz 8-bit 数据被 44100Hz I2S 双倍速播放。44100Hz 16-bit 直接播放效果正常确认。方案：重构为 4 层 44100Hz 16-bit 合成（LittleFS 存储→PSRAM 加载），对标地平线
+- **⚠️ 音频最终方案待执行（开新对话）** — 5 层完整段 LittleFS+PSRAM 方案：
+  - 素材：54s 录音按挡位切 5 段（7-11s/12-14s/15-19s/20-33s/34-40s）= 29 秒 44100Hz 16-bit = 2.56MB
+  - 存储：LittleFS 分区（9.8MB 足够）
+  - 运行时：开机加载到 PSRAM（8MB 中用 2.56MB）
+  - 合成：5 层可变速率 + 交叉淡入淡出（已验证 44100Hz 16-bit 效果正常）
+  - 关键 bug 已修：采样率不匹配（22050→44100 双倍速）是之前所有音频问题的根因
 - **油门模式音频逻辑已改** — 速度=0 静音，0→1 启动，减到 0 停声
 - **✅ 油门模式 UI 完成** — commit `2e88004`，彩色数字+色条显示完美
 - **待用户烧录验证** — 预设色条修复（draw_color_bar 顺序对齐 preset_colors.h）
@@ -271,3 +276,25 @@ Flutter APP：flutter analyze — 待验证（led_presets.dart 顺序重排）
 | APP 蓝牙状态 | `RideWind/lib/providers/bluetooth_provider.dart` |
 | APP 协议解析 | `RideWind/lib/protocol/protocol_parser.dart` |
 | APP BLE 底层 | `RideWind/lib/services/ble_service.dart` |
+
+- 2026-05-18：波浪效果v4宽波版确认并合入main
+  - 用户确认效果"非常好，非常满意"
+  - tag: `wave-v4-wide-confirmed`
+  - 已合入 main 主干
+  - 最终参数：相位间距25，20fps，底亮15%+潮汐8s(15%↔30%)，峰值100%，周期2.5s
+  - 炸灯频率明显降低
+  - AI自主执行规则落地（steering/commit-convention.md）
+  - 后续可优化：波速微变 / 双发防炸灯 / 全局brightness响应
+
+- 2026-05-18：风速联动波浪效果实验
+  - 分支：`fw/wave-wind-sync`（从 main 新建）
+  - 4个参数随 current_speed_kmh(0-100) 动态变化：
+    - wave_cycle: 2500→1200ms（风大浪快）
+    - base_bright: 38→3（风大浪深）
+    - phase_step: 25→40（风大波窄）
+    - tidal_cycle: 8000→4000ms（潮汐加速）
+  - 静止时效果与确认版v4完全一致
+  - 提交：`6eb045f`
+  - 编译通过(7% free)
+  - 回退：`git checkout main` (tag: wave-v4-wide-confirmed)
+  - 待烧录验证风速联动效果
