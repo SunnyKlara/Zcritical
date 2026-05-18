@@ -487,6 +487,18 @@ static void throttle_fx_wave(uint8_t spd)
     uint8_t wind = (uint8_t)g_app_state.current_speed_kmh;
     if (wind > 100) wind = 100;
 
+    /* Speed 0: static light, no wave motion */
+    if (wind == 0) {
+        for (int i = 0; i < 6; i++) {
+            drv_led_set_pixel(0, LED_MAIN_START + i, cr, cg, cb);
+        }
+        for (int i = 0; i < LED_TAIL_COUNT; i++) {
+            drv_led_set_pixel(1, LED_TAIL_START + i, tr, tg, tb);
+        }
+        drv_led_refresh();
+        return;
+    }
+
     uint16_t wave_cycle = 2500 - (uint16_t)wind * 17;   /* 2500→800ms */
     uint8_t base_bright = (uint8_t)(38 - wind * 38 / 100);  /* 38→0 */
     uint8_t phase_step = 25 + (uint8_t)(wind * 30 / 100);   /* 25→55 */
