@@ -464,91 +464,81 @@ static void throttle_fx_alternate(uint8_t spd)
     drv_led_refresh();
 }
 
-/* ── Effect 5: Wave Breathing (Ocean Wave Style) ──
+/* ── Effect 5: Wave (Continuous wide sine — left to right, with tidal overlay) ──
  *
- * All LEDs breathe together — like ocean waves, one surge at a time.
- * 3500ms period, ease-in-out curve, strong contrast (3% → 100%).
- * Peak holds briefly, trough holds briefly — natural wave rhythm.
- *
- * Uses user's preset color from led_colors[]. */
+ * Wide sine wave sweeps left→right, 2.5s period, 20fps.
+ * Phase spacing 25 (wide wave — adjacent LEDs very similar brightness).
+ * Tidal overlay: 8s slow modulation of base brightness.
+ * Uses preset color. */
 static void throttle_fx_wave(uint8_t spd)
 {
     (void)spd;
 
-    /* Use Main strip preset color */
-    uint8_t r = g_app_state.led_colors[0][0];
-    uint8_t g = g_app_state.led_colors[0][1];
-    uint8_t b = g_app_state.led_colors[0][2];
-
-    /* Tail preset color */
+    uint8_t cr = g_app_state.led_colors[0][0];
+    uint8_t cg = g_app_state.led_colors[0][1];
+    uint8_t cb = g_app_state.led_colors[0][2];
     uint8_t tr = g_app_state.led_colors[3][0];
     uint8_t tg = g_app_state.led_colors[3][1];
     uint8_t tb = g_app_state.led_colors[3][2];
 
-    #define WAVE_PERIOD_MS    3500
-    #define WAVE_MIN_BRIGHT   8     /* ~3% — very dim but not dead */
+    uint32_t t = s_throttle_fx_phase;
 
-    /* Phase: 0 to WAVE_PERIOD_MS, wrapping */
-    uint16_t phase = s_throttle_fx_phase % WAVE_PERIOD_MS;
+    #define WAVE_CYCLE    2500
+    #define BASE_BRIGHT   38
+    #define PEAK_BRIGHT   255
+    #define TIDAL_CYCLE   8000
 
-    /* Normalize to 0-255 for brightness calculation */
-    /* Wave shape: ease-in-out with peak/trough hold
-     *
-     * Timeline (3500ms total):
-     *   0-300ms:    trough hold (stay dim)
-     *   300-1400ms: rise (ease-in: slow start, fast middle)
-     *   1400-2100ms: peak hold (stay bright)
-     *   2100-3200ms: fall (ease-out: fast start, slow end)
-     *   3200-3500ms: trough hold (stay dim)
-     */
-    uint8_t brightness;
+    uint8_t wave_phase = (uint8_t)((uint32_t)(t % WAVE_CYCLE) * 255 / WAVE_CYCLE);
 
-    if (phase < 300) {
-        /* Trough hold */
-        brightness = WAVE_MIN_BRIGHT;
-    } else if (phase < 1400) {
-        /* Rise: 300→1400 (1100ms), ease-in (quadratic) */
-        uint32_t t = phase - 300;  /* 0 to 1100 */
-        /* Quadratic ease-in: (t/1100)^2 mapped to 0-255 */
-        uint32_t norm = t * 255 / 1100;  /* 0-255 */
-        uint8_t raw = (uint8_t)(norm * norm / 255);  /* quadratic */
-        brightness = WAVE_MIN_BRIGHT + (uint8_t)((uint16_t)raw * (255 - WAVE_MIN_BRIGHT) / 255);
-    } else if (phase < 2100) {
-        /* Peak hold */
-        brightness = 255;
-    } else if (phase < 3200) {
-        /* Fall: 2100→3200 (1100ms), ease-out (inverse quadratic) */
-        uint32_t t = phase - 2100;  /* 0 to 1100 */
-        uint32_t norm = t * 255 / 1100;  /* 0-255 */
-        /* Ease-out: 1 - (1-t)^2 inverted → starts fast, ends slow */
-        uint8_t inv = 255 - (uint8_t)norm;
-        uint8_t raw = (uint8_t)((uint16_t)inv * inv / 255);  /* high at start, low at end */
-        brightness = WAVE_MIN_BRIGHT + (uint8_t)((uint16_t)raw * (255 - WAVE_MIN_BRIGHT) / 255);
-    } else {
-        /* Trough hold */
-        brightness = WAVE_MIN_BRIGHT;
-    }
+    /* Tidal overlay: base brightness slowly oscillates 15%→30%→15% */
+    uint8_t tidal_phase = (uint8_t)((uint32_t)(t % TIDAL_CYCLE) * 255 / TIDAL_CYCLE);
+    uint8_t tidal_raw = (tidal_phase < 128) ? tidal_phase * 2 : (255 - tidal_phase) * 2;
+    uint8_t tidal_base = BASE_BRIGHT + (uint8_t)((uint16_t)tidal_raw * 38 / 255);
 
-    /* Apply to ALL Main LEDs simultaneously */
+    /* Main strip: wide wave moves left to right */
     for (int i = 0; i < 6; i++) {
+        uint8_t led_phase = wave_phase + (uint8_t)(i * 25);  /* 宽波 */
+
+        uint8_t raw;
+        if (led_phase < 128) {
+            raw = led_phase * 2;
+        } else {
+            raw = (255 - led_phase) * 2;
+        }
+        uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
+
         drv_led_set_pixel(0, LED_MAIN_START + i,
-            (uint8_t)((uint16_t)r * brightness / 255),
-            (uint8_t)((uint16_t)g * brightness / 255),
-            (uint8_t)((uint16_t)b * brightness / 255));
+            (uint8_t)((uint16_t)cr * brightness / 255),
+            (uint8_t)((uint16_t)cg * brightness / 255),
+            (uint8_t)((uint16_t)cb * brightness / 255));
     }
 
-    /* Tail: same brightness, same rhythm (all together) */
+    /* Tail: same wave, slightly behind */
     for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        uint8_t led_phase = wave_phase + (uint8_t)((2 - i) * 25) - 60;
+
+        uint8_t raw;
+        if (led_phase < 128) {
+            raw = led_phase * 2;
+        } else {
+            raw = (255 - led_phase) * 2;
+        }
+        uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
+
         drv_led_set_pixel(1, LED_TAIL_START + i,
             (uint8_t)((uint16_t)tr * brightness / 255),
             (uint8_t)((uint16_t)tg * brightness / 255),
             (uint8_t)((uint16_t)tb * brightness / 255));
     }
 
-    drv_led_refresh();
+    #undef WAVE_CYCLE
+    #undef BASE_BRIGHT
+    #undef PEAK_BRIGHT
+    #undef TIDAL_CYCLE
 
-    #undef WAVE_PERIOD_MS
-    #undef WAVE_MIN_BRIGHT
+    drv_led_refresh();
 }
 
 /* ── Effect 6: Lightning ──
