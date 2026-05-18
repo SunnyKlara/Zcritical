@@ -151,11 +151,12 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
   - LED 偶发闪烁问题暂搁，后续用降低刷新率或提升任务优先级解决
   - 编译通过：idf.py build 零错误
 
-- 2026-05-17（第九轮）：Git 管理 + 波浪效果分支
-  - 提交主干：`51cf974` — "feat: LED效果系统 + 预设色修复 + 油门灯效框架 + 波浪呼吸效果(WIP)"
-  - 新建分支：`feature/wave-effect-tuning`（当前在此分支）
-  - 波浪效果仍不满意，需要进一步探讨用户期望的具体视觉感受
-  - 待确认：用户描述期望效果的具体样子（节奏、对比度、过渡感觉）
+- 2026-05-18：Git 分支整合
+  - 问题：10 个分支互不同步，引脚修复在 `fw/treadmill-panel` 但当前在 `fw/wave-wind-sync` 导致丢失
+  - 决策：合并所有修改到 main，删除所有旧分支，以后只在 main 上工作
+  - 操作：stash → checkout main → pop → commit `3aa72af` → tag `v0.3-unified-main`
+  - 删除分支：fw/treadmill-panel, fw/treadmill-ui, fw/wave-effect, fw/wave-experiment, fw/wave-wind-sync, app/colorize-custom-presets, app/reconnect-restore, app/sync-throttle, app/ui-refactor
+  - 新工作流：只在 main 上开发，用 tag 标记好的版本点，改坏了用 tag 回退
 
 - 2026-05-17（第十轮）：波浪效果重写 — Pacifica 多层叠加
   - 参考 FastLED Pacifica（Mark Kriegsman 2019）的多层正弦波叠加原理
