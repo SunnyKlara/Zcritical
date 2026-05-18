@@ -53,9 +53,21 @@ class ColorizeController extends ChangeNotifier {
 
   // ── 硬件同步节流 ──
   int _lastSentHardwareUI = -1;
-  DateTime _lastColorSyncTime = DateTime.now();
   DateTime _lastPresetSyncTime = DateTime.now();
   bool _isReceivingPresetReport = false;
+
+  // ── Leading + Trailing 节流（RGB 颜色） ──
+  /// LED 颜色命令最小发送间隔
+  static const Duration _colorThrottleWindow = Duration(milliseconds: 80);
+  DateTime _lastColorSent = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _colorTrailingTimer;
+  ({int strip, int r, int g, int b})? _pendingColor;
+
+  // ── Leading + Trailing 节流（亮度，独立时间戳避免互相阻塞） ──
+  static const Duration _brightnessThrottleWindow = Duration(milliseconds: 80);
+  DateTime _lastBrightnessSent = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _brightnessTrailingTimer;
+  int? _pendingBrightness;
 
   // ── 内置预设 + 用户自定义 ──
   /// 内置 14 个预设（与 ESP32 preset_colors.h 对齐）
@@ -378,40 +390,96 @@ class ColorizeController extends ChangeNotifier {
   //  硬件同步
   // ═══════════════════════════════════════════════════════════════
 
+  /// 同步当前 RGB 颜色到硬件（Leading + Trailing 节流）
+  ///
+  /// 拖动 RGB 滑条/色环时高频调用：
+  /// - 第一次调用立即发送（leading），保留即时反馈
+  /// - 节流窗口（[_colorThrottleWindow]）内的调用缓存为 [_pendingColor]
+  /// - 窗口结束后由 [_colorTrailingTimer] 发出最后一次值（trailing），
+  ///   保证用户释放手指时的"最终颜色"一定到达硬件
   Future<void> syncLEDColor() async {
     if (!_btProvider.isConnected) return;
 
-    final now = DateTime.now();
-    if (now.difference(_lastColorSyncTime).inMilliseconds < 80) return;
-    _lastColorSyncTime = now;
+    const posMap = {'M': 1, 'L': 2, 'R': 3, 'B': 4};
+    final pos = _selectedLightPosition;
+    final strip = posMap[pos]!;
+    final r = _redValues[pos]!.clamp(0, 255);
+    final g = _greenValues[pos]!.clamp(0, 255);
+    final b = _blueValues[pos]!.clamp(0, 255);
 
+    final now = DateTime.now();
+    final elapsed = now.difference(_lastColorSent);
+
+    if (elapsed >= _colorThrottleWindow) {
+      // Leading: 立即发送，并取消可能 pending 的 trailing
+      _colorTrailingTimer?.cancel();
+      _colorTrailingTimer = null;
+      _pendingColor = null;
+      _lastColorSent = now;
+      await _sendLEDColorNow(strip, r, g, b);
+    } else {
+      // Trailing: 缓存最新意图，调度 timer
+      _pendingColor = (strip: strip, r: r, g: g, b: b);
+      _colorTrailingTimer ??= Timer(_colorThrottleWindow - elapsed, _flushPendingColor);
+    }
+  }
+
+  /// 真正发出 LED 命令（含 hardware UI 切换前置）
+  Future<void> _sendLEDColorNow(int strip, int r, int g, int b) async {
     if (_lastSentHardwareUI != 3) {
       await _btProvider.setHardwareUI(3);
       _lastSentHardwareUI = 3;
       await Future.delayed(const Duration(milliseconds: 50));
     }
-
-    final posMap = {'M': 1, 'L': 2, 'R': 3, 'B': 4};
-    final strip = posMap[_selectedLightPosition]!;
-    final pos = _selectedLightPosition;
-
-    final r = _redValues[pos]!.clamp(0, 255);
-    final g = _greenValues[pos]!.clamp(0, 255);
-    final b = _blueValues[pos]!.clamp(0, 255);
-
     await _btProvider.setLEDColor(strip, r, g, b);
   }
 
+  /// Trailing timer 回调：发出节流期内最后一次 pending 颜色
+  Future<void> _flushPendingColor() async {
+    _colorTrailingTimer = null;
+    final pending = _pendingColor;
+    _pendingColor = null;
+    if (pending == null) return;
+    if (!_btProvider.isConnected) return;
+    _lastColorSent = DateTime.now();
+    await _sendLEDColorNow(pending.strip, pending.r, pending.g, pending.b);
+  }
+
+  /// 同步亮度到硬件（Leading + Trailing 节流，独立时间戳）
+  ///
+  /// 与 [syncLEDColor] 不共享时间戳，避免拖完颜色立刻拖亮度时被相互阻塞。
   Future<void> syncBrightness() async {
     if (!_btProvider.isConnected) return;
 
-    final now = DateTime.now();
-    if (now.difference(_lastColorSyncTime).inMilliseconds < 80) return;
-    _lastColorSyncTime = now;
-
     // 不切换硬件 LCD 页面 — 直接发送亮度命令
     // 避免用户在 RGB 调色面板拖动亮度时 LCD 跳到亮度页面
-    await _btProvider.setBrightness((_brightnessValue * 100).toInt());
+    final brightness = (_brightnessValue * 100).toInt().clamp(0, 100);
+
+    final now = DateTime.now();
+    final elapsed = now.difference(_lastBrightnessSent);
+
+    if (elapsed >= _brightnessThrottleWindow) {
+      _brightnessTrailingTimer?.cancel();
+      _brightnessTrailingTimer = null;
+      _pendingBrightness = null;
+      _lastBrightnessSent = now;
+      await _btProvider.setBrightness(brightness);
+    } else {
+      _pendingBrightness = brightness;
+      _brightnessTrailingTimer ??=
+          Timer(_brightnessThrottleWindow - elapsed, _flushPendingBrightness);
+    }
+  }
+
+  /// Trailing timer 回调：发出节流期内最后一次 pending 亮度
+  Future<void> _flushPendingBrightness() async {
+    _brightnessTrailingTimer = null;
+    final pending = _pendingBrightness;
+    _pendingBrightness = null;
+    if (pending == null) return;
+    if (!_btProvider.isConnected) return;
+    _lastBrightnessSent = DateTime.now();
+    await _btProvider.setBrightness(pending);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -708,6 +776,8 @@ class ColorizeController extends ChangeNotifier {
   @override
   void dispose() {
     _cycleTimer?.cancel();
+    _colorTrailingTimer?.cancel();
+    _brightnessTrailingTimer?.cancel();
     rgbValueController.dispose();
     rgbValueFocusNode.dispose();
     super.dispose();
