@@ -489,6 +489,14 @@ static void throttle_fx_wave(uint8_t spd)
 
     uint8_t wave_phase = (uint8_t)((uint32_t)(t % WAVE_CYCLE) * 255 / WAVE_CYCLE);
 
+    /* Tidal overlay: slow global brightness modulation (8s cycle)
+     * Adds organic "big wave / small wave" variation */
+    #define TIDAL_CYCLE   8000
+    uint8_t tidal_phase = (uint8_t)((uint32_t)(t % TIDAL_CYCLE) * 255 / TIDAL_CYCLE);
+    uint8_t tidal_raw = (tidal_phase < 128) ? tidal_phase * 2 : (255 - tidal_phase) * 2;
+    /* Tidal modulates BASE_BRIGHT: 15%→30%→15% slowly */
+    uint8_t tidal_base = BASE_BRIGHT + (uint8_t)((uint16_t)tidal_raw * 38 / 255);  /* 38→76→38 */
+
     /* Main strip: wave moves left to right */
     for (int i = 0; i < 6; i++) {
         uint8_t led_phase = wave_phase + (uint8_t)(i * 42);
@@ -500,7 +508,7 @@ static void throttle_fx_wave(uint8_t spd)
             raw = (255 - led_phase) * 2;
         }
         uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
-        uint8_t brightness = BASE_BRIGHT + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - BASE_BRIGHT) / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
 
         drv_led_set_pixel(0, LED_MAIN_START + i,
             (uint8_t)((uint16_t)cr * brightness / 255),
@@ -519,7 +527,7 @@ static void throttle_fx_wave(uint8_t spd)
             raw = (255 - led_phase) * 2;
         }
         uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
-        uint8_t brightness = BASE_BRIGHT + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - BASE_BRIGHT) / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
 
         drv_led_set_pixel(1, LED_TAIL_START + i,
             (uint8_t)((uint16_t)tr * brightness / 255),
@@ -530,6 +538,7 @@ static void throttle_fx_wave(uint8_t spd)
     #undef WAVE_CYCLE
     #undef BASE_BRIGHT
     #undef PEAK_BRIGHT
+    #undef TIDAL_CYCLE
 
     drv_led_refresh();
 }
@@ -583,9 +592,9 @@ static void throttle_fx_lightning(uint8_t spd)
 static void throttle_fx_process(void)
 {
     uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    if (now - s_throttle_fx_tick < 20) return;  /* 50fps */
+    if (now - s_throttle_fx_tick < 33) return;  /* 30fps — 降低刷新率减少炸灯 */
     s_throttle_fx_tick = now;
-    s_throttle_fx_phase += 20;
+    s_throttle_fx_phase += 33;
 
     uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
     if (spd > 100) spd = 100;
