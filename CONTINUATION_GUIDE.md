@@ -1,6 +1,6 @@
 # Critical T1 — Session Handoff
 
-<!-- last-verified: 2026-05-15 -->
+<!-- last-verified: 2026-05-18 -->
 
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 
@@ -22,15 +22,14 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 | 4.5 引擎音效 | 4 层可变采样率合成 | idf.py build 零错误 |
 | 5. 自定义音频上传 | BLE 二进制传输 + LittleFS 存储 | idf.py build 零错误 |
 | 6. 真实引擎音频素材 | 用户 MP3 → 22050Hz 8-bit PCM 头文件 | idf.py build 零错误 (2.75MB/3MB) |
+| 7. 引擎音频重构 | Forza 方案：5 层 44100Hz 16-bit LittleFS+PSRAM | idf.py build 零错误 (22% free) |
 
 ## 当前阻塞
 
-- **⚠️ 音频最终方案待执行（开新对话）** — 5 层完整段 LittleFS+PSRAM 方案：
-  - 素材：54s 录音按挡位切 5 段（7-11s/12-14s/15-19s/20-33s/34-40s）= 29 秒 44100Hz 16-bit = 2.56MB
-  - 存储：LittleFS 分区（9.8MB 足够）
-  - 运行时：开机加载到 PSRAM（8MB 中用 2.56MB）
-  - 合成：5 层可变速率 + 交叉淡入淡出（已验证 44100Hz 16-bit 效果正常）
-  - 关键 bug 已修：采样率不匹配（22050→44100 双倍速）是之前所有音频问题的根因
+- **✅ 音频 Forza 方案已实现** — 5 层 LittleFS+PSRAM，编译通过，待烧录验证
+  - PCM 文件随 `idf.py flash` 自动写入 storage 分区（`storage.bin` at 0x620000）
+  - smooth_rpm 惯性降到 8-25/tick（~2-4s 从怠速到红线），涡轮迟滞感
+  - ⚠️ 首次烧录会覆盖 storage 分区（logo 文件需重新上传）
 - **油门模式音频逻辑已改** — 速度=0 静音，0→1 启动，减到 0 停声
 - **✅ 油门模式 UI 完成** — commit `2e88004`，彩色数字+色条显示完美
 - **待用户烧录验证** — 预设色条修复（draw_color_bar 顺序对齐 preset_colors.h）
@@ -259,7 +258,8 @@ DeviceConnectScreen 瘦身（~3500 行）暂缓，优先解决体验感受问题
 ## 编译状态
 
 ```
-ESP32 固件：idf.py build — ✅ 零错误（2026-05-16 验证，油门灯效 6 模式实现后编译通过）
+ESP32 固件：idf.py build — ✅ 零错误（2026-05-18 验证，Forza 音频重构 + selftest.c 加入 CMake）
+  固件 2.43MB/3MB (22% free)，storage.bin 含 5 层 PCM (2.38MB)
   待烧录验证
 Flutter APP：flutter analyze — 待验证（led_presets.dart 顺序重排）
 协议测试：flutter test test/protocol/ — ✅ 51/51 通过
@@ -299,3 +299,122 @@ Flutter APP：flutter analyze — 待验证（led_presets.dart 顺序重排）
   - 编译通过(7% free)
   - 回退：`git checkout main` (tag: wave-v4-wide-confirmed)
   - 待烧录验证风速联动效果
+
+- 2026-05-18：风速联动v2 — 加大变化幅度
+  - 用户反馈v1联动不明显，参数变化范围太小
+  - 加大：周期2500→800ms / 底亮38→0 / 相位25→55 / 潮汐8s→3s
+  - 提交：`647f668` on main（amend覆盖了之前的commit）
+  - ⚠️ 注意：直接提交到了main而非实验分支（git状态需确认）
+  - 编译通过(7% free)
+  - 待烧录验证联动效果是否明显
+
+- 2026-05-18（产测自检固件）：
+  - 新增产测自检模式：开机时按住编码器按钮（IO8）进入，正常不按则正常启动
+  - 新增文件：`app/selftest.h`、`app/selftest.c`
+  - 修改文件：`main.c`（app_main 开头加检测入口）、`CMakeLists.txt`（加源文件）
+  - 测试 10 项：LCD / LED Main / LED Tail / 编码器旋转 / 编码器按键 / 喇叭 / 风扇 / 雾化器 / BLE(跳过) / PSRAM
+  - LCD 显示逐项 PASS/FAIL + 最终 ALL PASS（绿）或 FAIL（红）
+  - ALL PASS 后等 3 秒自动 esp_restart() 进入正常主程序；FAIL 则死循环等待排查
+  - Speaker 测试后加 drv_audio_stop() 防止残留蜂鸣
+  - UART 串口同步输出详细日志
+  - 编译通过：`idf.py app` 零错误，分区剩余 22%
+  - ⚠️ `idf.py build`（全量含 storage）会报 littlefs-python circular import 错误（Python 3.14 兼容性问题），用 `idf.py app` 或 `idf.py app-flash` 绕过
+  - 产测锁（Production Test Lock）：ALL PASS 后写 NVS `selftest.passed=1`，后续开机即使按住按钮也不再进入自检
+  - 售后重测：通过 BLE 命令或 nvs_flash_erase 清除标志
+  - main.c 调整：NVS init 移到 selftest 检测之前（selftest 需要读 NVS）
+  - 使用场景：组装 20 台产品做 QC 验证
+
+- 2026-05-18（软件战略文档）：
+  - 新增 `.kiro/steering/SOFTWARE-STRATEGY.md`（manual inclusion）— 50 项总索引表
+  - 内容：产品演进 12 维度 + 公司软件版图 16 维度 + 学习路径 + 50 项技术系统清单
+  - 定位：练手项目，全方位学习技术栈
+  - ✅ 50/50 项全部展开完成（`.kiro/steering/strategy/` 12 个子目录，50 个文件）
+  - 目录：01-device(9) / 02-backend(7) / 03-iot-cloud(2) / 04-frontend(5) / 05-devops(7) / 06-data(4) / 07-marketing(3) / 08-content(1) / 09-operation(3) / 10-business(3) / 11-security(1) / 12-community(5)
+  - 每项含：架构图、技术栈、实现步骤、坑点表、与 RideWind 关系、工作量估算
+  - 总索引：`.kiro/steering/SOFTWARE-STRATEGY.md`
+
+- 2026-05-18（引擎音频 Forza Horizon 重构）：
+  - 方案执行：5 层按挡位切分 + LittleFS + PSRAM 运行时加载
+  - 新建脚本：`tools/gen_engine_layers_forza.py`（PyAV 解码 AAC → 44100Hz 16-bit mono PCM × 5 层）
+  - PCM 输出：Layer 0-4 共 2.38MB（169K/81K/169K/566K/257K samples）
+  - `storage.h/c`：层数 4→5，大小上限 256KB→1.2MB，新增 `storage_audio_read_16bit()` API
+  - `audio_player.c`：完全重写，去掉头文件数组依赖，开机从 LittleFS→PSRAM 加载
+  - smooth_rpm 惯性：80-200/tick → 8-25/tick（~2-4s 加速递进，涡轮迟滞感）
+  - `CMakeLists.txt`：加 `selftest.c`（修复预存链接错误），加 `littlefs_create_partition_image`
+  - `storage_data/`：5 个 PCM 文件，构建时自动打包为 `storage.bin`
+  - 烧录命令：`idf.py flash`（含 `0x620000 build\storage.bin`）
+  - ⚠️ 首次烧录覆盖整个 storage 分区（logo 需重新上传）
+  - 编译通过：idf.py build 零错误，固件 2.43MB/3MB (22% free)
+  - 旧 `engine_layers_16bit.h`（~2MB 头文件数组）不再被引用，固件体积从接近满改善到 22% free
+  - 待烧录验证音效
+  - 后续调参：smooth_rpm 加速率从 8-25 再降到 4-12/tick（~5-7s 从怠速到红线），用户反馈"0→340太快声音跟不上"
+
+- 2026-05-18（引擎音频架构重构 — RC Engine 方案）：
+  - 用户反馈 5 层切片方案效果不理想，根因：从动态加速录音切片无法得到好的稳态循环
+  - 决策：抛弃 5 层 RPM 分段架构，改用 TheDIYGuy999/Rc_Engine_Sound_ESP32 的已验证架构
+  - 新架构核心：idle 循环 + rev 循环（变速率播放）+ knock 脉冲（固定音高）+ start 一次性音效
+  - 素材：LaFerrari V12（TheDIYGuy999 项目 GPL-3.0 开源素材）
+    - idle: 7344 samples (166ms loop, 14.3KB)
+    - rev: 7324 samples (166ms loop, 14.3KB)
+    - knock: 74 samples (1.7ms pulse, 0.1KB)
+    - start: 111360 samples (2.5s one-shot, 217.5KB)
+    - 总计 246KB，直接编译进固件（不再依赖 LittleFS）
+  - 工具脚本：
+    - `tools/extract_rc_sounds.py` — 从 TheDIYGuy999 .h 文件提取 8-bit → 16-bit 44100Hz PCM
+    - `tools/gen_engine_header.py` — PCM → C 头文件 `resources/engine_sounds.h`
+  - `audio_player.c` 完全重写：
+    - 变速率播放（定点数步进，RPM 高→播放快→音高升高）
+    - idle/rev 交叉淡入淡出（低 RPM 90% idle，高 RPM 100% rev）
+    - V12 knock 脉冲（每引擎循环 12 次，固定音高，给"突突突"节奏感）
+    - 状态机：OFF → STARTING → RUNNING → STOPPING
+    - RPM 惯性：ACC_RATE=3, DEC_RATE=5（每 buffer tick ~5.8ms）
+  - `CMakeLists.txt`：移除 `littlefs_create_partition_image`（Python 3.14 不兼容 littlefs-python）
+  - 编译通过：idf.py build 零错误，固件 2.69MB/3MB (14% free)
+  - 旧 `engine_layers_16bit.h` 和 5 层 PCM 文件不再使用
+  - 待烧录验证效果
+  - 音量修正（用户反馈"太炸了"）：降低所有增益 + 加输出衰减器 `*6/10`
+    - FULL_THROTTLE_VOL 130→100, REV_VOLUME_PCT 120→80, KNOCK_VOLUME_PCT 600→150, START 150→80
+    - 编译通过：idf.py build 零错误，固件 2.69MB/3MB (14% free)
+  - ⚠️ 第二次烧录反馈"还是不行"——根因：我自己设计的混合逻辑有问题，不是原版
+  - 下一步决策（开新对话执行）：
+    - 完全照搬参考项目的 variablePlaybackTimer() 混合逻辑
+    - 直接用原始 8-bit signed char 素材（已复制到 resources/LaFerrari*_raw.h）
+    - 保持参考项目所有音量参数不变（针对 8-bit 范围调好的）
+    - 输出时 `(value - 128) << 8` 转 16-bit I2S
+    - 不要自己设计，直接复制粘贴参考代码适配 I2S 输出
+  - 参考项目已 clone 到 `tools/rc_engine_ref/`（71MB，可删除节省空间）
+  - 用户另有下载：`Rc_Engine_Sound_ESP32-9.14.0/`（桌面）
+
+- 2026-05-18：速度0静态 + 有风才起浪
+  - 用户反馈：速度为0时不应该有波浪效果
+  - 修复：wind==0时直接输出静态预设色，不执行波浪算法
+  - 提交：`7b6bb2b` on main
+  - 编译通过(22% free)
+
+- 2026-05-18：audio_player.c 从零重写 — 完全照搬参考项目
+  - 根因：之前自己设计的 16-bit 混合逻辑效果"太炸了"，不是原版的声音
+  - 决策：抛弃所有自定义混合逻辑，100% 照搬 TheDIYGuy999 的 variablePlaybackTimer() + fixedPlaybackTimer()
+  - 核心原则：**所有混合在 8-bit signed char 范围内完成**（和参考项目一模一样），最后才转 I2S
+  - 搬过来的逻辑：
+    - 8-bit 素材直接用（LaFerrariIdle_raw.h / Rev / Knock / Start）
+    - idle/rev 交叉淡入（revSwitchPoint=50, idleEndPoint=300, proportion=100%）
+    - throttleDependentVolume = map(rpm, 0, 500, 60, 130)
+    - throttleDependentRevVolume = map(rpm, 0, 500, 60, 130)
+    - throttleDependentKnockVolume = map(rpm, knockStartPoint, 500, 0, 100)
+    - rpmDependentKnockVolume = map(rpm, 400, 500, 5, 100)
+    - Diesel knock: 600% × throttleDepKnock × rpmDepKnock，V8 气缸模式
+    - DAC 混合公式：`(a*8/10 + b7*2/10) * masterVolume/100 + dacOffset`
+    - dacOffset 0→128 渐入防爆音
+    - 状态机：OFF→STARTING→RUNNING→STOPPING（attenuator 渐弱）
+    - RPM 惯性：ACC=2, DEC=1（LaFerrari.h 原值）
+    - MAX_RPM_PERCENTAGE=400（音高最高 4 倍）
+  - 输出转换：`(mixed_8bit - 128) << 8` → 16-bit signed I2S
+  - 变速率实现：定点数 16.16 步进（数学等价于原版改定时器频率）
+    - BASE_STEP = FP_ONE/2（22050→44100 上采样）
+    - play_step = BASE_STEP * map(rpm, 0, 500, 100, 400) / 100
+  - 编译通过：ninja 全量链接 [4/4] ✅ 零错误零警告
+  - 待烧录验证效果
+  - 如果效果还不对，可能需要检查：
+    - dacOffset 渐入速度（当前每 buffer tick +1，约 1.5 秒到 128）
+    - RPM 惯性是否太慢（ACC=2 per buffer = ~345 RPM/s）
+    - knock 的 b7*2/10 衰减是否太大（原版 DAC2 单独输出，我们合并到一个通道）
