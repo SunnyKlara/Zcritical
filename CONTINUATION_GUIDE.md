@@ -70,9 +70,10 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 ## 编译状态
 
 ```
-ESP32 固件：idf.py build — ✅ 通过（2026-05-21，v1.0.0，bin 2.9MB，分区余量 6%）
-  ⚠️ 全量编译需删除 sdkconfig + build 目录（改了 sdkconfig.defaults 时）
-  ⚠️ IRAM 余量紧张（已关闭 WiFi/LWIP/SPIRAM cache lib IRAM 优化）
+ESP32-S3 固件：idf.py build — ✅ 通过（2026-05-21，v1.0.0，target=esp32s3，bin 2.9MB，分区余量 7%）
+  ⚠️ CMakeLists.txt 已锁定 IDF_TARGET=esp32s3（之前误编为 esp32 已修正）
+  ⚠️ GitHub Release v1.0.0 的 bin 是 esp32 版本（错误），需重新上传 S3 版本
+  ⚠️ sdkconfig.defaults 中 SPIRAM_CACHE_LIBxxx 选项在 S3 上无效（warning 可忽略）
 Flutter APP：flutter build apk --release — ✅ 通过（74.6MB）
 协议测试：flutter test test/protocol/ — ✅ 51/51 通过
 ```
