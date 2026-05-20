@@ -28,6 +28,7 @@ import '../widgets/colorize_preset_view.dart';
 import '../widgets/colorize_rgb_detail_view.dart';
 import 'no_device_screen.dart';
 import 'logo_management_screen.dart';
+import '../services/audio_stream_service.dart';
 import 'audio_management_screen.dart';
 import 'ota_upgrade_screen.dart';
 import 'audio_stream_screen.dart';
@@ -795,6 +796,28 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             });
           },
         ),
+        // WiFi 配网选项
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.wifi_outlined, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text(
+                'WiFi 配网',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          onTap: () {
+            // 延迟 300ms 让 popup menu 完全关闭后再打开 dialog
+            // 避免 Overlay GlobalKey 冲突
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                _showWifiProvisioningDialog(parentContext);
+              }
+            });
+          },
+        ),
         // 音频投射选项
         PopupMenuItem(
           child: const Row(
@@ -908,6 +931,27 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const OtaUpgradeScreen()),
+    );
+  }
+
+  /// WiFi 配网对话框 — 扫描 WiFi 列表，用户选择后输入密码
+  void _showWifiProvisioningDialog(BuildContext parentContext) {
+    final btProvider = Provider.of<BluetoothProvider>(parentContext, listen: false);
+    if (!btProvider.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请先连接蓝牙设备'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: parentContext,
+      barrierDismissible: false,
+      builder: (_) => _WifiProvisioningDialog(btProvider: btProvider),
     );
   }
 
@@ -1554,3 +1598,242 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   // ╚════════════════════════════════════════════════════════════════════════╝
 
 } // _DeviceConnectScreenState 类结束
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  WiFi 配网对话框 — 独立 StatefulWidget（避免 StatefulBuilder 的 setState 问题）
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _WifiProvisioningDialog extends StatefulWidget {
+  final BluetoothProvider btProvider;
+  const _WifiProvisioningDialog({required this.btProvider});
+
+  @override
+  State<_WifiProvisioningDialog> createState() => _WifiProvisioningDialogState();
+}
+
+class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
+  bool _scanning = false;
+  bool _connecting = false;
+  String? _statusMessage;
+  List<Map<String, dynamic>> _wifiList = [];
+  StreamSubscription? _ipSub;
+  StreamSubscription? _errSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _ipSub = widget.btProvider.wifiIpStream.listen((ip) {
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _statusMessage = '✅ 连接成功！IP: $ip';
+      });
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) Navigator.of(context).pop();
+      });
+    });
+    _errSub = widget.btProvider.wifiErrorStream.listen((err) {
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _statusMessage = '❌ 连接失败: $err';
+      });
+    });
+    // 打开后自动扫描
+    _doScan();
+  }
+
+  @override
+  void dispose() {
+    _ipSub?.cancel();
+    _errSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _doScan() async {
+    setState(() {
+      _scanning = true;
+      _statusMessage = null;
+      _wifiList.clear();
+    });
+    try {
+      final results = await AudioStreamService.scanWifi();
+      if (mounted) {
+        setState(() {
+          _wifiList = results;
+          _scanning = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _scanning = false;
+          _statusMessage = '扫描失败: $e';
+        });
+      }
+    }
+  }
+
+  void _connectWifi(String ssid, String password) {
+    setState(() => _connecting = true);
+    widget.btProvider.sendWifiCredentials(ssid, password);
+  }
+
+  void _showPasswordDialog(String ssid) {
+    final controller = TextEditingController();
+    bool showPass = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Text(ssid, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          content: TextField(
+            controller: controller,
+            obscureText: !showPass,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: '输入密码',
+              labelStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+              suffixIcon: IconButton(
+                icon: Icon(showPass ? Icons.visibility : Icons.visibility_off, color: Colors.white54),
+                onPressed: () => setDlgState(() => showPass = !showPass),
+              ),
+            ),
+            onSubmitted: (_) {
+              Navigator.of(ctx).pop();
+              _connectWifi(ssid, controller.text);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _connectWifi(ssid, controller.text);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+              child: const Text('连接'),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) => controller.dispose());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: Row(
+        children: [
+          const Icon(Icons.wifi, color: Colors.blue, size: 24),
+          const SizedBox(width: 10),
+          const Text('WiFi 配网', style: TextStyle(color: Colors.white, fontSize: 18)),
+          const Spacer(),
+          if (!_scanning && !_connecting)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+              onPressed: _doScan,
+              tooltip: '重新扫描',
+            ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 320,
+        child: Column(
+          children: [
+            if (_connecting)
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.blue),
+                      SizedBox(height: 16),
+                      Text('正在连接...', style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
+                ),
+              )
+            else if (_scanning)
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.blue),
+                      SizedBox(height: 16),
+                      Text('正在扫描 WiFi...', style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
+                ),
+              )
+            else if (_wifiList.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('未找到 WiFi 网络\n点击右上角刷新重试',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54)),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _wifiList.length,
+                  itemBuilder: (_, i) {
+                    final ap = _wifiList[i];
+                    final ssid = ap['ssid'] as String;
+                    final rssi = ap['rssi'] as int;
+                    final secure = ap['secure'] as bool;
+                    final IconData icon = rssi > -50
+                        ? Icons.signal_wifi_4_bar
+                        : rssi > -70
+                            ? Icons.network_wifi_3_bar
+                            : Icons.network_wifi_1_bar;
+                    return ListTile(
+                      leading: Icon(icon, color: Colors.white70, size: 22),
+                      title: Text(ssid, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                      trailing: secure ? const Icon(Icons.lock_outline, color: Colors.white38, size: 18) : null,
+                      onTap: () {
+                        if (secure) {
+                          _showPasswordDialog(ssid);
+                        } else {
+                          _connectWifi(ssid, '');
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_statusMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _statusMessage!,
+                  style: TextStyle(
+                    color: _statusMessage!.startsWith('✅') ? Colors.green : Colors.red,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭', style: TextStyle(color: Colors.white54)),
+        ),
+      ],
+    );
+  }
+}
