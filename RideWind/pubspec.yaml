@@ -101,6 +101,8 @@ flutter:
     - assets/icon/
     - assets/sound/
     - assets/bmp/
+    - assets/car_thumbnails/car_index.json
+    - assets/car_thumbnails/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
