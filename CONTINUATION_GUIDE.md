@@ -42,8 +42,8 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 下一步
 
-1. **P0 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
-2. **P1 OTA 实机验证** — 烧录新固件后测试 BLE OTA 全流程（本地+远程）
+1. **P0 OTA 传输速率修复** — ESP32 在接收 binary data 时 crash（MEMPROT_SPLIT_ADDR_OUT_OF_RANGE），需要 APP 端加 BLE 包间节流（每 MTU 包 20ms 延迟）+ 严格等 ACK
+2. **P1 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
 3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
 4. **P3 DeviceConnectScreen 拆分**
 5. **P4 go_router + 国际化 + CI/CD**
