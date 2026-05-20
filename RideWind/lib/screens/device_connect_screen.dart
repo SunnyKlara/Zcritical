@@ -1600,7 +1600,15 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 } // _DeviceConnectScreenState 类结束
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  WiFi 配网对话框 — 独立 StatefulWidget（避免 StatefulBuilder 的 setState 问题）
+//  WiFi 配网对话框 — 自动识别手机当前 WiFi，用户只需输入密码
+//  设计参考：小米/涂鸦智能家居配网模式
+//
+//  流程：
+//    1. 自动读取手机当前连接的 WiFi SSID + 频率
+//    2. 如果是 5GHz → 显示警告（ESP32 仅支持 2.4GHz）
+//    3. 显示 SSID（不可编辑），用户只输密码
+//    4. 发送 WIFI:ssid:pass → ESP32 回复 OK:WIFI → BLE 断开（预期）
+//    5. 等待 BLE 重连 → 收到 WIFI_IP:x.x.x.x 表示成功
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _WifiProvisioningDialog extends StatefulWidget {
@@ -1612,131 +1620,107 @@ class _WifiProvisioningDialog extends StatefulWidget {
 }
 
 class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
-  bool _scanning = false;
+  String? _ssid;
+  int? _frequency;
+  bool _loading = true;
   bool _connecting = false;
   String? _statusMessage;
-  List<Map<String, dynamic>> _wifiList = [];
+  final _passwordController = TextEditingController();
+  bool _showPassword = false;
   StreamSubscription? _ipSub;
   StreamSubscription? _errSub;
+
+  bool get _is5GHz => (_frequency ?? 0) > 3000;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentWifi();
+
+    // Listen for WiFi IP (success) — may come after BLE reconnects
     _ipSub = widget.btProvider.wifiIpStream.listen((ip) {
       if (!mounted) return;
+      widget.btProvider.clearWifiProvisioningFlag();
       setState(() {
         _connecting = false;
-        _statusMessage = '✅ WiFi 已连接！IP: $ip\nWebSocket 服务已启动';
+        _statusMessage = '✅ WiFi 已连接\nIP: $ip';
       });
     });
+
+    // Listen for WiFi error
     _errSub = widget.btProvider.wifiErrorStream.listen((err) {
       if (!mounted) return;
+      widget.btProvider.clearWifiProvisioningFlag();
       setState(() {
         _connecting = false;
         _statusMessage = '❌ 连接失败: $err';
       });
     });
-    // 打开后自动扫描
-    _doScan();
   }
 
   @override
   void dispose() {
     _ipSub?.cancel();
     _errSub?.cancel();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _doScan() async {
-    setState(() {
-      _scanning = true;
-      _statusMessage = null;
-      _wifiList.clear();
-    });
+  Future<void> _loadCurrentWifi() async {
     try {
-      final results = await AudioStreamService.scanWifi();
-      if (mounted) {
+      final info = await AudioStreamService.getConnectedWifi();
+      if (!mounted) return;
+      if (info != null) {
         setState(() {
-          _wifiList = results;
-          _scanning = false;
+          _ssid = info['ssid'] as String?;
+          _frequency = info['frequency'] as int?;
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _ssid = null;
+          _loading = false;
+          _statusMessage = '⚠️ 手机未连接 WiFi\n请先连接 2.4GHz WiFi 网络';
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _scanning = false;
-          _statusMessage = '扫描失败: $e';
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _statusMessage = '⚠️ 无法获取 WiFi 信息: $e';
+      });
     }
   }
 
-  void _connectWifi(String ssid, String password) {
+  void _doConnect() {
+    if (_ssid == null || _ssid!.isEmpty) return;
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() => _statusMessage = '⚠️ 请输入密码');
+      return;
+    }
+
     setState(() {
       _connecting = true;
-      _statusMessage = null;
+      _statusMessage = '正在发送凭据...\n设备将断开蓝牙以连接 WiFi';
     });
-    widget.btProvider.sendWifiCredentials(ssid, password);
 
-    // 超时处理：如果 15 秒内没收到回复（可能 BLE 断了），提示用户
-    Future.delayed(const Duration(seconds: 15), () {
+    widget.btProvider.sendWifiCredentials(_ssid!, password);
+
+    // Save credentials locally for future use
+    AudioStreamService.saveWifiCredentials(_ssid!, password);
+
+    // Timeout: if no response after 20s (BLE disconnect + reconnect + WiFi connect)
+    Future.delayed(const Duration(seconds: 20), () {
       if (!mounted) return;
       if (_connecting) {
         setState(() {
           _connecting = false;
-          _statusMessage = '⏱️ WiFi 凭据已发送。\n如果蓝牙断开，说明设备正在连接 WiFi。\n请重启设备，WiFi 将自动连接。';
+          _statusMessage = '⏱️ 等待超时\n\n可能原因：\n• WiFi 密码错误\n• 设备距离路由器太远\n\n请重试或检查密码';
         });
+        widget.btProvider.clearWifiProvisioningFlag();
       }
     });
-  }
-
-  void _showPasswordDialog(String ssid) {
-    final controller = TextEditingController();
-    bool showPass = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          title: Text(ssid, style: const TextStyle(color: Colors.white, fontSize: 16)),
-          content: TextField(
-            controller: controller,
-            obscureText: !showPass,
-            autofocus: true,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: '输入密码',
-              labelStyle: const TextStyle(color: Colors.white54),
-              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-              suffixIcon: IconButton(
-                icon: Icon(showPass ? Icons.visibility : Icons.visibility_off, color: Colors.white54),
-                onPressed: () => setDlgState(() => showPass = !showPass),
-              ),
-            ),
-            onSubmitted: (_) {
-              Navigator.of(ctx).pop();
-              _connectWifi(ssid, controller.text);
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('取消', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _connectWifi(ssid, controller.text);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-              child: const Text('连接'),
-            ),
-          ],
-        ),
-      ),
-    ).then((_) => controller.dispose());
   }
 
   @override
@@ -1748,100 +1732,188 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
           const Icon(Icons.wifi, color: Colors.blue, size: 24),
           const SizedBox(width: 10),
           const Text('WiFi 配网', style: TextStyle(color: Colors.white, fontSize: 18)),
-          const Spacer(),
-          if (!_scanning && !_connecting)
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
-              onPressed: _doScan,
-              tooltip: '重新扫描',
-            ),
         ],
       ),
       content: SizedBox(
         width: double.maxFinite,
-        height: 320,
-        child: Column(
-          children: [
-            if (_connecting)
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Colors.blue),
-                      SizedBox(height: 16),
-                      Text('正在连接...', style: TextStyle(color: Colors.white70)),
+        child: _loading
+            ? const SizedBox(
+                height: 100,
+                child: Center(child: CircularProgressIndicator(color: Colors.blue)),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 5GHz warning
+                    if (_is5GHz) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '当前连接的是 5GHz 网络\nESP32 仅支持 2.4GHz，请切换网络',
+                                style: TextStyle(color: Colors.orange[200], fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
-                ),
-              )
-            else if (_scanning)
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Colors.blue),
-                      SizedBox(height: 16),
-                      Text('正在扫描 WiFi...', style: TextStyle(color: Colors.white70)),
+
+                    // SSID display (read-only)
+                    if (_ssid != null && _ssid!.isNotEmpty) ...[
+                      Text(
+                        '将设备连接到',
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _is5GHz ? Icons.signal_wifi_statusbar_connected_no_internet_4 : Icons.wifi,
+                              color: _is5GHz ? Colors.orange : Colors.blue,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _ssid!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (_frequency != null)
+                              Text(
+                                _is5GHz ? '5GHz' : '2.4GHz',
+                                style: TextStyle(
+                                  color: _is5GHz ? Colors.orange : Colors.green,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password input
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: !_showPassword,
+                        enabled: !_connecting,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'WiFi 密码',
+                          labelStyle: const TextStyle(color: Colors.white54),
+                          enabledBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white24),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.blue),
+                          ),
+                          disabledBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white12),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPassword ? Icons.visibility : Icons.visibility_off,
+                              color: Colors.white54,
+                            ),
+                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        onSubmitted: (_) {
+                          if (!_connecting && !_is5GHz) _doConnect();
+                        },
+                      ),
                     ],
-                  ),
-                ),
-              )
-            else if (_wifiList.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Text('未找到 WiFi 网络\n点击右上角刷新重试',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white54)),
-                ),
-              )
-            else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _wifiList.length,
-                  itemBuilder: (_, i) {
-                    final ap = _wifiList[i];
-                    final ssid = ap['ssid'] as String;
-                    final rssi = ap['rssi'] as int;
-                    final secure = ap['secure'] as bool;
-                    final IconData icon = rssi > -50
-                        ? Icons.signal_wifi_4_bar
-                        : rssi > -70
-                            ? Icons.network_wifi_3_bar
-                            : Icons.network_wifi_1_bar;
-                    return ListTile(
-                      leading: Icon(icon, color: Colors.white70, size: 22),
-                      title: Text(ssid, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                      trailing: secure ? const Icon(Icons.lock_outline, color: Colors.white38, size: 18) : null,
-                      onTap: () {
-                        if (secure) {
-                          _showPasswordDialog(ssid);
-                        } else {
-                          _connectWifi(ssid, '');
-                        }
-                      },
-                    );
-                  },
+
+                    // Status message
+                    if (_statusMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _statusMessage!.startsWith('✅')
+                              ? Colors.green.withOpacity(0.1)
+                              : _statusMessage!.startsWith('❌') || _statusMessage!.startsWith('⚠️')
+                                  ? Colors.red.withOpacity(0.1)
+                                  : Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_connecting)
+                              const SizedBox(
+                                width: 16, height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                              )
+                            else
+                              Icon(
+                                _statusMessage!.startsWith('✅')
+                                    ? Icons.check_circle
+                                    : _statusMessage!.startsWith('❌')
+                                        ? Icons.error
+                                        : Icons.info_outline,
+                                color: _statusMessage!.startsWith('✅')
+                                    ? Colors.green
+                                    : _statusMessage!.startsWith('❌')
+                                        ? Colors.red
+                                        : Colors.blue,
+                                size: 18,
+                              ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _statusMessage!,
+                                style: TextStyle(
+                                  color: _statusMessage!.startsWith('✅')
+                                      ? Colors.green[200]
+                                      : _statusMessage!.startsWith('❌') || _statusMessage!.startsWith('⚠️')
+                                          ? Colors.red[200]
+                                          : Colors.blue[200],
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            if (_statusMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _statusMessage!,
-                  style: TextStyle(
-                    color: _statusMessage!.startsWith('✅') ? Colors.green : Colors.red,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (_connecting) {
+              // Cancel provisioning — clear flag
+              widget.btProvider.clearWifiProvisioningFlag();
+            }
+            Navigator.of(context).pop();
+          },
           child: Text(
             _statusMessage != null && _statusMessage!.startsWith('✅') ? '完成' : '关闭',
             style: TextStyle(
@@ -1851,6 +1923,16 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
             ),
           ),
         ),
+        if (_ssid != null && _ssid!.isNotEmpty && !_connecting && !(_statusMessage?.startsWith('✅') ?? false))
+          ElevatedButton(
+            onPressed: _is5GHz ? null : _doConnect,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey[800],
+            ),
+            child: const Text('连接'),
+          ),
       ],
     );
   }

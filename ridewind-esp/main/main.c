@@ -828,9 +828,11 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         ssid_copy[sizeof(ssid_copy) - 1] = '\0';
         strncpy(pass_copy, cmd->param.wifi.password, sizeof(pass_copy) - 1);
         pass_copy[sizeof(pass_copy) - 1] = '\0';
-        APP_STATE_UNLOCK();  /* Release lock — connect runs async */
+        APP_STATE_UNLOCK();  /* Release lock — provisioning runs async */
         ble_service_notify_str("OK:WIFI\r\n");
-        wifi_audio_service_connect(ssid_copy, pass_copy);
+        /* Use provisioning flow: stop BLE → connect WiFi → restart BLE.
+         * This avoids RF contention during WiFi CONNECTING phase. */
+        wifi_audio_service_provision(ssid_copy, pass_copy);
         return;  /* Already unlocked */
     }
 
@@ -1089,20 +1091,25 @@ void app_main(void)
     audio_engine_set_volume(g_app_state.volume);
     ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio + WebSocket)");
 
-    /* Phase 4.5: WiFi auto-connect BEFORE BLE starts.
-     * If NVS has saved WiFi credentials, connect now (blocking, max 10s).
-     * This avoids BLE+WiFi RF contention — WiFi connects while BLE is off.
-     * If no credentials saved, skip (user will configure via BLE later). */
-    wifi_audio_service_auto_connect();
-    if (wifi_audio_service_is_connected()) {
-        ESP_LOGI(TAG, "WiFi connected before BLE — no RF contention");
+    /* ═══ WiFi + BLE Boot Sequence (Production) ═══
+     * Strategy: WiFi CONNECTING phase has RF contention with BLE (reason=201).
+     *           WiFi CONNECTED coexists stably with BLE (confirmed).
+     *
+     * Boot logic:
+     *   - Has NVS credentials → connect WiFi FIRST (blocking 5s, no BLE yet)
+     *                         → then start BLE (WiFi already CONNECTED = no contention)
+     *   - No credentials     → start BLE immediately (WiFi will be triggered by APP)
+     */
+    if (wifi_audio_service_has_credentials()) {
+        ESP_LOGI(TAG, "NVS has WiFi credentials — connecting WiFi before BLE...");
+        wifi_audio_service_auto_connect();  /* Blocking up to 10s */
+        ESP_LOGI(TAG, "WiFi phase done, now starting BLE...");
+        ble_service_init();
     } else {
-        ESP_LOGI(TAG, "WiFi not connected (no credentials or failed) — BLE will handle provisioning");
+        ESP_LOGI(TAG, "No WiFi credentials — starting BLE directly");
+        ble_service_init();
     }
-
-    /* Phase 5: BLE init + advertising (AFTER WiFi is settled) */
-    ble_service_init();
-    ESP_LOGI(TAG, "BLE initialized, advertising as \"%s\"", BLE_DEVICE_NAME);
+    ESP_LOGI(TAG, "BLE initialized (WiFi+BLE coex active)");
 
     /* Phase 6: LED effects init */
     led_effects_init();
