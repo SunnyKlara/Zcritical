@@ -132,8 +132,8 @@ class FirmwareUpdateService {
     if (data.isEmpty) {
       throw Exception('下载的固件文件为空');
     }
-    if (data.length > 960 * 1024) {
-      throw Exception('固件文件过大 (${data.length} bytes)，最大支持 960KB');
+    if (data.length > 3 * 1024 * 1024) {
+      throw Exception('固件文件过大 (${data.length} bytes)，最大支持 3MB');
     }
 
     return data;

@@ -37,6 +37,7 @@
 #include "storage.h"
 #include "boot_logo_240.h"
 #include "ota_service.h"
+#include "esp_app_desc.h"
 
 static const char *TAG = "MAIN";
 
@@ -808,6 +809,14 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         APP_STATE_UNLOCK();
         ota_service_end();
         return;  /* Already unlocked */
+
+    case CMD_OTA_VERSION: {
+        /* Reply with firmware version from app descriptor */
+        const esp_app_desc_t *desc = esp_app_get_description();
+        snprintf(resp, sizeof(resp), "OTA_VERSION:%s\r\n", desc->version);
+        ble_service_notify_str(resp);
+        break;
+    }
 
     // ═══ SECTION: WiFi 音频命令 (WIFI/WIFI_SCAN) ═══
 

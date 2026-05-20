@@ -46,6 +46,7 @@ typedef enum {
     CMD_AUDIO_END,      /* AUDIO_END */
     CMD_AUDIO_DELETE,   /* AUDIO_DELETE or AUDIO_DELETE:layer */
     CMD_GET_AUDIO,      /* GET:AUDIO — query custom audio status */
+    CMD_OTA_VERSION,    /* OTA_VERSION — query firmware version */
 } cmd_type_t;
 
 typedef struct {

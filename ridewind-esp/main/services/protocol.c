@@ -191,6 +191,10 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         out->type = CMD_OTA_END;  /* Reuse END type, dispatch handles abort */
         return true;
     }
+    if (strcmp(buf, "OTA_VERSION") == 0) {
+        out->type = CMD_OTA_VERSION;
+        return true;
+    }
 
     /* ── LED_GRADIENT:s:r:g:b:speed ── */
     if (strncmp(buf, "LED_GRADIENT:", 13) == 0) {
