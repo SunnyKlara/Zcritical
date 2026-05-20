@@ -29,7 +29,7 @@ class CarDetailScreen extends StatelessWidget {
               children: [
                 // 图片区域（可缩放）
                 SizedBox(
-                  height: screenHeight * 0.38,
+                  height: screenHeight * 0.45,
                   width: double.infinity,
                   child: Container(
                     color: const Color(0xFF0A0A0A),
