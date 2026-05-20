@@ -39,7 +39,6 @@ idf_component_register(
         "ui"
         "app"
         "resources"
-        "../取模数组"
     REQUIRES
         bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s esp_wifi esp_netif esp_event littlefs app_update mbedtls
 )
