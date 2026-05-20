@@ -20,7 +20,23 @@ inclusion: auto
 ### 编译固件命令（PowerShell）
 
 ```powershell
-# 一行搞定：加载环境 + 编译
+# 推荐：用快速编译脚本（跳过环境检查，增量编译 ~2s）
+powershell -ExecutionPolicy Bypass -File build.ps1
+
+# 全量编译（改了 sdkconfig.defaults 后）
+powershell -ExecutionPolicy Bypass -File build.ps1 -Full
+
+# 只编译 app（跳过 bootloader，日常最快）
+powershell -ExecutionPolicy Bypass -File build.ps1 -App
+
+# 编译 + 显示 size 报告
+powershell -ExecutionPolicy Bypass -File build.ps1 -Size
+```
+
+### 备选：用 export.ps1（首次或环境有问题时）
+
+```powershell
+# 完整环境加载 + 编译（较慢，~12s 起步）
 C:\Espressif\frameworks\esp-idf-v5.3.5\export.ps1; idf.py build
 ```
 
@@ -63,11 +79,12 @@ C:\Espressif\frameworks\esp-idf-v5.3.5\export.ps1; idf.py -p COM3 flash monitor
 
 ### AI 编译策略
 
-- 改了 .c/.h 文件 → 直接 `idf.py build`（增量）
-- 改了 sdkconfig.defaults → 删 build + sdkconfig → `idf.py build`（全量）
-- 只想验证编译通过 → `idf.py app`（跳过 bootloader）
-- 需要看 flash 用量 → `idf.py size`
-- 需要看 IRAM/DRAM 详情 → `idf.py size-components`
+- 改了 .c/.h 文件 → `powershell -ExecutionPolicy Bypass -File build.ps1`（增量，~2s）
+- 改了 sdkconfig.defaults → `powershell -ExecutionPolicy Bypass -File build.ps1 -Full`（全量，~3-5min）
+- 只想验证编译通过 → `powershell -ExecutionPolicy Bypass -File build.ps1 -App`（跳过 bootloader）
+- 需要看 flash 用量 → `powershell -ExecutionPolicy Bypass -File build.ps1 -Size`
+- 需要看 IRAM/DRAM 详情 → 用 export.ps1 + `idf.py size-components`
+- **工作目录必须是 `ridewind-esp/`**
 
 ## 固件产物路径
 
