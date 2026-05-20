@@ -1,12 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/car_model.dart';
+import 'logo_management_screen.dart';
 
-/// 🚗 车辆详情页 — 可缩放大图 + 丰富信息 + Hero 动画
-class CarDetailScreen extends StatelessWidget {
+/// 🚗 车辆详情页 — 可缩放大图 + 丰富信息 + Hero 动画 + 设为 Logo
+class CarDetailScreen extends StatefulWidget {
   final CarModel car;
 
   const CarDetailScreen({super.key, required this.car});
+
+  @override
+  State<CarDetailScreen> createState() => _CarDetailScreenState();
+}
+
+class _CarDetailScreenState extends State<CarDetailScreen> {
+  bool _isUploading = false;
+  double _uploadProgress = 0.0;
+  String? _uploadStatus;
+
+  CarModel get car => widget.car;
+
+  /// 跳转到 Logo 管理页面，传入当前车辆图片
+  Future<void> _setAsLogo() async {
+    setState(() => _uploadStatus = '加载图片...');
+
+    try {
+      final byteData = await rootBundle.load(car.assetPath);
+      final imageBytes = byteData.buffer.asUint8List();
+
+      if (!mounted) return;
+
+      // 跳转到 Logo 管理页面，传入预选图片
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LogoManagementScreen(initialImageBytes: imageBytes),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载图片失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadStatus = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +232,62 @@ class CarDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
+
+                      // 设为 Logo 按钮（WiFi 上传）
+                      if (_isUploading) ...[
+                        // 上传进度
+                        Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: _uploadProgress,
+                                minHeight: 6,
+                                backgroundColor: Colors.grey[800],
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00C8FF)),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _uploadStatus ?? '上传中...',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            onPressed: _setAsLogo,
+                            icon: const Icon(Icons.upload_rounded, size: 20),
+                            label: const Text(
+                              'SET AS LOGO',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00C8FF).withOpacity(0.15),
+                              foregroundColor: const Color(0xFF00C8FF),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(
+                                  color: Color(0xFF00C8FF),
+                                  width: 0.5,
+                                ),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
 
                       // 选择按钮
                       SizedBox(
