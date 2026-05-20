@@ -38,6 +38,21 @@ CONFIG_LWIP_SO_REUSE=y
 # (hardware supply issue, not software — USB cable may be too long/thin)
 CONFIG_ESP_BROWNOUT_DET=n
 
+# IRAM optimization — reduce IRAM usage to fit within segment
+# WiFi/LWIP hot paths moved to flash (slight latency increase, acceptable for BLE app)
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_LWIP_IRAM_OPTIMIZATION=n
+# Move less-critical C library functions out of IRAM (PSRAM cache miss acceptable)
+CONFIG_SPIRAM_CACHE_LIBTIME_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBENV_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBFILE_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBMISC_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBRAND_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBNUMPARSER_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBIO_IN_IRAM=n
+CONFIG_SPIRAM_CACHE_LIBCHAR_IN_IRAM=n
+
 # OTA Rollback — new firmware auto-rollback if it crashes before confirming
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
