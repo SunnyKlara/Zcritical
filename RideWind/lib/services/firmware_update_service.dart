@@ -71,9 +71,9 @@ class FirmwareInfo {
 /// }
 /// ```
 class FirmwareUpdateService {
-  /// GitHub 上 firmware.json 的原始文件地址（使用镜像加速，国内可访问）
+  /// GitHub 上 firmware.json 的原始文件地址（使用 jsdelivr CDN 加速，国内稳定可访问）
   static const String _firmwareInfoUrl =
-      'https://raw.gitmirror.com/SunnyKlara/Zcritical/main/firmware.json';
+      'https://cdn.jsdelivr.net/gh/SunnyKlara/Zcritical@main/firmware.json';
 
   /// 检查是否有新固件版本
   ///
