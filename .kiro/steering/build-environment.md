@@ -121,20 +121,12 @@ gh release upload fw-vX.Y.Z "ridewind-esp\build\ridewind-fw-vX.Y.Z.bin" --clobbe
 
 **原因：** 国内网络环境对 GitHub 不稳定，DNS 污染或 GFW 干扰
 
-**解决方案（按优先级）：**
+**已解决：切换到 SSH 协议（2026-05-21）**
 
-1. **重试** — 等 10-30 秒再试，经常能通
-2. **换 DNS** — 用 `8.8.8.8` 或 `223.5.5.5`
-3. **Git 代理** — 如果有代理：
-   ```powershell
-   git config --global http.proxy http://127.0.0.1:7890
-   git config --global https.proxy http://127.0.0.1:7890
-   ```
-4. **GitHub 镜像** — 用 `ghp.ci` 或 `hub.fastgit.xyz` 做 push mirror
-5. **SSH 替代 HTTPS** — SSH 走 22 端口，有时比 443 稳定：
-   ```powershell
-   git remote set-url origin git@github.com:SunnyKlara/Zcritical.git
-   ```
+- Remote URL: `git@github.com:SunnyKlara/Zcritical.git`
+- SSH config: `~/.ssh/config` 配置走 `ssh.github.com:443`
+- Key: `~/.ssh/id_ed25519`（ed25519，已添加到 GitHub）
+- 以后所有 git push/pull 走 SSH 443 端口，不再受 HTTPS 封锁影响
 
 ### AI 操作策略
 
