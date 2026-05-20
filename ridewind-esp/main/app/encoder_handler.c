@@ -1,10 +1,14 @@
+/**
+ * @file encoder_handler.c
+ * @brief EC11 编码器事件处理 — 按键状态机 + BLE 上报
+ *
+ * 处理原始编码器事件并上报 BLE。具体 UI 响应由各 ui_xxx_update() 处理。
+ */
+
 #include "encoder_handler.h"
 #include "app_state.h"
 #include "ble_service.h"
 #include <stdio.h>
-
-/* Encoder handler: processes raw encoder events and reports to BLE.
- * The actual UI-specific handling is done in each ui_xxx_update(). */
 
 void encoder_handler_init(void)
 {

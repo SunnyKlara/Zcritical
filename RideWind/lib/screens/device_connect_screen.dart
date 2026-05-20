@@ -1,3 +1,9 @@
+/// 主控制页面 — 设备连接后的核心交互界面
+///
+/// 包含：速度仪表盘、风扇控制、雾化器开关、LED 预设切换、
+/// 油门模式、音频投射入口、Logo 管理入口。
+/// 通过 BluetoothProvider 与 ESP32 通信。
+
 import 'dart:async'; // 用于 StreamSubscription
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 用于震动反馈
@@ -13,6 +19,7 @@ import '../widgets/device_connect_helpers.dart';
 import '../models/guide_models.dart';
 import '../services/feature_guide_service.dart';
 import '../services/preference_service.dart';
+import '../services/update_service.dart';
 import '../configs/device_connect_config.dart';
 import '../data/led_presets.dart';
 import '../controllers/colorize_controller.dart';
@@ -175,6 +182,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         // 💾 恢复用户偏好设置（会重建 _colorPageController）
         debugPrint('🚀 [3c] 准备调用 _restoreUserPreferences');
         _restoreUserPreferences();
+        // 🔄 检查 App 更新（异步，不阻塞）
+        UpdateService.showUpdateDialogIfNeeded(context);
         debugPrint('🚀 [3/5] PostFrameCallback 执行完成');
     });
 

@@ -1,3 +1,8 @@
+/// BLE 底层连接管理 — 扫描/连接/MTU/服务发现/收发队列
+///
+/// 封装 flutter_blue_plus，提供设备类型检测(ESP32/F4)、
+/// 自动重连、发送队列(20ms间隔防拥塞)、数据流分发。
+
 import 'dart:async';
 import 'dart:collection';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';

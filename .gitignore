@@ -48,7 +48,11 @@ audio参考项目/build/
 # Python cache
 __pycache__/
 *.pyc
+.venv/
 
 # Misc
 *.bak
 *.tmp
+
+# ESP32 clangd cache
+ridewind-esp/.cache/

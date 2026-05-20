@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Project Hygiene Check",
+  "description": "When the user manually triggers this hook, the AI performs a project hygiene audit: checks for stale documentation, oversized CONTINUATION_GUIDE, unrecorded lessons, and files that should be cleaned up.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "执行项目卫生检查（大扫除）：\n\n1. **CONTINUATION_GUIDE.md 膨胀检查** — 超过 80 行了吗？如果是，把历史决策归档到 knowledge/decision-log.md\n2. **经验沉淀检查** — 最近的对话中有没有新的坑位/教训值得记录到 known-pitfalls.md 或 lessons-learned.md？\n3. **过时内容检查** — steering/ 中有没有描述已完成/已废弃功能的内容需要更新或归档？\n4. **文件清理** — 有没有临时文件、空文件、或不再使用的代码文件可以删除？\n5. **Kiro 配置健康** — hooks 是否都还有效？有没有新的自动化机会？\n\n输出一份简短的清理报告，列出需要动作的项目。用户确认后执行。"
+  }
+}

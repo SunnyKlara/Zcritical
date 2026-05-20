@@ -50,7 +50,7 @@ fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/comman
 | 雾化器 | `WUHUA:x\n` | 0/1 | `OK:WUHUA:x\r\n` |
 | UI 切换 | `UI:x\n` | 0-6 | `OK:UI:x\r\n` |
 | 油门模式 | `THROTTLE:x\n` | 0/1 | `OK:THROTTLE:x\r\n` |
-| 油门灯效 | `THROTTLE_FX:x\n` | 1-6 | `OK:THROTTLE_FX:x\r\n` |
+| 油门灯效 | `THROTTLE_FX:x\n` | 0-8 | `OK:THROTTLE_FX:x\r\n` |
 | 速度单位 | `UNIT:x\n` | 0=km/h, 1=mph | `OK:UNIT:x\r\n` |
 | LCD 开关 | `LCD:x\n` | 0/1 | `OK:LCD:x\r\n` |
 
@@ -90,11 +90,15 @@ Logo 格式：240×240 RGB565，115200 字节，CRC32 校验（ISO 3309，多项
 
 | 命令 | 格式 | 响应 |
 |------|------|------|
-| 开始 | `OTA_START:size:crc32\n` | `OTA_READY\r\n` |
+| 开始（推荐） | `OTA_BEGIN:size[:sha256_hex]\n` | `OTA_READY\r\n` |
+| 开始（旧格式） | `OTA_START:size\n` | `OTA_READY\r\n` |
 | 数据包 | `OTA_DATA:seq:hex\n` | `OTA_ACK:seq\r\n` |
 | 结束 | `OTA_END\n` | `OTA_OK\r\n` 或 `OTA_FAIL:reason\r\n` |
+| 中止 | `OTA_ABORT\n` | — |
 
-最大固件 2.5MB。失败自动回滚。
+- `OTA_BEGIN` 为推荐格式，支持可选 SHA256 校验（64 字符十六进制）。`OTA_START` 保留向后兼容。
+- `OTA_ABORT` 中止正在进行的 OTA 传输，设备回滚到当前固件。
+- 最大固件 2.5MB。失败自动回滚。
 
 ### 自定义引擎音频上传（二进制模式）
 

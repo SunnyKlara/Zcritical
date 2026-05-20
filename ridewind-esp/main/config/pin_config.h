@@ -1,9 +1,9 @@
-#pragma once
+/**
+ * @file pin_config.h
+ * @brief ESP32-S3 GPIO 引脚定义 — 所有硬件引脚分配集中管理
+ */
 
-/* ═══════════════════════════════════════════════════════════════
- *  Critical ESP32-S3 Pin Configuration
- *  All GPIO assignments in one place
- * ═══════════════════════════════════════════════════════════════ */
+#pragma once
 
 /* GC9A01 Round LCD (SPI) */
 #define PIN_LCD_SCL     7

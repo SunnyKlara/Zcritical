@@ -37,3 +37,10 @@ CONFIG_LWIP_SO_REUSE=y
 # Brownout — disable to prevent reboot during BLE+WiFi init current spike
 # (hardware supply issue, not software — USB cable may be too long/thin)
 CONFIG_ESP_BROWNOUT_DET=n
+
+# OTA Rollback — new firmware auto-rollback if it crashes before confirming
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# App version (embedded in firmware image for OTA version checking)
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="1.0.0"

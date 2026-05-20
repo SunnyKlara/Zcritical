@@ -158,10 +158,23 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
     }
 
     /* ── OTA commands ── */
+    /* OTA_BEGIN:size:sha256_hex  or  OTA_BEGIN:size */
+    if (strncmp(buf, "OTA_BEGIN:", 10) == 0) {
+        p = buf + 10;
+        char *end_ptr;
+        unsigned long size = strtoul(p, &end_ptr, 10);
+        if (end_ptr == p || size == 0) return false;
+        out->type = CMD_OTA_START;
+        out->param.ota_size = (uint32_t)size;
+        /* SHA256 hex is stored in the raw buffer — caller extracts via next_field */
+        return true;
+    }
+    /* Legacy format compatibility */
     if (strncmp(buf, "OTA_START:", 10) == 0) {
-        int size;
-        if (!parse_int(buf + 10, &size)) return false;
-        if (size <= 0) return false;
+        p = buf + 10;
+        char *end_ptr;
+        unsigned long size = strtoul(p, &end_ptr, 10);
+        if (end_ptr == p || size == 0) return false;
         out->type = CMD_OTA_START;
         out->param.ota_size = (uint32_t)size;
         return true;
@@ -172,6 +185,10 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
     }
     if (strcmp(buf, "OTA_END") == 0) {
         out->type = CMD_OTA_END;
+        return true;
+    }
+    if (strcmp(buf, "OTA_ABORT") == 0) {
+        out->type = CMD_OTA_END;  /* Reuse END type, dispatch handles abort */
         return true;
     }
 

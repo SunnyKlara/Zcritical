@@ -1,3 +1,8 @@
+/**
+ * @file drv_pwm.c
+ * @brief LEDC PWM 风扇驱动 — 非线性曲线 + 平滑加减速
+ */
+
 #include "drv_pwm.h"
 #include "pin_config.h"
 #include "board_config.h"

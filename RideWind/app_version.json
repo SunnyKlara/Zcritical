@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "buildNumber": 1,
+  "minSupportedVersion": "1.0.0",
+  "downloadUrl": "",
+  "changelog": "首个正式版本\n- 全功能 BLE 控制\n- 8 种油门灯效\n- WiFi 音频投射\n- OTA 固件升级\n- 自定义 Logo/音效上传",
+  "releaseDate": "2026-05-21",
+  "forceUpdate": false
+}

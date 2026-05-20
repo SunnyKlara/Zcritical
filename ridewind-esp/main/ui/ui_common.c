@@ -1,3 +1,8 @@
+/**
+ * @file ui_common.c
+ * @brief 共享 UI 绘图工具 — 进度条/圆点/F4 位图渲染/数字绘制
+ */
+
 #include "ui_common.h"
 #include "ui_images.h"
 #include "colored_digits.h"

@@ -1,3 +1,8 @@
+/**
+ * @file drv_encoder.c
+ * @brief EC11 旋转编码器 PCNT 驱动 + 按键检测（单击/双击/长按）
+ */
+
 #include "drv_encoder.h"
 #include "pin_config.h"
 #include "board_config.h"

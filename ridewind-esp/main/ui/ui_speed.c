@@ -1,3 +1,8 @@
+/**
+ * @file ui_speed.c
+ * @brief UI1 — 速度仪表盘界面 + 油门模式（风扇联动）
+ */
+
 #include "ui_speed.h"
 #include "ui_common.h"
 #include "ui_images.h"

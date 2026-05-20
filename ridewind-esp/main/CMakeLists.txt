@@ -13,6 +13,7 @@ idf_component_register(
         "services/storage.c"
         "services/audio_engine.c"
         "services/audio_player.c"
+        "services/ota_service.c"
         "ui/ui_manager.c"
         "ui/ui_menu.c"
         "ui/ui_speed.c"
@@ -40,5 +41,5 @@ idf_component_register(
         "resources"
         "../取模数组"
     REQUIRES
-        bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s esp_wifi esp_netif esp_event littlefs
+        bt nvs_flash driver esp_driver_spi esp_driver_gpio esp_driver_rmt esp_driver_ledc esp_driver_pcnt esp_driver_i2s esp_wifi esp_netif esp_event littlefs app_update mbedtls
 )

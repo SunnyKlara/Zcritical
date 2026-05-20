@@ -122,8 +122,36 @@ extern bool logo_is_binary_mode(void);
 extern void audio_upload_feed_binary(const uint8_t *data, uint16_t len);
 extern bool audio_is_binary_mode(void);
 
+/* External OTA data handler — defined in ota_service.c */
+extern void ota_service_feed_data(const uint8_t *data, uint16_t len);
+extern bool ota_is_binary_mode(void);
+
 static void process_rx_data(const uint8_t *data, uint16_t len)
 {
+    /* OTA binary mode: all incoming data is raw firmware bytes.
+     * Exception: if we see "OTA_END" or "OTA_ABORT" text, exit binary mode. */
+    if (ota_is_binary_mode()) {
+        if (len >= 7 && len <= 11) {
+            char tmp[16];
+            uint16_t copy_len = (len < sizeof(tmp) - 1) ? len : sizeof(tmp) - 1;
+            memcpy(tmp, data, copy_len);
+            tmp[copy_len] = '\0';
+            for (int i = copy_len - 1; i >= 0 && (tmp[i] == '\r' || tmp[i] == '\n'); i--) {
+                tmp[i] = '\0';
+            }
+            if (strcmp(tmp, "OTA_END") == 0 || strcmp(tmp, "OTA_ABORT") == 0) {
+                cmd_msg_t msg;
+                if (protocol_parse(tmp, (uint16_t)strlen(tmp), &msg)) {
+                    if (cmd_queue) xQueueSend(cmd_queue, &msg, 0);
+                }
+                return;
+            }
+        }
+        /* Raw firmware bytes — feed to OTA service */
+        ota_service_feed_data(data, len);
+        return;
+    }
+
     /* Binary logo mode: all incoming data is raw pixel bytes, no text framing.
      * Exception: if we see "LOGO_END" text, exit binary mode. */
     if (logo_is_binary_mode()) {
