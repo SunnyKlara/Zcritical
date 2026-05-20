@@ -98,7 +98,12 @@ class _OtaUpgradeScreenState extends State<OtaUpgradeScreen> {
     try {
       final firmwareData = await OtaUploadService.pickLocalFirmware();
       if (firmwareData == null) return; // 用户取消
-      await _otaService.upload(firmwareData);
+      // Auto-select: WiFi if connected (30-100x faster), BLE as fallback
+      if (_btProvider.esp32IpAddress != null && _btProvider.esp32IpAddress!.isNotEmpty) {
+        await _otaService.uploadViaWifi(firmwareData);
+      } else {
+        await _otaService.upload(firmwareData);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -168,8 +173,12 @@ class _OtaUpgradeScreenState extends State<OtaUpgradeScreen> {
         return;
       }
 
-      // 4. 蓝牙传输（复用现有 upload 流程）
-      await _otaService.upload(firmwareData);
+      // 4. 传输固件（WiFi 优先，BLE fallback）
+      if (_btProvider.esp32IpAddress != null && _btProvider.esp32IpAddress!.isNotEmpty) {
+        await _otaService.uploadViaWifi(firmwareData);
+      } else {
+        await _otaService.upload(firmwareData);
+      }
     } catch (e) {
       setState(() {
         _isCheckingUpdate = false;
@@ -435,7 +444,7 @@ class _OtaUpgradeScreenState extends State<OtaUpgradeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          '蓝牙传输 $percent%',
+          _btProvider.esp32IpAddress != null ? 'WiFi 传输 $percent%' : '蓝牙传输 $percent%',
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: Colors.white70,

@@ -15,7 +15,7 @@ inclusion: auto
 | Export 脚本 | `C:\Espressif\frameworks\esp-idf-v5.3.5\export.ps1` |
 | Python 环境 | `C:\Espressif\python_env\idf5.3_py3.14_env` |
 | 工具链 | xtensa-esp-elf GCC 13.2.0 |
-| 目标芯片 | ESP32（非 S3，注意！sdkconfig 里 IDF_TARGET=esp32） |
+| 目标芯片 | ESP32-S3（sdkconfig 里 IDF_TARGET=esp32s3） |
 
 ### 编译固件命令（PowerShell）
 

@@ -84,6 +84,26 @@ class MainActivity : FlutterActivity() {
                             result.success(wifiList)
                         }
                     }
+                    "getConnectedWifi" -> {
+                        val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager
+                        @Suppress("DEPRECATION")
+                        val info = wifiManager.connectionInfo
+                        if (info != null && info.networkId != -1) {
+                            var ssid = info.ssid ?: ""
+                            // Remove surrounding quotes from SSID
+                            if (ssid.startsWith("\"") && ssid.endsWith("\"")) {
+                                ssid = ssid.substring(1, ssid.length - 1)
+                            }
+                            // Get frequency in MHz
+                            val frequency = info.frequency
+                            result.success(mapOf(
+                                "ssid" to ssid,
+                                "frequency" to frequency
+                            ))
+                        } else {
+                            result.success(null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

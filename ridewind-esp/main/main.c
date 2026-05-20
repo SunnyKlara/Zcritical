@@ -32,6 +32,7 @@
 #include "ui_manager.h"
 #include "drv_audio.h"
 #include "wifi_audio_service.h"
+#include "wifi_comm_service.h"
 #include "audio_engine.h"
 #include "audio_player.h"
 #include "storage.h"
@@ -40,6 +41,14 @@
 #include "esp_app_desc.h"
 
 static const char *TAG = "MAIN";
+
+/* Helper: notify both BLE and WebSocket for Logo/Audio upload responses.
+ * Commands can arrive from either channel, so responses go to both. */
+static void dual_notify_str(const char *str)
+{
+    ble_service_notify_str(str);
+    wifi_comm_service_notify_str(str);
+}
 
 static inline uint16_t rgb565_color(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -96,7 +105,7 @@ static uint8_t hex_nibble(char c)
 void logo_upload_feed_hex(const char *hex_str, uint16_t len)
 {
     if (!s_logo_rx.active || !hex_str || !s_logo_rx.buf) {
-        ble_service_notify_str("LOGO_ERROR:NO_SESSION\r\n");
+        dual_notify_str("LOGO_ERROR:NO_SESSION\r\n");
         return;
     }
 
@@ -129,7 +138,7 @@ void logo_upload_feed_hex(const char *hex_str, uint16_t len)
         if (s_logo_rx.pkt_count >= LOGO_BATCH_SIZE) {
             char ack[32];
             snprintf(ack, sizeof(ack), "LOGO_ACK:%d\r\n", seq);
-            ble_service_notify_str(ack);
+            dual_notify_str(ack);
             ESP_LOGI(TAG, "ACK sent: seq=%d received=%u", seq, (unsigned)s_logo_rx.received);
             s_logo_rx.pkt_count = 0;
         }
@@ -150,7 +159,7 @@ void logo_upload_feed_binary(const uint8_t *data, uint16_t len)
 {
     if (!s_logo_rx.active || !s_logo_rx.buf || !data || len == 0) {
         if (!s_logo_rx.active) {
-            ble_service_notify_str("LOGO_ERROR:NO_SESSION\r\n");
+            dual_notify_str("LOGO_ERROR:NO_SESSION\r\n");
         }
         return;
     }
@@ -172,7 +181,7 @@ void logo_upload_feed_binary(const uint8_t *data, uint16_t len)
         snprintf(ack, sizeof(ack), "LOGO_ACK_BIN:%u\r\n", (unsigned)s_logo_rx.received);
         ESP_LOGI(TAG, "BIN ACK: received=%u/%u", (unsigned)s_logo_rx.received,
                  (unsigned)s_logo_rx.expected_size);
-        ble_service_notify_str(ack);
+        dual_notify_str(ack);
         s_logo_bin_batch_bytes = 0;
     }
 }
@@ -223,7 +232,7 @@ void audio_upload_feed_binary(const uint8_t *data, uint16_t len)
 {
     if (!s_audio_rx.active || !s_audio_rx.buf || !data || len == 0) {
         if (!s_audio_rx.active) {
-            ble_service_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
+            dual_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
         }
         return;
     }
@@ -240,7 +249,7 @@ void audio_upload_feed_binary(const uint8_t *data, uint16_t len)
         s_audio_rx.received >= s_audio_rx.expected_size) {
         char ack[48];
         snprintf(ack, sizeof(ack), "AUDIO_ACK_BIN:%u\r\n", (unsigned)s_audio_rx.received);
-        ble_service_notify_str(ack);
+        dual_notify_str(ack);
         s_audio_bin_batch_bytes = 0;
     }
 }
@@ -541,7 +550,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
                  storage_logo_exists(1) ? 1 : 0,
                  storage_logo_exists(2) ? 1 : 0,
                  g_app_state.active_logo_slot);
-        ble_service_notify_str(logo_resp);
+        dual_notify_str(logo_resp);
         break;
     }
 
@@ -571,7 +580,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             char err[48];
             snprintf(err, sizeof(err), "LOGO_ERROR:SIZE_MISMATCH:%u\r\n",
                      (unsigned)LOGO_PIXEL_BYTES);
-            ble_service_notify_str(err);
+            dual_notify_str(err);
             break;
         }
 
@@ -581,7 +590,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             if (slot >= MAX_LOGO_SLOTS) slot = 0;
         }
         if (slot >= MAX_LOGO_SLOTS) {
-            ble_service_notify_str("LOGO_ERROR:INVALID_SLOT\r\n");
+            dual_notify_str("LOGO_ERROR:INVALID_SLOT\r\n");
             break;
         }
 
@@ -589,7 +598,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         s_logo_rx.buf = (uint8_t *)heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
         if (!s_logo_rx.buf) {
             ESP_LOGE(TAG, "PSRAM alloc failed for %u bytes", (unsigned)size);
-            ble_service_notify_str("LOGO_ERROR:MEM\r\n");
+            dual_notify_str("LOGO_ERROR:MEM\r\n");
             break;
         }
         memset(s_logo_rx.buf, 0, size);
@@ -612,7 +621,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
         char ready[32];
         snprintf(ready, sizeof(ready), "LOGO_READY:%d\r\n", slot);
-        ble_service_notify_str(ready);
+        dual_notify_str(ready);
         break;
     }
 
@@ -622,7 +631,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
     case CMD_LOGO_END: {
         if (!s_logo_rx.active || !s_logo_rx.buf) {
-            ble_service_notify_str("LOGO_ERROR:NO_SESSION\r\n");
+            dual_notify_str("LOGO_ERROR:NO_SESSION\r\n");
             break;
         }
 
@@ -630,7 +639,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         if (s_logo_rx.last_seq >= 0) {
             char ack[32];
             snprintf(ack, sizeof(ack), "LOGO_ACK:%d\r\n", (int)s_logo_rx.last_seq);
-            ble_service_notify_str(ack);
+            dual_notify_str(ack);
         }
 
         uint32_t data_size = s_logo_rx.received;
@@ -679,7 +688,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             char fail[64];
             snprintf(fail, sizeof(fail), "LOGO_FAIL:SIZE:%u/%u\r\n",
                      (unsigned)data_size, (unsigned)s_logo_rx.expected_size);
-            ble_service_notify_str(fail);
+            dual_notify_str(fail);
             logo_rx_cleanup();
             break;
         }
@@ -731,7 +740,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             char fail[64];
             snprintf(fail, sizeof(fail), "LOGO_FAIL:CRC:0x%08X:0x%08X\r\n",
                      (unsigned)s_logo_rx.expected_crc32, (unsigned)calc_crc);
-            ble_service_notify_str(fail);
+            dual_notify_str(fail);
             ESP_LOGE(TAG, "CRC mismatch — aborting, not writing corrupted data");
             logo_rx_cleanup();
             break;
@@ -758,9 +767,9 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
             char ok_resp[32];
             snprintf(ok_resp, sizeof(ok_resp), "LOGO_OK:%d\r\n", s_logo_rx.slot);
-            ble_service_notify_str(ok_resp);
+            dual_notify_str(ok_resp);
         } else {
-            ble_service_notify_str("LOGO_FAIL:WRITE\r\n");
+            dual_notify_str("LOGO_FAIL:WRITE\r\n");
         }
 
         logo_rx_cleanup();
@@ -770,7 +779,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
     case CMD_LOGO_DELETE: {
         uint8_t slot = cmd->param.u8_val;
         if (slot >= MAX_LOGO_SLOTS) {
-            ble_service_notify_str("LOGO_ERROR:SLOT\r\n");
+            dual_notify_str("LOGO_ERROR:SLOT\r\n");
             break;
         }
         if (storage_logo_delete(slot)) {
@@ -778,9 +787,9 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
                 g_app_state.active_logo_slot = 0;
                 storage_save_current();
             }
-            ble_service_notify_str("OK:LOGO_DELETE\r\n");
+            dual_notify_str("OK:LOGO_DELETE\r\n");
         } else {
-            ble_service_notify_str("LOGO_ERROR:DELETE\r\n");
+            dual_notify_str("LOGO_ERROR:DELETE\r\n");
         }
         break;
     }
@@ -827,9 +836,11 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         ssid_copy[sizeof(ssid_copy) - 1] = '\0';
         strncpy(pass_copy, cmd->param.wifi.password, sizeof(pass_copy) - 1);
         pass_copy[sizeof(pass_copy) - 1] = '\0';
-        APP_STATE_UNLOCK();  /* Release lock — connect runs async */
+        APP_STATE_UNLOCK();  /* Release lock — provisioning runs async */
         ble_service_notify_str("OK:WIFI\r\n");
-        wifi_audio_service_connect(ssid_copy, pass_copy);
+        /* Use provisioning flow: stop BLE → connect WiFi → restart BLE.
+         * This avoids RF contention during WiFi CONNECTING phase. */
+        wifi_audio_service_provision(ssid_copy, pass_copy);
         return;  /* Already unlocked */
     }
 
@@ -853,21 +864,21 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         uint8_t layer = raw_layer & 0x7F;
 
         if (layer >= AUDIO_LAYER_COUNT) {
-            ble_service_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
+            dual_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
             break;
         }
         if (size == 0 || size > AUDIO_MAX_PCM_SIZE) {
             char err[64];
             snprintf(err, sizeof(err), "AUDIO_ERROR:SIZE:%u (max %u)\r\n",
                      (unsigned)size, AUDIO_MAX_PCM_SIZE);
-            ble_service_notify_str(err);
+            dual_notify_str(err);
             break;
         }
 
         s_audio_rx.buf = (uint8_t *)heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
         if (!s_audio_rx.buf) {
             ESP_LOGE(TAG, "Audio PSRAM alloc failed for %u bytes", (unsigned)size);
-            ble_service_notify_str("AUDIO_ERROR:MEM\r\n");
+            dual_notify_str("AUDIO_ERROR:MEM\r\n");
             break;
         }
         memset(s_audio_rx.buf, 0, size);
@@ -886,7 +897,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
         char ready[32];
         snprintf(ready, sizeof(ready), "AUDIO_READY:%d\r\n", layer);
-        ble_service_notify_str(ready);
+        dual_notify_str(ready);
         break;
     }
 
@@ -896,7 +907,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
     case CMD_AUDIO_END: {
         if (!s_audio_rx.active || !s_audio_rx.buf) {
-            ble_service_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
+            dual_notify_str("AUDIO_ERROR:NO_SESSION\r\n");
             break;
         }
 
@@ -908,7 +919,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             char fail[64];
             snprintf(fail, sizeof(fail), "AUDIO_FAIL:SIZE:%u/%u\r\n",
                      (unsigned)data_size, (unsigned)s_audio_rx.expected_size);
-            ble_service_notify_str(fail);
+            dual_notify_str(fail);
             audio_rx_cleanup();
             break;
         }
@@ -922,7 +933,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             char fail[64];
             snprintf(fail, sizeof(fail), "AUDIO_FAIL:CRC:0x%08X:0x%08X\r\n",
                      (unsigned)s_audio_rx.expected_crc32, (unsigned)calc_crc);
-            ble_service_notify_str(fail);
+            dual_notify_str(fail);
             audio_rx_cleanup();
             break;
         }
@@ -932,15 +943,15 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             ESP_LOGI(TAG, "Audio layer %d written OK (%u bytes)", s_audio_rx.layer, (unsigned)data_size);
             char ok_resp[32];
             snprintf(ok_resp, sizeof(ok_resp), "AUDIO_OK:%d\r\n", s_audio_rx.layer);
-            ble_service_notify_str(ok_resp);
+            dual_notify_str(ok_resp);
 
             /* If all 4 layers are now present, reload the audio engine */
             if (storage_audio_count() == AUDIO_LAYER_COUNT) {
                 audio_player_reload_layers();
-                ble_service_notify_str("AUDIO_RELOAD:OK\r\n");
+                dual_notify_str("AUDIO_RELOAD:OK\r\n");
             }
         } else {
-            ble_service_notify_str("AUDIO_FAIL:WRITE\r\n");
+            dual_notify_str("AUDIO_FAIL:WRITE\r\n");
         }
 
         audio_rx_cleanup();
@@ -953,7 +964,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             /* Delete all custom audio */
             storage_audio_delete_all();
             audio_player_reload_layers();
-            ble_service_notify_str("OK:AUDIO_DELETE_ALL\r\n");
+            dual_notify_str("OK:AUDIO_DELETE_ALL\r\n");
         } else if (layer < AUDIO_LAYER_COUNT) {
             storage_audio_delete(layer);
             audio_player_reload_layers();
@@ -961,7 +972,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             snprintf(ok, sizeof(ok), "OK:AUDIO_DELETE:%d\r\n", layer);
             ble_service_notify_str(ok);
         } else {
-            ble_service_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
+            dual_notify_str("AUDIO_ERROR:INVALID_LAYER\r\n");
         }
         break;
     }
@@ -976,7 +987,7 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
                  storage_audio_exists(2) ? 1 : 0,
                  storage_audio_exists(3) ? 1 : 0,
                  audio_player_has_custom_audio() ? 1 : 0);
-        ble_service_notify_str(audio_resp);
+        dual_notify_str(audio_resp);
         break;
     }
 
@@ -1084,12 +1095,29 @@ void app_main(void)
      * internal SRAM pressure is no longer a concern. */
     audio_engine_init();
     wifi_audio_service_init();
+    wifi_comm_service_init();
     audio_engine_set_volume(g_app_state.volume);
-    ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio)");
+    ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio + WebSocket)");
 
-    /* Phase 5: BLE init + advertising (after WiFi is connected or waiting) */
-    ble_service_init();
-    ESP_LOGI(TAG, "BLE initialized, advertising as \"%s\"", BLE_DEVICE_NAME);
+    /* ═══ WiFi + BLE Boot Sequence (Production) ═══
+     * Strategy: WiFi CONNECTING phase has RF contention with BLE (reason=201).
+     *           WiFi CONNECTED coexists stably with BLE (confirmed).
+     *
+     * Boot logic:
+     *   - Has NVS credentials → connect WiFi FIRST (blocking 5s, no BLE yet)
+     *                         → then start BLE (WiFi already CONNECTED = no contention)
+     *   - No credentials     → start BLE immediately (WiFi will be triggered by APP)
+     */
+    if (wifi_audio_service_has_credentials()) {
+        ESP_LOGI(TAG, "NVS has WiFi credentials — connecting WiFi before BLE...");
+        wifi_audio_service_auto_connect();  /* Blocking up to 10s */
+        ESP_LOGI(TAG, "WiFi phase done, now starting BLE...");
+        ble_service_init();
+    } else {
+        ESP_LOGI(TAG, "No WiFi credentials — starting BLE directly");
+        ble_service_init();
+    }
+    ESP_LOGI(TAG, "BLE initialized (WiFi+BLE coex active)");
 
     /* Phase 6: LED effects init */
     led_effects_init();

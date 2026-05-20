@@ -19,6 +19,7 @@
 #include "wifi_audio_service.h"
 #include "audio_engine.h"
 #include "ble_service.h"
+#include "wifi_comm_service.h"
 
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -31,6 +32,7 @@
 #include "lwip/sockets.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 static const char *TAG = "WIFI_AUDIO";
 
@@ -91,10 +93,12 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         switch (event_id) {
         case WIFI_EVENT_STA_START:
             ESP_LOGI(TAG, "WiFi STA started, connecting...");
-            /* Disable power save AFTER wifi_start — must be here, not before.
-             * This prevents BLE from starving WiFi of RF time. */
-            esp_wifi_set_ps(WIFI_PS_NONE);
-            ESP_LOGI(TAG, "WiFi power save DISABLED");
+            /* Use MIN_MODEM power save — this is REQUIRED for coexistence.
+             * WIFI_PS_NONE starves BLE of RF time and causes coex failures.
+             * MIN_MODEM lets the coex scheduler properly time-slice between
+             * WiFi and BLE while still maintaining good WiFi throughput. */
+            esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+            ESP_LOGI(TAG, "WiFi power save set to MIN_MODEM (coex-friendly)");
             xEventGroupSetBits(s_wifi_event_group, WIFI_STARTED_BIT);
             esp_wifi_connect();
             break;
@@ -110,6 +114,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGW(TAG, "WiFi disconnected (reason=%d)", evt->reason);
             s_wifi_connected = false;
             xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+
+            /* Stop WebSocket server when WiFi is lost */
+            wifi_comm_service_stop();
 
             if (s_retry_count < WIFI_MAX_RETRY) {
                 s_retry_count++;
@@ -137,6 +144,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         char buf[48];
         snprintf(buf, sizeof(buf), "WIFI_IP:%s\r\n", s_ip_addr);
         ble_service_notify_str(buf);
+
+        /* Start WebSocket communication server */
+        wifi_comm_service_start();
     }
 }
 
@@ -400,8 +410,21 @@ void wifi_audio_service_connect(const char *ssid, const char *password)
 void wifi_audio_service_auto_connect(void)
 {
     if (s_saved_ssid[0] != '\0') {
-        ESP_LOGI(TAG, "Auto-connecting to saved WiFi: \"%s\"", s_saved_ssid);
+        ESP_LOGI(TAG, "Auto-connecting to saved WiFi: \"%s\" (blocking, max 10s)", s_saved_ssid);
         wifi_do_connect(s_saved_ssid, s_saved_pass);
+
+        /* Block until connected or timeout (10 seconds).
+         * This is called at boot BEFORE BLE starts, so blocking is safe.
+         * Ensures WiFi is fully connected before BLE init to avoid RF contention. */
+        EventBits_t bits = xEventGroupWaitBits(
+            s_wifi_event_group, WIFI_CONNECTED_BIT,
+            pdFALSE, pdFALSE, pdMS_TO_TICKS(10000));
+
+        if (bits & WIFI_CONNECTED_BIT) {
+            ESP_LOGI(TAG, "WiFi auto-connect SUCCESS: %s", s_ip_addr);
+        } else {
+            ESP_LOGW(TAG, "WiFi auto-connect TIMEOUT (10s) — will retry in background");
+        }
     } else {
         ESP_LOGI(TAG, "No saved WiFi to auto-connect");
     }
@@ -453,4 +476,87 @@ void wifi_audio_service_notify_status(void)
             ble_service_notify_str(buf2);
         }
     }
+}
+
+bool wifi_audio_service_has_credentials(void)
+{
+    char ssid[33] = {0}, pass[65] = {0};
+    return nvs_load_wifi(ssid, pass);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ *  WiFi Provisioning Task — async BLE-coordinated WiFi connect
+ *
+ *  Flow: stop BLE advertising → disconnect BLE → connect WiFi
+ *        → success: restart BLE advertising + notify WIFI_IP
+ *        → failure: restart BLE advertising + notify error
+ *
+ *  This avoids RF contention during WiFi CONNECTING phase.
+ *  Once WiFi is CONNECTED, coexistence with BLE is stable.
+ * ═══════════════════════════════════════════════════════════════ */
+typedef struct {
+    char ssid[33];
+    char password[65];
+} wifi_provision_params_t;
+
+static void wifi_provision_task(void *arg)
+{
+    wifi_provision_params_t *params = (wifi_provision_params_t *)arg;
+
+    ESP_LOGI(TAG, "Provisioning: stopping BLE to avoid RF contention...");
+
+    /* Step 1: Stop BLE advertising and disconnect client.
+     * This eliminates RF competition during WiFi CONNECTING phase. */
+    ble_service_stop();
+    vTaskDelay(pdMS_TO_TICKS(200));  /* Let BLE stack settle */
+
+    /* Step 2: Connect WiFi (blocking wait up to 10s) */
+    ESP_LOGI(TAG, "Provisioning: connecting to \"%s\"...", params->ssid);
+    nvs_save_wifi(params->ssid, params->password);
+    wifi_do_connect(params->ssid, params->password);
+
+    /* Wait for connection result */
+    EventBits_t bits = xEventGroupWaitBits(
+        s_wifi_event_group, WIFI_CONNECTED_BIT,
+        pdFALSE, pdFALSE, pdMS_TO_TICKS(10000));
+
+    /* Step 3: Restart BLE regardless of WiFi result.
+     * WiFi CONNECTED state coexists stably with BLE (confirmed). */
+    ESP_LOGI(TAG, "Provisioning: restarting BLE advertising...");
+    ble_service_start();
+
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Provisioning SUCCESS: IP=%s", s_ip_addr);
+        /* APP will receive WIFI_IP notification when it reconnects via BLE.
+         * The event handler already sends WIFI_IP on got_ip event.
+         * But APP may not be connected yet — it will get status on reconnect
+         * via wifi_audio_service_notify_status() in MTU event. */
+    } else {
+        ESP_LOGW(TAG, "Provisioning FAILED: WiFi connect timeout (10s)");
+        /* BLE is back up — APP will reconnect and we notify failure.
+         * Use a small delay to let BLE advertising restart, then notify. */
+        vTaskDelay(pdMS_TO_TICKS(500));
+        ble_service_notify_str("WIFI_ERR:CONNECT_FAILED\r\n");
+    }
+
+    free(params);
+    vTaskDelete(NULL);
+}
+
+void wifi_audio_service_provision(const char *ssid, const char *password)
+{
+    /* Allocate params on heap — task will free them */
+    wifi_provision_params_t *params = malloc(sizeof(wifi_provision_params_t));
+    if (!params) {
+        ESP_LOGE(TAG, "Provision: malloc failed");
+        ble_service_notify_str("WIFI_ERR:MEM\r\n");
+        return;
+    }
+    strncpy(params->ssid, ssid, sizeof(params->ssid) - 1);
+    params->ssid[sizeof(params->ssid) - 1] = '\0';
+    strncpy(params->password, password, sizeof(params->password) - 1);
+    params->password[sizeof(params->password) - 1] = '\0';
+
+    /* Spawn provisioning task — runs async so BLE command handler returns immediately */
+    xTaskCreatePinnedToCore(wifi_provision_task, "wifi_prov", 4096, params, 5, NULL, 0);
 }
