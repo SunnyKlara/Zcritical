@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "size": 2969792,
+  "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.0.0/ridewind-fw-v1.0.0.bin",
+  "changelog": "首个正式版本\n- ESP32-S3 全功能固件\n- BLE + WiFi 共存\n- OTA 升级 + Rollback 自检"
+}
