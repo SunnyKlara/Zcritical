@@ -85,9 +85,9 @@ class CommandSender {
   Future<bool> setStreamlightMode(bool enable) =>
       _send('STREAMLIGHT:${enable ? 1 : 0}');
 
-  /// THROTTLE_FX:mode\n (1-6, 油门灯效模式)
+  /// THROTTLE_FX:mode\n (0-7, 灯光模式)
   Future<bool> setThrottleEffect(int mode) {
-    if (mode < 1 || mode > 6) return Future.value(false);
+    if (mode < 0 || mode > 7) return Future.value(false);
     return _send('THROTTLE_FX:$mode');
   }
 

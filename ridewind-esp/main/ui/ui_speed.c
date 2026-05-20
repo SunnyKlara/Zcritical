@@ -232,8 +232,10 @@ void ui_speed_enter(void)
     s_last_wuhuaqi = 0xFF;
     s_throttle_mode = 0;
 
-    /* Start wave breathing effect using current preset colors */
-    led_effects_throttle_start();
+    /* Start LED effect only if mode is not static (mode=0 means no effect) */
+    if (g_app_state.throttle_fx_mode != THROTTLE_FX_STATIC) {
+        led_effects_throttle_start();
+    }
 
     /* Only start engine sound if speed is already non-zero */
     if (g_app_state.current_speed_kmh > 0) {
