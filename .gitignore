@@ -8,6 +8,9 @@ RideWind/build/
 RideWind/.dart_tool/
 RideWind/.flutter-plugins-dependencies
 
+# Large asset files (downloaded via tools/fetch_fh5_thumbnails.py)
+RideWind/assets/car_thumbnails/*.png
+
 # IDE
 .vscode/
 .idea/
