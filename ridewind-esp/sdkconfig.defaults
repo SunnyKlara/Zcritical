@@ -34,6 +34,9 @@ CONFIG_FREERTOS_HZ=1000
 # LWIP — needed for TCP sockets
 CONFIG_LWIP_SO_REUSE=y
 
+# HTTP Server — WebSocket support for WiFi communication channel
+CONFIG_HTTPD_WS_SUPPORT=y
+
 # Brownout — disable to prevent reboot during BLE+WiFi init current spike
 # (hardware supply issue, not software — USB cable may be too long/thin)
 CONFIG_ESP_BROWNOUT_DET=n

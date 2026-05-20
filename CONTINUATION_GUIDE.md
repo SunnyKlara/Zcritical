@@ -33,6 +33,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 | **v1.0.0 发版** | GitHub Release 创建，APK(74.6MB)+固件bin(2.9MB) 上传，app_version.json 配置完成 |
 | **编译工程化** | build.ps1 快速编译脚本（增量 2s），IRAM 溢出修复，build-environment.md 环境文档 |
 | **OTA 协议对齐** | Flutter 改为 binary mode 传输，ESP32 加 OTA_VERSION 命令，创建 firmware.json |
+| **OTA 传输节流** | APP 端改为逐 MTU 包发送（20ms 间隔）+ 严格等 ACK，修复 ESP32 crash（MEMPROT_SPLIT_ADDR_OUT_OF_RANGE） |
 
 ## 当前阻塞
 
@@ -42,11 +43,42 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 下一步
 
-1. **P0 OTA 传输速率修复** — ESP32 在接收 binary data 时 crash（MEMPROT_SPLIT_ADDR_OUT_OF_RANGE），需要 APP 端加 BLE 包间节流（每 MTU 包 20ms 延迟）+ 严格等 ACK
+1. **P0 架构升级：WiFi 主通道** — 重大决策已确认（2026-05-21），见下方详情
 2. **P1 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
 3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
 4. **P3 DeviceConnectScreen 拆分**
 5. **P4 go_router + 国际化 + CI/CD**
+
+## ⭐ 架构决策：WiFi 为主通道（2026-05-21 确认）
+
+**决策**：放弃 BLE 作为主通信通道，改为 WiFi STA + WebSocket。BLE 仅保留用于首次配网和 fallback。
+
+**背景**：
+- 产品是桌面级汽车风洞模型摆件，固定室内使用，用户环境 100% 有路由器
+- BLE OTA 传 2.9MB 需 3-5 分钟且有 ESP32 crash 问题（MEMPROT_SPLIT_ADDR_OUT_OF_RANGE）
+- WiFi 传输快 30-100 倍，且 ESP-IDF 有成熟的 HTTP/WebSocket 支持
+- 之前用 BLE 是因为从 STM32（无 WiFi）迁移过来的历史惯性
+
+**架构**：
+- BLE：仅配网（传 WiFi 凭据）+ fallback
+- WiFi STA：连用户路由器，ESP32 启动 WebSocket server
+- 设备发现：mDNS `critical-t1.local`
+- 协议层：现有文本命令不变，传输层从 BLE 切换到 WebSocket
+- OTA：ESP32 通过 WiFi HTTP 直接从 GitHub Release 下载，或 APP 通过 WebSocket 推送
+
+**实施 Phase**：
+1. ESP32 WiFi STA + WebSocket Server（复用 protocol_parse → cmd_queue）
+2. BLE 配网流程（NVS 存凭据 + 配网模式 UI）
+3. APP 端通信层切换（mDNS 发现 + WebSocket client）
+4. 大数据走 WiFi（OTA HTTP 下载 / Logo WebSocket binary / 音频复用现有 TCP）
+
+**对 BLE OTA crash 的影响**：WiFi 通道完成后 BLE OTA 不再需要，crash 问题自然消失。暂不修 BLE OTA。
+
+**已确认（2026-05-21）**：
+- BLE OTA 不急需，暂不修复，等 WiFi 通道完成后自然替代
+- 在 `feat/wifi-main-channel` 分支上开发实验，验证跑通后再合回 main
+- 配网 UX 待 Phase 1 跑通后再设计
+- 下一步：创建分支 → Phase 1（ESP32 WebSocket server + mDNS）
 
 ## OTA 实现进度（Phase 10, 2026-05-21）
 

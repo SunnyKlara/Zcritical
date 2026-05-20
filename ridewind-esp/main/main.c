@@ -32,6 +32,7 @@
 #include "ui_manager.h"
 #include "drv_audio.h"
 #include "wifi_audio_service.h"
+#include "wifi_comm_service.h"
 #include "audio_engine.h"
 #include "audio_player.h"
 #include "storage.h"
@@ -1084,8 +1085,9 @@ void app_main(void)
      * internal SRAM pressure is no longer a concern. */
     audio_engine_init();
     wifi_audio_service_init();
+    wifi_comm_service_init();
     audio_engine_set_volume(g_app_state.volume);
-    ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio)");
+    ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio + WebSocket)");
 
     /* Phase 5: BLE init + advertising (after WiFi is connected or waiting) */
     ble_service_init();
