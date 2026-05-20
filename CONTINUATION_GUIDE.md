@@ -39,13 +39,12 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 下一步
 
-1. **P0 发版收尾** — `git push` + 创建 GitHub Release v1.0.0 + 构建上传 APK（网络恢复后执行）
-2. **P1 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
-3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
-4. **P3 DeviceConnectScreen 拆分**
-5. **P4 OTA 编译验证** — ESP32 端代码已完成，用户需手动 `idf.py build` 验证
-6. **P5 OTA App 端** — Flutter BLE OTA 页面（下载 bin + 传输 + 进度条）
-7. **P6 go_router + 国际化 + CI/CD**
+1. **P0 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
+2. **P1 引擎音效调参** — RC Engine 方案待烧录验证最终效果
+3. **P2 DeviceConnectScreen 拆分**
+4. **P3 OTA 编译验证** — ESP32 端代码已完成，用户需手动 `idf.py build` 验证
+5. **P4 OTA App 端** — Flutter BLE OTA 页面（下载 bin + 传输 + 进度条）
+6. **P5 go_router + 国际化 + CI/CD**
 
 ## OTA 实现进度（Phase 10, 2026-05-21）
 
