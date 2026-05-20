@@ -53,6 +53,15 @@ class AudioStreamService {
     return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  /// Get the currently connected WiFi network info.
+  /// Returns {ssid: String, frequency: int (MHz)} or null if not connected.
+  /// frequency > 3000 means 5GHz band (ESP32 only supports 2.4GHz).
+  static Future<Map<String, dynamic>?> getConnectedWifi() async {
+    final result = await _channel.invokeMethod<Map>('getConnectedWifi');
+    if (result == null) return null;
+    return Map<String, dynamic>.from(result);
+  }
+
   // ╔══════════════════════════════════════════════════════════════╗
   // ║          📶 WiFi 凭据管理 (需求 11.1, 11.2, 11.3)            ║
   // ╚══════════════════════════════════════════════════════════════╝

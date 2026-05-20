@@ -17,24 +17,30 @@ enum OtaState {
   error,
 }
 
-/// OTA 固件上传服务 — Binary Mode
+/// OTA 固件上传服务 — Binary Mode (MTU-paced)
 ///
 /// 协议流程（与 ESP32 ota_service.c 对齐）：
 ///   1. App → ESP32: OTA_BEGIN:size\n
 ///   2. ESP32 → App: OTA_READY:partition_size\r\n
-///   3. App → ESP32: [raw binary bytes — 按 MTU 分包发送]
+///   3. App → ESP32: [raw binary bytes — 逐 MTU 包发送，每包间隔 20ms]
 ///   4. ESP32 → App: OTA_ACK:received_bytes\r\n (每 ~4KB)
 ///   5. App → ESP32: OTA_END\n
 ///   6. ESP32 → App: OTA_OK:version\r\n 或 OTA_FAIL:reason\r\n
 ///   7. ESP32: esp_restart() 500ms 后
+///
+/// 关键修复（2026-05-21）：
+///   - 不再一次性 writeBytes 4KB（BLE 层瞬间拆成 ~17 个 MTU 包淹没 ESP32）
+///   - 改为逐 MTU 包发送，每包间隔 20ms，给 ESP32 足够时间做 flash 写入
+///   - 严格等待 OTA_ACK 后再发下一批，超时不再继续发送
 class OtaUploadService {
   final BluetoothProvider _btProvider;
 
   // 协议参数
   static const int maxFirmwareSize = 3 * 1024 * 1024; // 3MB（OTA 分区大小）
   static const int ackInterval = 4096; // ESP32 每 ~4KB 发一次 ACK
-  static const int ackTimeoutMs = 10000; // ACK 超时（擦除阶段需要更长）
-  static const int chunkDelayMs = 4; // 每个 BLE 包之间的延迟（ms）
+  static const int ackTimeoutMs = 15000; // ACK 超时（flash 写入可能需要较长时间）
+  static const int packetDelayMs = 20; // 每个 MTU 包之间的延迟（ms）— 防止淹没 ESP32
+  static const int defaultMtu = 244; // 默认 MTU payload（247 - 3 ATT header）
 
   // 回调
   Function(String)? onLog;
@@ -195,36 +201,54 @@ class OtaUploadService {
     throw Exception('OTA 启动异常响应: $response');
   }
 
-  /// Binary mode: 直接发送原始固件字节
+  /// Binary mode: 逐 MTU 包发送原始固件字节（防止淹没 ESP32）
   ///
-  /// ESP32 进入 binary mode 后，所有收到的 BLE 数据都被当作固件字节。
-  /// 按 MTU 大小分包发送，ESP32 每 ~4KB 回复一个 OTA_ACK。
+  /// 关键改动：
+  /// 1. 不再一次性 writeBytes 4KB（会被 BLE 层瞬间拆成 ~17 个 MTU 包）
+  /// 2. 改为 APP 自己按 MTU 大小逐包发送，每包间隔 20ms
+  /// 3. 每发送 ~4KB（一个 ACK 窗口）后，严格等待 OTA_ACK 再继续
+  /// 4. ACK 超时视为失败，不再盲目继续发送
   Future<bool> _sendBinaryData(Uint8List firmwareData) async {
     final totalSize = firmwareData.length;
     int sent = 0;
     int lastAckAt = 0;
 
-    _log('开始 binary mode 传输，总大小: $totalSize bytes');
+    // 获取实际 MTU（从 BLE 层），如果不可用则用默认值
+    final mtu = _btProvider.effectiveMtu ?? defaultMtu;
+    final packetsPerAck = (ackInterval / mtu).ceil(); // ~17 packets per ACK window
 
-    // 按 ~4KB 批次发送，匹配 ESP32 ACK 间隔
-    const batchSize = 4096;
+    _log('开始 MTU-paced 传输: total=$totalSize, mtu=$mtu, packetsPerAck=$packetsPerAck');
 
     while (sent < totalSize) {
       _checkCancelled();
 
-      // 计算本批大小
-      final remaining = totalSize - sent;
-      final thisChunk = remaining > batchSize ? batchSize : remaining;
+      // 发送一个 ACK 窗口的数据（~4KB），逐 MTU 包发送
+      int windowSent = 0;
+      final windowTarget = ackInterval.clamp(0, totalSize - sent);
 
-      // 发送一批原始字节（BLEService 内部按 MTU 自动分包）
-      final chunk = firmwareData.sublist(sent, sent + thisChunk);
-      await _btProvider.writeBytes(chunk);
-      sent += thisChunk;
+      while (windowSent < windowTarget && sent < totalSize) {
+        _checkCancelled();
+
+        // 计算本包大小（不超过 MTU）
+        final remaining = totalSize - sent;
+        final packetSize = remaining > mtu ? mtu : remaining;
+
+        // 发送单个 MTU 包（不经过 BLE 层的 _writeChunked 分包）
+        final packet = firmwareData.sublist(sent, sent + packetSize);
+        await _btProvider.writeBytes(packet);
+        sent += packetSize;
+        windowSent += packetSize;
+
+        // 每包之间延迟 20ms — 给 ESP32 时间处理 flash 写入
+        if (sent < totalSize) {
+          await Future.delayed(const Duration(milliseconds: packetDelayMs));
+        }
+      }
 
       // 更新进度
       onProgress?.call(sent / totalSize);
 
-      // 等待 ACK（ESP32 每 ~4KB 发一次）
+      // 严格等待 ACK — 不超时继续
       final ackResponse = await _waitForResponse(
         timeout: Duration(milliseconds: ackTimeoutMs),
       );
@@ -235,24 +259,20 @@ class OtaUploadService {
         );
         if (acked != null) {
           lastAckAt = acked;
-          if ((acked - sent).abs() > batchSize * 2) {
-            _log('⚠️ ACK 字节数偏差较大: sent=$sent, acked=$acked');
+          // 检查 ACK 字节数是否合理
+          if ((acked - sent).abs() > ackInterval * 2) {
+            _log('⚠️ ACK 偏差较大: sent=$sent, acked=$acked');
           }
         }
       } else if (ackResponse.startsWith('OTA_FAIL:')) {
         final reason = ackResponse.substring(9).replaceAll('\r\n', '');
         throw Exception('传输失败: $reason');
       } else if (ackResponse == 'TIMEOUT') {
-        // ACK 超时不一定失败，ESP32 可能在忙于 flash 写入
-        _log('⚠️ ACK 超时 (sent=$sent/$totalSize)，继续传输...');
-        lastAckAt = sent;
+        // 严格模式：ACK 超时 = 失败，不再继续发送
+        throw Exception('OTA_ACK 超时 (sent=$sent/$totalSize, lastAck=$lastAckAt)。'
+            'ESP32 可能已 crash，请检查串口日志。');
       } else if (ackResponse == 'CANCELLED') {
         return false;
-      }
-
-      // 批次间短暂延迟
-      if (sent < totalSize) {
-        await Future.delayed(const Duration(milliseconds: chunkDelayMs));
       }
     }
 
@@ -363,5 +383,181 @@ class OtaUploadService {
     _responseSub = null;
     _connectionSub?.cancel();
     _connectionSub = null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  WiFi WebSocket OTA — 比 BLE 快 30-100 倍
+  //
+  //  协议与 BLE 完全相同（OTA_BEGIN → binary → OTA_END），
+  //  但传输层从 BLE MTU 包改为 WebSocket binary frames。
+  //  4KB/frame，无需 20ms 延迟，局域网 WiFi ~1MB/s。
+  //  2.9MB 固件约 3-5 秒传完。
+  // ═══════════════════════════════════════════════════════════════
+
+  /// WiFi OTA chunk size — 4KB per WebSocket binary frame
+  static const int wifiChunkSize = 4096;
+
+  /// WiFi OTA: upload firmware via WebSocket (much faster than BLE)
+  ///
+  /// Requires ESP32 WiFi to be connected (esp32IpAddress != null).
+  /// Uses ws://[ip]:81/ws — same WebSocket server as command channel.
+  Future<bool> uploadViaWifi(Uint8List firmwareData) async {
+    if (_isUploading) {
+      _log('已有上传任务进行中');
+      return false;
+    }
+
+    final ip = _btProvider.esp32IpAddress;
+    if (ip == null || ip.isEmpty) {
+      onError?.call('ESP32 WiFi 未连接，无法使用 WiFi OTA');
+      return false;
+    }
+
+    if (firmwareData.isEmpty) {
+      onError?.call('固件文件无效');
+      return false;
+    }
+    if (firmwareData.length > maxFirmwareSize) {
+      onError?.call('固件文件过大，最大支持 3MB');
+      return false;
+    }
+
+    _isUploading = true;
+    _cancelled = false;
+    WebSocket? ws;
+    StreamSubscription? wsSub;
+
+    try {
+      // 1. 连接 WebSocket
+      _setState(OtaState.preparing);
+      _log('WiFi OTA: 连接 ws://$ip:81/ws ...');
+
+      ws = await WebSocket.connect('ws://$ip:81/ws')
+          .timeout(const Duration(seconds: 5));
+      _log('WebSocket 已连接');
+
+      // Single persistent listener — WebSocket is a single-subscription stream
+      Completer<String>? pendingResponse;
+
+      wsSub = ws.listen((data) {
+        if (data is String) {
+          final trimmed = data.trim();
+          if (trimmed.startsWith('OTA_')) {
+            _log('← $trimmed');
+            if (pendingResponse != null && !pendingResponse!.isCompleted) {
+              pendingResponse!.complete(trimmed);
+            }
+          }
+        }
+      }, onError: (e) {
+        _log('WebSocket 错误: $e');
+        if (pendingResponse != null && !pendingResponse!.isCompleted) {
+          pendingResponse!.complete('WS_ERROR:$e');
+        }
+      }, onDone: () {
+        _log('WebSocket 关闭');
+        if (pendingResponse != null && !pendingResponse!.isCompleted) {
+          pendingResponse!.complete('WS_CLOSED');
+        }
+      });
+
+      // Helper: wait for next OTA response
+      Future<String> waitWsResponse(Duration timeout) async {
+        pendingResponse = Completer<String>();
+        try {
+          return await pendingResponse!.future.timeout(timeout);
+        } on TimeoutException {
+          return 'TIMEOUT';
+        }
+      }
+
+      // 2. 发送 OTA_BEGIN
+      _setState(OtaState.erasing);
+      final beginCmd = 'OTA_BEGIN:${firmwareData.length}\n';
+      _log('发送: ${beginCmd.trim()}');
+      ws.add(beginCmd);
+
+      // 等待 OTA_READY（擦除分区 3-5s）
+      final readyResp = await waitWsResponse(const Duration(seconds: 15));
+      if (readyResp.startsWith('OTA_READY:')) {
+        _log('ESP32 就绪: $readyResp');
+      } else if (readyResp.startsWith('OTA_FAIL:')) {
+        throw Exception('OTA 启动失败: ${readyResp.substring(9)}');
+      } else if (readyResp == 'TIMEOUT') {
+        throw Exception('OTA 启动超时（15s）');
+      } else {
+        throw Exception('OTA 启动异常: $readyResp');
+      }
+
+      // 3. 发送固件数据 — 4KB binary frames
+      _setState(OtaState.uploading);
+      final totalSize = firmwareData.length;
+      int sent = 0;
+      final sw = Stopwatch()..start();
+
+      _log('开始 WiFi 传输: total=$totalSize bytes, chunk=$wifiChunkSize');
+
+      while (sent < totalSize) {
+        if (_cancelled) throw Exception('升级已取消');
+
+        final end = (sent + wifiChunkSize).clamp(0, totalSize);
+        final chunk = firmwareData.sublist(sent, end);
+
+        // Send as binary WebSocket frame
+        ws.add(chunk);
+        sent += chunk.length;
+
+        // Update progress
+        onProgress?.call(sent / totalSize);
+
+        // Wait for ACK every ~4KB (ESP32 sends OTA_ACK after each flash write)
+        final ackResp = await waitWsResponse(const Duration(seconds: 10));
+        if (ackResp.startsWith('OTA_ACK:')) {
+          // Good, continue
+        } else if (ackResp.startsWith('OTA_FAIL:')) {
+          throw Exception('传输失败: ${ackResp.substring(9)}');
+        } else if (ackResp == 'TIMEOUT') {
+          throw Exception('OTA_ACK 超时 (sent=$sent/$totalSize)');
+        }
+      }
+
+      sw.stop();
+      final speed = (totalSize / 1024) / (sw.elapsedMilliseconds / 1000);
+      _log('数据传输完成: ${sw.elapsedMilliseconds}ms (${speed.toStringAsFixed(1)} KB/s)');
+
+      // 4. 发送 OTA_END
+      _setState(OtaState.verifying);
+      _log('发送 OTA_END');
+      ws.add('OTA_END\n');
+
+      final endResp = await waitWsResponse(const Duration(seconds: 15));
+      if (endResp.startsWith('OTA_OK:')) {
+        final version = endResp.substring(7).replaceAll('\r\n', '');
+        _log('✅ WiFi OTA 成功！新固件版本: $version');
+      } else if (endResp.startsWith('OTA_FAIL:')) {
+        throw Exception('OTA 校验失败: ${endResp.substring(9)}');
+      } else if (endResp == 'TIMEOUT') {
+        throw Exception('等待 OTA 校验结果超时（15s）');
+      } else {
+        throw Exception('OTA 校验异常: $endResp');
+      }
+
+      // 5. 成功
+      _setState(OtaState.rebooting);
+      _log('ESP32 正在重启...');
+      _setState(OtaState.complete);
+      onSuccess?.call();
+      return true;
+    } catch (e) {
+      _setState(OtaState.error);
+      final msg = e.toString();
+      _log('WiFi OTA 失败: $msg');
+      onError?.call(msg);
+      return false;
+    } finally {
+      _isUploading = false;
+      wsSub?.cancel();
+      try { ws?.close(); } catch (_) {}
+    }
   }
 }
