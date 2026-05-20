@@ -1628,9 +1628,6 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
         _connecting = false;
         _statusMessage = '✅ 连接成功！IP: $ip';
       });
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) Navigator.of(context).pop();
-      });
     });
     _errSub = widget.btProvider.wifiErrorStream.listen((err) {
       if (!mounted) return;
@@ -1831,7 +1828,14 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭', style: TextStyle(color: Colors.white54)),
+          child: Text(
+            _statusMessage != null && _statusMessage!.startsWith('✅') ? '完成' : '关闭',
+            style: TextStyle(
+              color: _statusMessage != null && _statusMessage!.startsWith('✅')
+                  ? Colors.green
+                  : Colors.white54,
+            ),
+          ),
         ),
       ],
     );
