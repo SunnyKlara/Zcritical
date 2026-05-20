@@ -19,6 +19,7 @@ typedef enum {
     THROTTLE_FX_WAVE        = 5,  /* 波浪呼吸: 固定节奏，不随速度变化 */
     THROTTLE_FX_LIGHTNING   = 6,  /* 闪电爆发: 随机白闪 */
     THROTTLE_FX_WIND_WAVE   = 7,  /* 风浪联动: 波浪+随速度变化 (PRO) */
+    THROTTLE_FX_STAGE       = 8,  /* 舞台灯光秀: 每颗灯独立随机明暗 */
 } throttle_fx_mode_t;
 
 void led_effects_init(void);

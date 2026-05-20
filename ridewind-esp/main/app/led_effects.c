@@ -646,6 +646,103 @@ static void throttle_fx_lightning(uint8_t spd)
     drv_led_refresh();
 }
 
+/* ── Effect 8: Stage Light Show (每颗灯独立随机明暗) ──
+ * Each LED has its own target brightness and fades independently.
+ * Creates an organic, non-uniform flickering pattern like stage lighting.
+ * Uses preset color with varying brightness per LED. */
+static void throttle_fx_stage(uint8_t spd)
+{
+    (void)spd;
+
+    /* Per-LED state: current brightness, target brightness, fade speed, hold timer */
+    static uint8_t s_current[9];   /* 6 Main + 3 Tail */
+    static uint8_t s_target[9];
+    static uint8_t s_speed[9];     /* fade step per tick (3-15) */
+    static uint8_t s_hold[9];      /* hold ticks before next target */
+    static uint8_t s_initialized = 0;
+
+    /* Simple pseudo-random using phase + index mixing */
+    #define STAGE_RAND(seed) ((uint8_t)((seed) * 179 + 53))
+
+    if (!s_initialized) {
+        uint8_t seed = (uint8_t)(s_throttle_fx_phase & 0xFF);
+        for (int i = 0; i < 9; i++) {
+            seed = STAGE_RAND(seed + i * 37);
+            s_current[i] = 30 + (seed % 200);
+            seed = STAGE_RAND(seed);
+            s_target[i] = 20 + (seed % 235);
+            seed = STAGE_RAND(seed);
+            s_speed[i] = 3 + (seed % 13);
+            s_hold[i] = 0;
+        }
+        s_initialized = 1;
+    }
+
+    uint8_t cr = g_app_state.led_colors[0][0];
+    uint8_t cg = g_app_state.led_colors[0][1];
+    uint8_t cb = g_app_state.led_colors[0][2];
+    uint8_t tr = g_app_state.led_colors[3][0];
+    uint8_t tg = g_app_state.led_colors[3][1];
+    uint8_t tb = g_app_state.led_colors[3][2];
+
+    /* Update each LED independently */
+    uint8_t phase_seed = (uint8_t)((s_throttle_fx_phase >> 4) & 0xFF);
+    for (int i = 0; i < 9; i++) {
+        if (s_hold[i] > 0) {
+            s_hold[i]--;
+        } else {
+            /* Fade toward target */
+            if (s_current[i] < s_target[i]) {
+                uint8_t step = s_speed[i];
+                if (s_current[i] + step >= s_target[i]) {
+                    s_current[i] = s_target[i];
+                } else {
+                    s_current[i] += step;
+                }
+            } else if (s_current[i] > s_target[i]) {
+                uint8_t step = s_speed[i];
+                if (s_current[i] - step <= s_target[i]) {
+                    s_current[i] = s_target[i];
+                } else {
+                    s_current[i] -= step;
+                }
+            }
+
+            /* Reached target — pick new random target + speed + hold */
+            if (s_current[i] == s_target[i]) {
+                uint8_t seed = STAGE_RAND(phase_seed + i * 41 + s_current[i]);
+                s_target[i] = 10 + (seed % 245);  /* 10-255 range */
+                seed = STAGE_RAND(seed);
+                s_speed[i] = 3 + (seed % 10);     /* 3-12 step per 20ms tick */
+                seed = STAGE_RAND(seed);
+                s_hold[i] = seed % 15;             /* 0-14 ticks hold (0-280ms) */
+            }
+        }
+    }
+
+    /* Apply brightness to Main strip (6 LEDs) */
+    for (int i = 0; i < 6; i++) {
+        uint8_t b = s_current[i];
+        drv_led_set_pixel(0, LED_MAIN_START + i,
+            (uint8_t)((uint16_t)cr * b / 255),
+            (uint8_t)((uint16_t)cg * b / 255),
+            (uint8_t)((uint16_t)cb * b / 255));
+    }
+
+    /* Apply brightness to Tail strip (3 LEDs) */
+    for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        uint8_t b = s_current[6 + i];
+        drv_led_set_pixel(1, LED_TAIL_START + i,
+            (uint8_t)((uint16_t)tr * b / 255),
+            (uint8_t)((uint16_t)tg * b / 255),
+            (uint8_t)((uint16_t)tb * b / 255));
+    }
+
+    #undef STAGE_RAND
+
+    drv_led_refresh();
+}
+
 /* ── Throttle FX dispatcher ── */
 
 static void throttle_fx_process(void)
@@ -667,6 +764,7 @@ static void throttle_fx_process(void)
     case THROTTLE_FX_WAVE:       throttle_fx_wave(spd);       break;
     case THROTTLE_FX_LIGHTNING:  throttle_fx_lightning(spd);  break;
     case THROTTLE_FX_WIND_WAVE:  throttle_fx_wind_wave(spd);  break;
+    case THROTTLE_FX_STAGE:      throttle_fx_stage(spd);      break;
     default:                     throttle_fx_wave(spd);       break;
     }
 }
@@ -695,7 +793,7 @@ void led_effects_throttle_stop(void)
 
 void led_effects_set_throttle_mode(uint8_t mode)
 {
-    if (mode <= 7) {
+    if (mode <= 8) {
         g_app_state.throttle_fx_mode = mode;
     }
 }
