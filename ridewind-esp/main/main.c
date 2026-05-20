@@ -1089,7 +1089,18 @@ void app_main(void)
     audio_engine_set_volume(g_app_state.volume);
     ESP_LOGI(TAG, "Audio pipeline initialized (engine + WiFi audio + WebSocket)");
 
-    /* Phase 5: BLE init + advertising (after WiFi is connected or waiting) */
+    /* Phase 4.5: WiFi auto-connect BEFORE BLE starts.
+     * If NVS has saved WiFi credentials, connect now (blocking, max 10s).
+     * This avoids BLE+WiFi RF contention — WiFi connects while BLE is off.
+     * If no credentials saved, skip (user will configure via BLE later). */
+    wifi_audio_service_auto_connect();
+    if (wifi_audio_service_is_connected()) {
+        ESP_LOGI(TAG, "WiFi connected before BLE — no RF contention");
+    } else {
+        ESP_LOGI(TAG, "WiFi not connected (no credentials or failed) — BLE will handle provisioning");
+    }
+
+    /* Phase 5: BLE init + advertising (AFTER WiFi is settled) */
     ble_service_init();
     ESP_LOGI(TAG, "BLE initialized, advertising as \"%s\"", BLE_DEVICE_NAME);
 

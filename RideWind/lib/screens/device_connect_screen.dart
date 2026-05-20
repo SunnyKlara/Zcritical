@@ -1626,7 +1626,7 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
       if (!mounted) return;
       setState(() {
         _connecting = false;
-        _statusMessage = '✅ 连接成功！IP: $ip';
+        _statusMessage = '✅ WiFi 已连接！IP: $ip\nWebSocket 服务已启动';
       });
     });
     _errSub = widget.btProvider.wifiErrorStream.listen((err) {
@@ -1672,8 +1672,22 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
   }
 
   void _connectWifi(String ssid, String password) {
-    setState(() => _connecting = true);
+    setState(() {
+      _connecting = true;
+      _statusMessage = null;
+    });
     widget.btProvider.sendWifiCredentials(ssid, password);
+
+    // 超时处理：如果 15 秒内没收到回复（可能 BLE 断了），提示用户
+    Future.delayed(const Duration(seconds: 15), () {
+      if (!mounted) return;
+      if (_connecting) {
+        setState(() {
+          _connecting = false;
+          _statusMessage = '⏱️ WiFi 凭据已发送。\n如果蓝牙断开，说明设备正在连接 WiFi。\n请重启设备，WiFi 将自动连接。';
+        });
+      }
+    });
   }
 
   void _showPasswordDialog(String ssid) {
