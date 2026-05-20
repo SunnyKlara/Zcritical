@@ -1,3 +1,8 @@
+/**
+ * @file ui_manager.c
+ * @brief UI 状态机调度器 — 根据 g_app_state.ui 分发到各子界面
+ */
+
 #include "ui_manager.h"
 #include "app_state.h"
 #include "drv_lcd.h"

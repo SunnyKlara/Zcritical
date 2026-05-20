@@ -1,3 +1,8 @@
+/**
+ * @file app_state.h
+ * @brief 全局应用状态结构体 — 所有可变状态的唯一真相源，由 mutex 保护
+ */
+
 #pragma once
 
 #include <stdint.h>

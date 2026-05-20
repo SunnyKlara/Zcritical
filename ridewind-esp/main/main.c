@@ -1,10 +1,18 @@
+/**
+ * @file main.c
+ * @brief 应用入口 + BLE 命令分发 + 外设初始化序列
+ *
+ * app_main() 按阶段初始化所有外设，然后启动 main_task。
+ * main_task 以 20ms 周期运行：排空命令队列 → 更新 UI → 刷新 LED → 风扇平滑。
+ * dispatch_ble_command() 是所有 BLE 命令的唯一入口。
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "freertos/ringbuf.h"
 #include "esp_log.h"
 #include "esp_crc.h"
 #include "esp_heap_caps.h"
@@ -22,13 +30,13 @@
 #include "led_effects.h"
 #include "preset_colors.h"
 #include "ui_manager.h"
-#include "encoder_handler.h"
 #include "drv_audio.h"
 #include "wifi_audio_service.h"
 #include "audio_engine.h"
 #include "audio_player.h"
 #include "storage.h"
 #include "boot_logo_240.h"
+#include "ota_service.h"
 
 static const char *TAG = "MAIN";
 
@@ -262,6 +270,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
 
     switch (cmd->type) {
 
+    // ═══ SECTION: 基础控制命令 (FAN/SPEED/WUHUA/BRIGHT/VOL/UNIT/LCD) ═══
+
     /* ── FAN:xx ── */
     case CMD_FAN:
         if (g_app_state.wuhuaqi_state != 2) {  /* not in throttle mode */
@@ -313,6 +323,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         }
         ble_service_notify_str("OK:WUHUA\r\n");
         break;
+
+    // ═══ SECTION: LED 颜色命令 (LED/PRESET/STREAMLIGHT/LED_GRADIENT/THROTTLE_FX) ═══
 
     /* ── LED:s:r:g:b ── */
     case CMD_LED: {
@@ -373,6 +385,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         drv_led_refresh();
         ble_service_notify_str("OK:BRIGHT\r\n");
         break;
+
+    // ═══ SECTION: UI 控制命令 (UI/THROTTLE) ═══
 
     /* ── UI:x ── */
     case CMD_UI:
@@ -474,6 +488,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         ble_service_notify_str("OK:VOL\r\n");
         break;
 
+    // ═══ SECTION: 状态查询命令 (GET:ALL/GET:PRESET/GET:VOL/...) ═══
+
     /* ── GET commands ── */
     case CMD_GET_FAN:
         snprintf(resp, sizeof(resp), "FAN:%d\r\n", g_app_state.fan_speed);
@@ -532,6 +548,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         snprintf(resp, sizeof(resp), "VOL:%d\r\n", g_app_state.volume);
         ble_service_notify_str(resp);
         break;
+
+    // ═══ SECTION: Logo 上传协议 (LOGO_START/DATA/END/DELETE) ═══
 
     /* ── LOGO upload protocol (Phase 9) ── */
     case CMD_LOGO_START: {
@@ -766,12 +784,32 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         break;
     }
 
-    case CMD_OTA_START:
+    // ═══ SECTION: OTA 升级协议 (OTA_START/DATA/END) ═══
+
+    case CMD_OTA_START: {
+        /* OTA_BEGIN:size or OTA_BEGIN:size:sha256
+         * Extract SHA256 from the raw command if present.
+         * The protocol parser stored size in ota_size.
+         * We need to re-parse the raw text for SHA256 — but cmd_msg_t
+         * only carries ota_size. For SHA256, we pass NULL (optional).
+         * Future: extend cmd_msg_t or pass via a side channel.
+         * For now, App can omit SHA256 and rely on esp_ota_end() validation. */
+        APP_STATE_UNLOCK();
+        ota_service_begin(cmd->param.ota_size, NULL);
+        return;  /* Already unlocked */
+    }
+
     case CMD_OTA_DATA:
-    case CMD_OTA_END:
-        /* TODO Phase 10: OTA handling */
-        ble_service_notify_str("ERR:NOT_IMPL\r\n");
+        /* Binary data is routed directly via ota_service_feed_data()
+         * from BLE callback. This case shouldn't normally be hit. */
         break;
+
+    case CMD_OTA_END:
+        APP_STATE_UNLOCK();
+        ota_service_end();
+        return;  /* Already unlocked */
+
+    // ═══ SECTION: WiFi 音频命令 (WIFI/WIFI_SCAN) ═══
 
     /* ── WIFI:ssid:password ── */
     case CMD_WIFI: {
@@ -790,6 +828,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
     case CMD_WIFI_SCAN:
         wifi_audio_service_scan();
         break;
+
+    // ═══ SECTION: 自定义音频上传 (AUDIO_START_BIN/DATA/END/DELETE) ═══
 
     /* ── Audio upload protocol ── */
     case CMD_AUDIO_START: {
@@ -977,6 +1017,10 @@ void app_main(void)
 
     /* 1. AppState init (factory defaults) */
     app_state_init();
+
+    /* OTA rollback self-test — must be early, before any heavy init.
+     * If this is first boot after OTA and firmware is bad, we rollback here. */
+    ota_service_init();
 
     /* Phase 8: Load saved settings from NVS */
     storage_init();

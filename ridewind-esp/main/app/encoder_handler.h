@@ -1,3 +1,8 @@
+/**
+ * @file encoder_handler.h
+ * @brief EC11 编码器按键状态机接口（单击/双击/三击/长按）
+ */
+
 #pragma once
 #include "drv_encoder.h"
 

@@ -1,3 +1,8 @@
+/// 音频上传传输管理器 — 滑动窗口协议实现（Logo/PCM 二进制上传）
+///
+/// 管理 BLE 大文件传输：分包、ACK 确认、CRC32 校验、超时重传。
+/// 支持 Logo 图片和自定义引擎音效的上传。
+
 import 'dart:async';
 import 'dart:typed_data';
 import '../providers/bluetooth_provider.dart';

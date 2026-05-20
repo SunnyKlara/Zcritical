@@ -1,3 +1,8 @@
+/**
+ * @file app_state.c
+ * @brief 全局应用状态初始化（工厂默认值）
+ */
+
 #include "app_state.h"
 #include "led_effects.h"
 #include <string.h>

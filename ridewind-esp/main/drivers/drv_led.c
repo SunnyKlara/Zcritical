@@ -1,3 +1,8 @@
+/**
+ * @file drv_led.c
+ * @brief WS2812B LED 灯带 RMT 驱动 — 双灯带(10+3颗)，亮度缩放
+ */
+
 #include "drv_led.h"
 #include "pin_config.h"
 #include "led_strip.h"

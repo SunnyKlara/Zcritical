@@ -1,3 +1,8 @@
+/**
+ * @file led_effects.h
+ * @brief LED 灯效引擎接口 — 渐变/流光/呼吸/油门特效模式定义
+ */
+
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>

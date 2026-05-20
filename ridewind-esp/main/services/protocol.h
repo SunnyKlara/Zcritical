@@ -1,3 +1,8 @@
+/**
+ * @file protocol.h
+ * @brief BLE 文本协议命令类型定义 + 解析器接口
+ */
+
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>

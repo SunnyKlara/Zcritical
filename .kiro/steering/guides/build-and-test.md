@@ -38,3 +38,18 @@ flutter run                      # 运行（需连接设备）
 - `pubspec.yaml` 中 `image: any` 重复出现在 dependencies 和 dev_dependencies（已知，不影响构建）
 - 7 个旧测试失败（重构前就有，非回归）
 - Android 包名 com.example.ridewind 不要改（改了会导致 MethodChannel 断裂）
+
+## 项目健康指标
+
+| 指标 | 当前值 | 警戒线 |
+|------|--------|--------|
+| 固件体积 | 2.43MB / 3MB (22% free) | <10% free 需优化 |
+| Flutter 最大单文件 | ~3500行 | >1000行需拆分 |
+| 协议测试覆盖 | 51/51 | 新命令必须有测试 |
+| ESP32 编译警告 | 0 | >0 需处理 |
+
+### 维护规则
+
+- 新增 BLE 命令时，必须同步在 `test/protocol/protocol_parser_test.dart` 添加测试
+- 单文件超过 500 行时考虑拆分（ESP32 C 文件例外：main.c 因 dispatch 集中允许更长）
+- 每次 release 前检查 `idf.py size` 输出，确认 flash 余量 >10%

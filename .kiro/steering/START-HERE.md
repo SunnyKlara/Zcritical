@@ -35,17 +35,13 @@ inclusion: auto
 ```
 ├── ridewind-esp/     ESP32-S3 固件（drivers/services/app/ui/config/resources）
 ├── RideWind/         Flutter APP（protocol/services/providers/screens/widgets）
-├── f4_26_1.1/        旧 STM32 固件（仅参考，不修改）
-├── Tixing-main/      Pico Python 显示项目（独立，不影响主项目）
-├── audio参考项目/     PlatformIO 参考（独立）
-└── ESPtest/          ESP32 早期测试（独立）
+└── .kiro/            AI 协作体系（steering/hooks/specs/reference）
 ```
 
 ## 深入（按需读取）
 
 | 主题 | 文件 |
 |------|------|
-| **18 模式蓝图（元文档）** | `.kiro/steering/AI-COLLAB-OS-BLUEPRINT.md` |
 | BLE 协议完整定义 | `.kiro/steering/specs/protocol-contract.md` |
 | 固件架构全景 | `.kiro/steering/specs/architecture.md` |
 | 命名统一表（三端映射） | `.kiro/steering/specs/naming-conventions.md` |
@@ -53,14 +49,17 @@ inclusion: auto
 | 硬件常量/时序参数 | `ridewind-esp/main/config/board_config.h` |
 | 已知坑位（19 个） | `.kiro/steering/knowledge/known-pitfalls.md` |
 | 教训与决策记录 | `.kiro/steering/knowledge/lessons-learned.md` |
+| 历史决策日志（归档） | `.kiro/steering/knowledge/decision-log.md` |
 | 引擎音效架构 | `.kiro/steering/knowledge/engine-sound-design.md` |
 | 参考项目为何不能照搬 | `.kiro/steering/knowledge/why-reference-failed.md` |
-| AI 协作模式（探索/手术/脚手架/重构） | `.kiro/steering/guides/collaboration-modes.md` |
 | Git 工作流规范 | `.kiro/steering/guides/git-workflow.md` |
 | 构建/测试命令 | `.kiro/steering/guides/build-and-test.md` |
-| AI 行为规范 | `.kiro/steering/guides/ai-behavior.md` |
+| AI 行为规范（含协作模式） | `.kiro/steering/guides/ai-behavior.md` |
+| 发布流程 | `.kiro/steering/guides/release-workflow.md` |
 | 真机调试计划 | `DEBUG_PLAN.md` |
 | APP 交互逻辑 | `RideWind/docs/app-interaction-guide.md` |
 | 全功能测试清单 | `RideWind/docs/FULL_TEST_CHECKLIST.md` |
 | APP 架构 | `RideWind/README.md` |
 | 固件 Kiro Specs | `.kiro/specs/`（3 个已完成 spec，历史参考） |
+| 50 项技术学习路线图 | `.kiro/reference/SOFTWARE-STRATEGY.md` |
+| 18 模式蓝图（元文档） | `.kiro/reference/AI-COLLAB-OS-BLUEPRINT.md` |

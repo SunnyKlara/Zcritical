@@ -1,3 +1,8 @@
+/**
+ * @file board_config.h
+ * @brief 板级硬件常量 — LED 数量/逻辑分区/时序参数/队列深度
+ */
+
 #pragma once
 
 #include "driver/ledc.h"
@@ -98,6 +103,9 @@
 
 /* Message queue */
 #define CMD_QUEUE_DEPTH             32
+
+/* Protocol version (increment on breaking changes) */
+#define PROTOCOL_VERSION            1
 
 /* Speed */
 #define SPEED_MAX_KMH               340

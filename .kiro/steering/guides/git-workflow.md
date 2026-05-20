@@ -168,48 +168,26 @@ git tag snapshot-YYYYMMDD-描述
 
 ---
 
-## 当前紧急事项
+## AI 自主执行规则
 
-> ⚠️ 项目当前有 **3400+ 未提交变更**，只有 3 个历史 commit。
-> 需要执行一次"历史补救"操作。
+当已有完善的 git tag 管理时，AI 直接执行实验性改动，不等用户确认。
 
-### 历史补救方案
+**流程：**
+1. 说明方案（1-2句）
+2. 保存当前版本（tag）
+3. 直接执行改动 + 编译
+4. 呈现结果供用户评判
 
-由于无法回溯中间状态，建议做一次结构化的大提交，然后从此刻开始严格执行规范：
+**前提：**
+- 有 tag 可随时回退
+- 不涉及破坏性操作（删分支、force push）
 
-```bash
-# Step 1: 确认当前状态
-git status
+用户只需看结果说"好"或"不好"，不需要中间确认步骤。
 
-# Step 2: 分批提交（按模块）
-git add ridewind-esp/
-git commit -m "[esp] feat: complete ESP32-S3 firmware (migrated from STM32)
+---
 
-Includes: drivers, services, app logic, UI menu system, audio engine,
-BLE service, WiFi audio, protocol handler, NVS storage.
-All verified: idf.py build zero errors."
+## 当前 Git 状态
 
-git add RideWind/lib/ RideWind/test/ RideWind/pubspec.* RideWind/README.md
-git commit -m "[app] feat: complete Flutter APP rewrite
-
-Includes: protocol layer (parser/commands/router/errors),
-BLE service, providers, screens, widgets.
-51 protocol tests passing. flutter analyze clean."
-
-git add .kiro/
-git commit -m "[meta] feat: establish AI collaboration OS (18 patterns)
-
-Steering docs, hooks, specs, guides, knowledge base.
-See .kiro/steering/AI-COLLAB-OS-BLUEPRINT.md for full map."
-
-git add .
-git commit -m "[infra] chore: gitignore, docs cleanup, project config"
-
-# Step 3: 推送
-git push -u origin main
-
-# Step 4: 打标签标记新起点
-git tag v0.1.0-baseline -m "Post-migration baseline: firmware + app complete, pre-hardware-testing"
-```
-
-执行后，从此刻起每个变更都按规范提交。
+- 历史补救已完成（2026-05-12），tag `v0.1.0-baseline`
+- 当前工作在 main 分支，tag `v0.3-unified-main`
+- 分支 `feature/light-mode-pro-popup` 待合入

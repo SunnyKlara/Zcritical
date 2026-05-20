@@ -1,3 +1,8 @@
+/**
+ * @file audio_engine.h
+ * @brief 音频混合器接口 — WiFi PCM 接收 + 音量控制 + I2S 输出任务
+ */
+
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>

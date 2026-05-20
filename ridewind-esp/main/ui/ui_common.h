@@ -1,3 +1,8 @@
+/**
+ * @file ui_common.h
+ * @brief 共享 UI 绘图工具接口 — 进度条/圆点/F4 位图渲染
+ */
+
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>

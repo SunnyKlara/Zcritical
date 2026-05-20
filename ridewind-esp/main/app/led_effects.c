@@ -1,3 +1,10 @@
+/**
+ * @file led_effects.c
+ * @brief LED 灯效引擎 — 渐变/流光/呼吸/油门特效
+ *
+ * 每 20ms 由 Main_Task 调用。优先级: RGB自定义 > 呼吸 > 流光 > 静态。
+ */
+
 #include "led_effects.h"
 #include "app_state.h"
 #include "drv_led.h"
@@ -6,10 +13,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <math.h>
-
-/* LED Effect Engine
- * Called every 20ms from Main_Task.
- * Priority: RGB Custom > Breathing > Streamlight > Static */
 
 static uint32_t s_gradient_tick = 0;
 static uint32_t s_streamlight_tick = 0;
