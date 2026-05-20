@@ -254,7 +254,7 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         { "LCD:",       4,  CMD_LCD,        0, 1   },
         { "UNIT:",      5,  CMD_UNIT,       0, 1   },
         { "THROTTLE:",  9,  CMD_THROTTLE,   0, 1   },
-        { "THROTTLE_FX:", 12, CMD_THROTTLE_FX, 1, 6 },
+        { "THROTTLE_FX:", 12, CMD_THROTTLE_FX, 0, 7 },
         { "VOL:",       4,  CMD_VOLUME,     0, 100 },
     };
 

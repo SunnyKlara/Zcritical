@@ -49,7 +49,7 @@ void app_state_init(void)
     g_app_state.breath_color_index = 1;
     g_app_state.last_reported_speed = -1;
     g_app_state.throttle_frozen_speed = -1;
-    g_app_state.throttle_fx_mode = THROTTLE_FX_WAVE;  /* Default: wave breathing */
+    g_app_state.throttle_fx_mode = THROTTLE_FX_STATIC;  /* Default: static (no effect) */
 
     /* Boot into menu */
     g_app_state.ui  = 5;

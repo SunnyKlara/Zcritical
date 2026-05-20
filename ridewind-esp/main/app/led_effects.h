@@ -11,12 +11,14 @@ typedef enum {
 
 /* ── Throttle LED effect modes ── */
 typedef enum {
+    THROTTLE_FX_STATIC      = 0,  /* 静态: 不启动任何效果，保持预设色 */
     THROTTLE_FX_TACHOMETER  = 1,  /* 转速条填充: 速度→逐颗点亮 */
     THROTTLE_FX_PULSE       = 2,  /* 脉冲波: 中心向两端扩散 */
     THROTTLE_FX_CHASE       = 3,  /* 追逐流光: 光点奔跑 */
     THROTTLE_FX_ALTERNATE   = 4,  /* Main↔Tail 交替闪烁 */
-    THROTTLE_FX_WAVE        = 5,  /* 波浪呼吸: 蛇形游动 */
+    THROTTLE_FX_WAVE        = 5,  /* 波浪呼吸: 固定节奏，不随速度变化 */
     THROTTLE_FX_LIGHTNING   = 6,  /* 闪电爆发: 随机白闪 */
+    THROTTLE_FX_WIND_WAVE   = 7,  /* 风浪联动: 波浪+随速度变化 (PRO) */
 } throttle_fx_mode_t;
 
 void led_effects_init(void);

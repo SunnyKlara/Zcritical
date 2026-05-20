@@ -464,15 +464,14 @@ static void throttle_fx_alternate(uint8_t spd)
     drv_led_refresh();
 }
 
-/* ── Effect 5: Wave (Continuous wide sine — left to right, with tidal overlay) ──
- *
- * Wide sine wave sweeps left→right, 2.5s period, 20fps.
- * Phase spacing 25 (wide wave — adjacent LEDs very similar brightness).
- * Tidal overlay: 8s slow modulation of base brightness.
- * Uses preset color. */
+/* ── Effect 5: Wave (Fixed rhythm — does NOT read speed) ──
+ * Wide sine wave sweeps left→right, fixed 2.5s period, 20fps.
+ * Phase spacing 42 (6 LEDs cover full wavelength).
+ * Tidal overlay: 8s slow modulation.
+ * Uses preset color. Always animates regardless of speed. */
 static void throttle_fx_wave(uint8_t spd)
 {
-    (void)spd;
+    (void)spd;  /* mode=5 ignores speed entirely */
 
     uint8_t cr = g_app_state.led_colors[0][0];
     uint8_t cg = g_app_state.led_colors[0][1];
@@ -483,9 +482,68 @@ static void throttle_fx_wave(uint8_t spd)
 
     uint32_t t = s_throttle_fx_phase;
 
-    /* Wind-reactive: speed 0=calm, 100=storm */
-    uint8_t wind = (uint8_t)g_app_state.current_speed_kmh;
-    if (wind > 100) wind = 100;
+    /* Fixed parameters — no wind reactivity */
+    uint16_t wave_cycle = 2500;
+    uint8_t base_bright = 38;
+    uint8_t phase_step = 42;
+    uint16_t tidal_cycle = 8000;
+
+    #define PEAK_BRIGHT_W5   255
+
+    uint8_t wave_phase = (uint8_t)((uint32_t)(t % wave_cycle) * 255 / wave_cycle);
+
+    /* Tidal overlay */
+    uint8_t tidal_phase = (uint8_t)((uint32_t)(t % tidal_cycle) * 255 / tidal_cycle);
+    uint8_t tidal_raw = (tidal_phase < 128) ? tidal_phase * 2 : (255 - tidal_phase) * 2;
+    uint8_t tidal_base = base_bright + (uint8_t)((uint16_t)tidal_raw * base_bright / 255);
+
+    /* Main strip */
+    for (int i = 0; i < 6; i++) {
+        uint8_t led_phase = wave_phase + (uint8_t)(i * phase_step);
+        uint8_t raw = (led_phase < 128) ? led_phase * 2 : (255 - led_phase) * 2;
+        uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT_W5 - tidal_base) / 255);
+
+        drv_led_set_pixel(0, LED_MAIN_START + i,
+            (uint8_t)((uint16_t)cr * brightness / 255),
+            (uint8_t)((uint16_t)cg * brightness / 255),
+            (uint8_t)((uint16_t)cb * brightness / 255));
+    }
+
+    /* Tail */
+    for (int i = 0; i < LED_TAIL_COUNT; i++) {
+        uint8_t led_phase = wave_phase + (uint8_t)((2 - i) * phase_step) - 60;
+        uint8_t raw = (led_phase < 128) ? led_phase * 2 : (255 - led_phase) * 2;
+        uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT_W5 - tidal_base) / 255);
+
+        drv_led_set_pixel(1, LED_TAIL_START + i,
+            (uint8_t)((uint16_t)tr * brightness / 255),
+            (uint8_t)((uint16_t)tg * brightness / 255),
+            (uint8_t)((uint16_t)tb * brightness / 255));
+    }
+
+    #undef PEAK_BRIGHT_W5
+
+    drv_led_refresh();
+}
+
+/* ── Effect 7: Wind-Wave Sync (PRO — reads speed for dynamic parameters) ──
+ * Same wave algorithm but parameters react to current_speed_kmh.
+ * Speed 0 = static preset color (no wave).
+ * Speed 1-100 = wave gets faster, deeper contrast, tidal accelerates. */
+static void throttle_fx_wind_wave(uint8_t spd)
+{
+    uint8_t cr = g_app_state.led_colors[0][0];
+    uint8_t cg = g_app_state.led_colors[0][1];
+    uint8_t cb = g_app_state.led_colors[0][2];
+    uint8_t tr = g_app_state.led_colors[3][0];
+    uint8_t tg = g_app_state.led_colors[3][1];
+    uint8_t tb = g_app_state.led_colors[3][2];
+
+    uint32_t t = s_throttle_fx_phase;
+
+    uint8_t wind = spd;
 
     /* Speed 0: static light, no wave motion */
     if (wind == 0) {
@@ -499,12 +557,12 @@ static void throttle_fx_wave(uint8_t spd)
         return;
     }
 
-    uint16_t wave_cycle = 2500 - (uint16_t)wind * 17;   /* 2500→800ms */
+    uint16_t wave_cycle = 2500 - (uint16_t)wind * 10;   /* 2500→1500ms */
     uint8_t base_bright = (uint8_t)(38 - wind * 38 / 100);  /* 38→0 */
-    uint8_t phase_step = 25 + (uint8_t)(wind * 30 / 100);   /* 25→55 */
+    uint8_t phase_step = 42;
     uint16_t tidal_cycle = 8000 - (uint16_t)wind * 50;  /* 8000→3000ms */
 
-    #define PEAK_BRIGHT   255
+    #define PEAK_BRIGHT_W7   255
 
     uint8_t wave_phase = (uint8_t)((uint32_t)(t % wave_cycle) * 255 / wave_cycle);
 
@@ -513,18 +571,12 @@ static void throttle_fx_wave(uint8_t spd)
     uint8_t tidal_raw = (tidal_phase < 128) ? tidal_phase * 2 : (255 - tidal_phase) * 2;
     uint8_t tidal_base = base_bright + (uint8_t)((uint16_t)tidal_raw * base_bright / 255);
 
-    /* Main strip: wide wave moves left to right */
+    /* Main strip */
     for (int i = 0; i < 6; i++) {
         uint8_t led_phase = wave_phase + (uint8_t)(i * phase_step);
-
-        uint8_t raw;
-        if (led_phase < 128) {
-            raw = led_phase * 2;
-        } else {
-            raw = (255 - led_phase) * 2;
-        }
+        uint8_t raw = (led_phase < 128) ? led_phase * 2 : (255 - led_phase) * 2;
         uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
-        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT_W7 - tidal_base) / 255);
 
         drv_led_set_pixel(0, LED_MAIN_START + i,
             (uint8_t)((uint16_t)cr * brightness / 255),
@@ -532,18 +584,12 @@ static void throttle_fx_wave(uint8_t spd)
             (uint8_t)((uint16_t)cb * brightness / 255));
     }
 
-    /* Tail: same wave, slightly behind */
+    /* Tail */
     for (int i = 0; i < LED_TAIL_COUNT; i++) {
         uint8_t led_phase = wave_phase + (uint8_t)((2 - i) * phase_step) - 60;
-
-        uint8_t raw;
-        if (led_phase < 128) {
-            raw = led_phase * 2;
-        } else {
-            raw = (255 - led_phase) * 2;
-        }
+        uint8_t raw = (led_phase < 128) ? led_phase * 2 : (255 - led_phase) * 2;
         uint8_t smooth = (uint8_t)((uint16_t)raw * raw / 255);
-        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT - tidal_base) / 255);
+        uint8_t brightness = tidal_base + (uint8_t)((uint16_t)smooth * (PEAK_BRIGHT_W7 - tidal_base) / 255);
 
         drv_led_set_pixel(1, LED_TAIL_START + i,
             (uint8_t)((uint16_t)tr * brightness / 255),
@@ -551,7 +597,7 @@ static void throttle_fx_wave(uint8_t spd)
             (uint8_t)((uint16_t)tb * brightness / 255));
     }
 
-    #undef PEAK_BRIGHT
+    #undef PEAK_BRIGHT_W7
 
     drv_led_refresh();
 }
@@ -613,13 +659,15 @@ static void throttle_fx_process(void)
     if (spd > 100) spd = 100;
 
     switch (g_app_state.throttle_fx_mode) {
+    case THROTTLE_FX_STATIC:     /* Do nothing — static preset colors */ break;
     case THROTTLE_FX_TACHOMETER: throttle_fx_tachometer(spd); break;
     case THROTTLE_FX_PULSE:      throttle_fx_pulse(spd);      break;
     case THROTTLE_FX_CHASE:      throttle_fx_chase(spd);      break;
     case THROTTLE_FX_ALTERNATE:  throttle_fx_alternate(spd);  break;
     case THROTTLE_FX_WAVE:       throttle_fx_wave(spd);       break;
     case THROTTLE_FX_LIGHTNING:  throttle_fx_lightning(spd);  break;
-    default:                     throttle_fx_alternate(spd);  break;
+    case THROTTLE_FX_WIND_WAVE:  throttle_fx_wind_wave(spd);  break;
+    default:                     throttle_fx_wave(spd);       break;
     }
 }
 
@@ -647,7 +695,7 @@ void led_effects_throttle_stop(void)
 
 void led_effects_set_throttle_mode(uint8_t mode)
 {
-    if (mode >= 1 && mode <= 6) {
+    if (mode <= 7) {
         g_app_state.throttle_fx_mode = mode;
     }
 }
