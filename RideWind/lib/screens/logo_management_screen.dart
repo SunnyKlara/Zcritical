@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../services/enhanced_image_preprocessor.dart';
-import '../services/logo_transmission_manager.dart';
 
 /// 正式 Logo 管理界面
 ///
@@ -14,7 +14,11 @@ import '../services/logo_transmission_manager.dart';
 /// 使用统一的 LogoTransmissionManager 执行上传。
 /// _需求: 14.2, 14.3_
 class LogoManagementScreen extends StatefulWidget {
-  const LogoManagementScreen({Key? key}) : super(key: key);
+  /// 可选：从外部传入的预选图片（如车库页面选中的汽车图片）
+  /// 如果提供，将跳过图片选择步骤，直接进入预览+上传流程。
+  final Uint8List? initialImageBytes;
+
+  const LogoManagementScreen({Key? key, this.initialImageBytes}) : super(key: key);
 
   @override
   State<LogoManagementScreen> createState() => _LogoManagementScreenState();
@@ -33,7 +37,6 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String _statusMessage = '';
-  LogoTransmissionManager? _transmissionManager;
 
   // 槽位状态
   int _selectedSlot = 0;
@@ -48,13 +51,16 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _querySlotStatus();
+      // 如果有预选图片（从车库传入），自动处理
+      if (widget.initialImageBytes != null) {
+        _processSelectedImage(widget.initialImageBytes!);
+      }
     });
   }
 
   @override
   void dispose() {
     _responseSub?.cancel();
-    _transmissionManager?.cancel();
     super.dispose();
   }
 
@@ -111,29 +117,37 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
 
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
-        final decoded = img.decodeImage(bytes);
-        if (decoded != null) {
-          // 中心裁剪为正方形 → 缩放到 240×240 → 圆形裁剪预览
-          final squared = _preprocessor.cropToSquare(decoded);
-          final resized = _preprocessor.highQualityResize(squared, 240);
-          final circular = _preprocessor.cropToCircle(resized);
-
-          setState(() {
-            _selectedImageBytes = bytes;
-            _processedImage = resized;
-            _circularPreview = circular;
-            _statusMessage = '图片已准备: ${decoded.width}×${decoded.height} → 240×240';
-          });
-        } else {
-          _showError('图片解码失败');
-        }
+        _processSelectedImage(bytes);
       }
     } catch (e) {
       _showError('选择图片失败: $e');
     }
   }
 
-  /// 开始上传
+  /// 处理选中的图片（从相册或车库传入）
+  void _processSelectedImage(Uint8List bytes) {
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded != null) {
+        final squared = _preprocessor.cropToSquare(decoded);
+        final resized = _preprocessor.highQualityResize(squared, 240);
+        final circular = _preprocessor.cropToCircle(resized);
+
+        setState(() {
+          _selectedImageBytes = bytes;
+          _processedImage = resized;
+          _circularPreview = circular;
+          _statusMessage = '图片已准备: ${decoded.width}×${decoded.height} → 240×240';
+        });
+      } else {
+        _showError('图片解码失败');
+      }
+    } catch (e) {
+      _showError('处理图片失败: $e');
+    }
+  }
+
+  /// 开始上传（WiFi WebSocket — 秒传 115KB）
   Future<void> _startUpload() async {
     if (_processedImage == null) {
       _showError('请先选择图片');
@@ -141,8 +155,10 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
     }
 
     final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
-    if (!btProvider.isConnected) {
-      _showError('蓝牙未连接');
+    final ip = btProvider.esp32IpAddress;
+
+    if (ip == null || ip.isEmpty) {
+      _showError('WiFi 未连接，请先配网');
       return;
     }
 
@@ -155,68 +171,27 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
       return;
     }
 
+    // 计算 CRC32
+    final crc32 = _preprocessor.calculateCRC32(rgb565Data);
+
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.0;
-      _statusMessage = '准备上传...';
+      _statusMessage = '连接设备...';
     });
 
-    // 创建 LogoTransmissionManager 实例
-    _transmissionManager = LogoTransmissionManager(
-      btProvider: btProvider,
-      imageData: rgb565Data,
-      onProgress: (progress) {
-        if (mounted) {
-          setState(() {
-            _uploadProgress = progress;
-          });
-        }
-      },
-      onStateChange: (state) {
-        if (mounted) {
-          setState(() {
-            switch (state) {
-              case TransmissionState.starting:
-                _statusMessage = '正在连接设备...';
-                break;
-              case TransmissionState.transmitting:
-                _statusMessage = '正在上传...';
-                break;
-              case TransmissionState.verifying:
-                _statusMessage = '校验中...';
-                break;
-              case TransmissionState.completed:
-                _statusMessage = '上传成功！';
-                break;
-              case TransmissionState.error:
-                _statusMessage = '上传失败';
-                break;
-              default:
-                break;
-            }
-          });
-        }
-      },
-      onError: (error) {
-        if (mounted) {
-          _showError(error);
-        }
-      },
-    );
-
     try {
-      final success = await _transmissionManager!.transmit(slot: _selectedSlot);
+      final success = await _uploadViaWifi(ip, rgb565Data, crc32);
       if (success && mounted) {
         setState(() {
           _uploadProgress = 1.0;
-          _statusMessage = '上传成功！Logo 已写入槽位 $_selectedSlot';
+          _statusMessage = '上传成功！Logo 已写入设备';
         });
-        // 刷新槽位状态
         await _querySlotStatus();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Logo 上传成功 (槽位 $_selectedSlot)'),
+            const SnackBar(
+              content: Text('Logo 上传成功'),
               backgroundColor: Colors.green,
             ),
           );
@@ -224,17 +199,109 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _statusMessage = '上传失败: $e';
-        });
+        setState(() => _statusMessage = '上传失败: $e');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  /// WiFi WebSocket Logo 上传（复用 OTA 验证过的模式）
+  Future<bool> _uploadViaWifi(String ip, Uint8List rgb565Data, int crc32) async {
+    WebSocket? ws;
+    StreamSubscription? wsSub;
+
+    try {
+      ws = await WebSocket.connect('ws://$ip:81/ws')
+          .timeout(const Duration(seconds: 5));
+
+      Completer<String>? pendingResponse;
+
+      wsSub = ws.listen((data) {
+        if (data is String) {
+          final trimmed = data.trim();
+          if (trimmed.startsWith('LOGO_')) {
+            if (pendingResponse != null && !pendingResponse!.isCompleted) {
+              pendingResponse!.complete(trimmed);
+            }
+          }
+        }
+      }, onError: (e) {
+        if (pendingResponse != null && !pendingResponse!.isCompleted) {
+          pendingResponse!.complete('WS_ERROR:$e');
+        }
+      }, onDone: () {
+        if (pendingResponse != null && !pendingResponse!.isCompleted) {
+          pendingResponse!.complete('WS_CLOSED');
+        }
+      });
+
+      Future<String> waitResponse(Duration timeout) async {
+        pendingResponse = Completer<String>();
+        try {
+          return await pendingResponse!.future.timeout(timeout);
+        } on TimeoutException {
+          return 'TIMEOUT';
+        }
       }
-      _transmissionManager = null;
+
+      // LOGO_START_BIN: slot with bit7=1 for binary mode
+      // slot 0 = first slot, bit7 set = binary mode → 0x80
+      // CRC=0 to skip CRC check (WiFi transport is reliable, TCP handles integrity)
+      final slot = _selectedSlot | 0x80; // selected slot + binary mode flag
+      ws.add('LOGO_START_BIN:$slot:${rgb565Data.length}:0\n');
+
+      if (mounted) setState(() => _statusMessage = '等待设备就绪...');
+
+      final readyResp = await waitResponse(const Duration(seconds: 5));
+      if (!readyResp.startsWith('LOGO_READY:')) {
+        _showError('设备未就绪: $readyResp');
+        return false;
+      }
+
+      // 发送 binary data（4KB chunks）
+      if (mounted) setState(() => _statusMessage = '上传中...');
+      final totalSize = rgb565Data.length;
+      int sent = 0;
+      const chunkSize = 4096;
+
+      while (sent < totalSize) {
+        final end = (sent + chunkSize).clamp(0, totalSize);
+        ws.add(rgb565Data.sublist(sent, end));
+        sent += end - sent;
+
+        if (mounted) setState(() => _uploadProgress = sent / totalSize * 0.9);
+
+        // Wait for ACK
+        final ack = await waitResponse(const Duration(seconds: 5));
+        if (ack.startsWith('LOGO_ACK_BIN:') || ack.startsWith('LOGO_ACK:')) {
+          // Good
+        } else if (ack.startsWith('LOGO_ERROR:') || ack.startsWith('LOGO_FAIL:')) {
+          _showError('上传错误: $ack');
+          return false;
+        } else if (ack == 'TIMEOUT') {
+          // Last chunk may not ACK, proceed to END
+          break;
+        }
+      }
+
+      // LOGO_END
+      if (mounted) setState(() => _statusMessage = '校验中...');
+      ws.add('LOGO_END\n');
+
+      final endResp = await waitResponse(const Duration(seconds: 5));
+      if (endResp.startsWith('LOGO_OK:')) {
+        return true;
+      } else {
+        _showError('校验失败: $endResp');
+        return false;
+      }
+    } catch (e) {
+      _showError('WiFi 上传异常: $e');
+      return false;
+    } finally {
+      wsSub?.cancel();
+      try { ws?.close(); } catch (_) {}
     }
   }
 
@@ -332,7 +399,6 @@ class _LogoManagementScreenState extends State<LogoManagementScreen> {
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: () {
-                  _transmissionManager?.cancel();
                   setState(() {
                     _isUploading = false;
                     _statusMessage = '已取消上传';

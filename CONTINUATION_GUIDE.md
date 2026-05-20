@@ -42,6 +42,8 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 - **DeviceConnectScreen ~3500 行** — 暂缓
 - **WiFi 配网已验证通过** — 实机测试成功（2026-05-21），全流程秒级完成
 - **WiFi OTA 全流程验证通过** — APP 端 WebSocket OTA 成功（2.95MB，含擦除约 83s），Rollback 自检通过，设备正常重启
+- **车库 Logo WiFi 上传验证通过** — Python 脚本测试成功：115KB / 3.0s / 29 ACKs / LOGO_OK:0。CRC=0 跳过应用层校验（WiFi TCP 已保证完整性）。ESP32 日志确认 `Logo slot 0 written OK`。APP 端待实测。
+- **死代码清理完成** — 删除 4 文件 ~600 行：`image_preprocessing_service.dart` + `image_compression_service.dart` + `transmission_benchmark.dart` + `test/image_preprocessing_test.dart`。`logo_transmission_manager.dart`(1373行) 不再被 Logo 页面使用，仅被测试文件引用，后续可删。
 
 ## 最近修复（2026-05-21）
 
