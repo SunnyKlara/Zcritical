@@ -9,8 +9,9 @@
 
 功能全部跑通，进入打磨阶段。用户以产品经理身份提需求，AI 深入理解后设计实现。
 
-**Git**：只在 main 分支开发，用 tag 标记版本。当前 tag: `v0.3-unified-main`。
-用户说"保留"时才 commit，commit message 用中文描述达成效果。
+**Git**：main 单分支 + tag 发版。当前 tag: `v1.0.0`。
+Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/release）。
+详见 `.kiro/steering/git-and-release.md`。
 
 ## 已完成
 
@@ -31,6 +32,7 @@
 
 ## 当前阻塞
 
+- **⚠️ 没有远程 Git 仓库** — 本地有 v1.0.0 tag 但未 push，GitHub Release 未创建，APP 自动升级无下载源
 - **⚠️ 风扇无法调速（硬件限制）** — GPIO 40 PWM 对风扇转速无影响，风扇只受 GPIO 10 开关控制
 - **LED 偶发闪烁** — RMT DMA 通道不足已回退，暂搁
 - **DeviceConnectScreen ~3500 行** — 暂缓
