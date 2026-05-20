@@ -32,7 +32,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 当前阻塞
 
-- **⚠️ 没有远程 Git 仓库** — 本地有 v1.0.0 tag 但未 push，GitHub Release 未创建，APP 自动升级无下载源
+- **⚠️ 风扇无法调速（硬件限制）** — GPIO 40 PWM 对风扇转速无影响，风扇只受 GPIO 10 开关控制
 - **⚠️ 风扇无法调速（硬件限制）** — GPIO 40 PWM 对风扇转速无影响，风扇只受 GPIO 10 开关控制
 - **LED 偶发闪烁** — RMT DMA 通道不足已回退，暂搁
 - **DeviceConnectScreen ~3500 行** — 暂缓
