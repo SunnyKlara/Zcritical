@@ -41,7 +41,7 @@ class _GarageScreenState extends State<GarageScreen> {
   Future<void> _loadCarData() async {
     try {
       final jsonStr = await rootBundle.loadString(
-        'assets/car_thumbnails/car_index.json',
+        'assets/car_thumbnails/car_specs.json',
       );
       final List<dynamic> jsonList = json.decode(jsonStr);
       final cars = jsonList.map((e) => CarModel.fromJson(e)).toList();

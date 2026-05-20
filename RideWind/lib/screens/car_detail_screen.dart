@@ -12,10 +12,8 @@ class CarDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final topPadding = MediaQuery.of(context).padding.top;
-    final year = _extractYear(car.model);
+    final specs = car.specs;
     final country = _getCountryFlag(car.brand);
-    final category = _guessCategory(car.brand, car.model);
-    final engineType = _guessEngineType(car.model, car.brand);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -61,7 +59,7 @@ class CarDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 品牌 + 国旗
+                      // 品牌 + 国旗 + 年份
                       Row(
                         children: [
                           if (country.isNotEmpty) ...[
@@ -77,6 +75,16 @@ class CarDetailScreen extends StatelessWidget {
                               letterSpacing: 2,
                             ),
                           ),
+                          if (specs?.year != null) ...[
+                            const SizedBox(width: 12),
+                            Text(
+                              specs!.year!,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -93,15 +101,27 @@ class CarDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
 
+                      // 性能数据网格（有数据时显示）
+                      if (specs != null && specs.horsepower != null) ...[
+                        _buildSpecsGrid(specs),
+                        const SizedBox(height: 20),
+                      ],
+
                       // 标签行
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          if (year != null) _buildChip(year, Icons.calendar_today),
-                          if (category.isNotEmpty) _buildChip(category, Icons.category),
-                          if (engineType.isNotEmpty) _buildChip(engineType, Icons.speed),
-                          _buildChip(car.brand, Icons.business),
+                          if (specs?.engine != null)
+                            _buildChip('${specs!.displacement ?? ''} ${specs.engine!}'.trim(), Icons.settings),
+                          if (specs?.aspiration != null)
+                            _buildChip(specs!.aspiration!, Icons.air),
+                          if (specs?.drivetrain != null)
+                            _buildChip(specs!.drivetrain!, Icons.swap_horiz),
+                          if (specs?.gears != null)
+                            _buildChip(specs!.gears!, Icons.speed),
+                          if (specs?.layout != null)
+                            _buildChip(specs!.layout!, Icons.architecture),
                         ],
                       ),
                       const SizedBox(height: 28),
@@ -252,6 +272,89 @@ class CarDetailScreen extends StatelessWidget {
     );
   }
 
+  /// 性能数据网格 — 2x2 布局展示核心参数
+  Widget _buildSpecsGrid(CarSpecs specs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildSpecItem(
+                '${specs.horsepower ?? "—"}',
+                'HP',
+                Icons.bolt,
+              )),
+              Container(width: 1, height: 44, color: Colors.white.withOpacity(0.05)),
+              Expanded(child: _buildSpecItem(
+                '${specs.torqueLbft ?? "—"}',
+                'LB·FT',
+                Icons.rotate_right,
+              )),
+            ],
+          ),
+          Container(height: 1, color: Colors.white.withOpacity(0.05)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildSpecItem(
+                specs.weightKg != null ? '${specs.weightKg}' : '—',
+                'KG',
+                Icons.fitness_center,
+              )),
+              Container(width: 1, height: 44, color: Colors.white.withOpacity(0.05)),
+              Expanded(child: _buildSpecItem(
+                specs.drivetrain ?? '—',
+                'DRIVE',
+                Icons.swap_horiz,
+              )),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpecItem(String value, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: Colors.white.withOpacity(0.3)),
+              const SizedBox(width: 6),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.3),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildChip(String label, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -276,12 +379,6 @@ class CarDetailScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  /// 从 model 名中提取年份
-  String? _extractYear(String model) {
-    final match = RegExp(r'\b(19|20)\d{2}\b').firstMatch(model);
-    return match?.group(0);
   }
 
   /// 品牌→国旗映射
@@ -327,46 +424,5 @@ class CarDetailScreen extends StatelessWidget {
       'Holden': '🇦🇺',
     };
     return map[brand] ?? '';
-  }
-
-  /// 从品牌+车型推断分类
-  String _guessCategory(String brand, String model) {
-    final m = model.toLowerCase();
-    final b = brand.toLowerCase();
-
-    if (m.contains('gt3') || m.contains('gt2') || m.contains('race') ||
-        m.contains('gte') || m.contains('lm')) return 'Race';
-    if (b == 'ferrari' || b == 'lamborghini' || b == 'bugatti' ||
-        b == 'pagani' || b == 'koenigsegg' || b == 'mclaren' ||
-        m.contains('hypercar')) return 'Hypercar';
-    if (m.contains('suv') || m.contains('truck') || m.contains('raptor') ||
-        b == 'jeep' || b == 'land rover') return 'Off-Road';
-    if (m.contains('rally') || m.contains('wrc')) return 'Rally';
-    if (RegExp(r'\b(19[4-7]\d)\b').hasMatch(model)) return 'Classic';
-    if (b == 'porsche' || b == 'lotus' || m.contains('gt') ||
-        m.contains('sport')) return 'Sports';
-    return 'Car';
-  }
-
-  /// 从车型名推断引擎类型
-  String _guessEngineType(String model, String brand) {
-    final m = model.toLowerCase();
-    if (m.contains('ev') || m.contains('electric') || m.contains('e-tron')) {
-      return 'Electric';
-    }
-    if (m.contains('v12') || brand == 'Ferrari' || brand == 'Lamborghini' ||
-        brand == 'Pagani') {
-      return 'V12';
-    }
-    if (m.contains('v10')) return 'V10';
-    if (m.contains('v8') || m.contains('gt500') || m.contains('hellcat')) {
-      return 'V8';
-    }
-    if (m.contains('turbo') || m.contains('sti') || m.contains('rs')) {
-      return 'Turbo';
-    }
-    if (m.contains('v6')) return 'V6';
-    if (m.contains('i6') || m.contains('inline')) return 'I6';
-    return '';
   }
 }
