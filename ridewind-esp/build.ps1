@@ -18,6 +18,9 @@ $IDF_PATH = "C:\Espressif\frameworks\esp-idf-v5.3.5"
 $env:IDF_PATH = $IDF_PATH
 $env:IDF_PYTHON_ENV_PATH = "C:\Espressif\python_env\idf5.3_py3.14_env"
 
+# 强制锁定 Python 路径，避免系统 PATH 中其他 Python 版本干扰
+$env:PYTHON = "C:\Espressif\python_env\idf5.3_py3.14_env\Scripts\python.exe"
+
 # 构建 PATH（只添加一次，不重复）
 $idfTools = @(
     "C:\Espressif\tools\xtensa-esp-elf-gdb\16.3_20250913\xtensa-esp-elf-gdb\bin",
@@ -39,6 +42,19 @@ $idfTools = @(
 # 只在 PATH 中没有 idf.py 时才添加
 if (-not ($env:Path -like "*Espressif*tools*ninja*")) {
     $env:Path = ($idfTools -join ";") + ";" + $env:Path
+}
+
+# 自动检测 Python 版本冲突：如果 CMakeCache 里的 Python 路径和当前不一致，自动清除缓存
+if (Test-Path "build\CMakeCache.txt") {
+    $cacheContent = Get-Content "build\CMakeCache.txt" -Raw
+    if ($cacheContent -match "PYTHON=(.+)") {
+        $cachedPython = $Matches[1].Trim()
+        if ($cachedPython -ne $env:PYTHON -and $cachedPython -notlike "*py3.14*") {
+            Write-Host "[FIX] Python 版本冲突检测: 缓存=$cachedPython, 当前=$($env:PYTHON)" -ForegroundColor Yellow
+            Write-Host "      自动删除 CMakeCache.txt..." -ForegroundColor Yellow
+            Remove-Item "build\CMakeCache.txt" -Force
+        }
+    }
 }
 
 # 全量编译：删除 build + sdkconfig
