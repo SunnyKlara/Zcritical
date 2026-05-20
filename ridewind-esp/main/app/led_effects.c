@@ -649,31 +649,34 @@ static void throttle_fx_lightning(uint8_t spd)
 /* ── Effect 8: Stage Light Show (每颗灯独立随机明暗) ──
  * Each LED has its own target brightness and fades independently.
  * Creates an organic, non-uniform flickering pattern like stage lighting.
+ * Key: extreme contrast (full bright vs full dark), with decisive transitions.
  * Uses preset color with varying brightness per LED. */
 static void throttle_fx_stage(uint8_t spd)
 {
     (void)spd;
 
-    /* Per-LED state: current brightness, target brightness, fade speed, hold timer */
+    /* Per-LED state */
     static uint8_t s_current[9];   /* 6 Main + 3 Tail */
     static uint8_t s_target[9];
-    static uint8_t s_speed[9];     /* fade step per tick (3-15) */
-    static uint8_t s_hold[9];      /* hold ticks before next target */
+    static uint8_t s_speed[9];     /* fade step per tick */
+    static uint8_t s_hold[9];      /* hold ticks at target before next change */
     static uint8_t s_initialized = 0;
 
-    /* Simple pseudo-random using phase + index mixing */
+    /* Simple pseudo-random */
     #define STAGE_RAND(seed) ((uint8_t)((seed) * 179 + 53))
 
     if (!s_initialized) {
         uint8_t seed = (uint8_t)(s_throttle_fx_phase & 0xFF);
         for (int i = 0; i < 9; i++) {
             seed = STAGE_RAND(seed + i * 37);
-            s_current[i] = 30 + (seed % 200);
+            /* Start with random extreme: either bright or dark */
+            s_current[i] = (seed & 1) ? 240 : 5;
             seed = STAGE_RAND(seed);
-            s_target[i] = 20 + (seed % 235);
+            s_target[i] = (seed & 1) ? 250 : 0;
             seed = STAGE_RAND(seed);
-            s_speed[i] = 3 + (seed % 13);
-            s_hold[i] = 0;
+            s_speed[i] = 8 + (seed % 20);  /* 8-27: fast decisive transitions */
+            seed = STAGE_RAND(seed);
+            s_hold[i] = 10 + (seed % 40);  /* 200-1000ms hold at target */
         }
         s_initialized = 1;
     }
@@ -685,42 +688,45 @@ static void throttle_fx_stage(uint8_t spd)
     uint8_t tg = g_app_state.led_colors[3][1];
     uint8_t tb = g_app_state.led_colors[3][2];
 
-    /* Update each LED independently */
-    uint8_t phase_seed = (uint8_t)((s_throttle_fx_phase >> 4) & 0xFF);
+    uint8_t phase_seed = (uint8_t)((s_throttle_fx_phase >> 3) & 0xFF);
+
     for (int i = 0; i < 9; i++) {
         if (s_hold[i] > 0) {
+            /* Holding at target — don't move */
             s_hold[i]--;
         } else {
             /* Fade toward target */
             if (s_current[i] < s_target[i]) {
-                uint8_t step = s_speed[i];
-                if (s_current[i] + step >= s_target[i]) {
-                    s_current[i] = s_target[i];
-                } else {
-                    s_current[i] += step;
-                }
+                uint16_t next = (uint16_t)s_current[i] + s_speed[i];
+                s_current[i] = (next >= s_target[i]) ? s_target[i] : (uint8_t)next;
             } else if (s_current[i] > s_target[i]) {
-                uint8_t step = s_speed[i];
-                if (s_current[i] - step <= s_target[i]) {
-                    s_current[i] = s_target[i];
-                } else {
-                    s_current[i] -= step;
-                }
+                int16_t next = (int16_t)s_current[i] - s_speed[i];
+                s_current[i] = (next <= (int16_t)s_target[i]) ? s_target[i] : (uint8_t)next;
             }
 
-            /* Reached target — pick new random target + speed + hold */
+            /* Reached target — pick new extreme target */
             if (s_current[i] == s_target[i]) {
                 uint8_t seed = STAGE_RAND(phase_seed + i * 41 + s_current[i]);
-                s_target[i] = 10 + (seed % 245);  /* 10-255 range */
+
+                /* Bias toward extremes: 70% chance of 0 or 255, 30% mid-range */
+                if ((seed % 10) < 7) {
+                    /* Extreme: if currently bright go dark, if dark go bright */
+                    s_target[i] = (s_current[i] > 128) ? (seed % 15) : (240 + (seed % 16));
+                } else {
+                    /* Occasional mid-range for variety */
+                    s_target[i] = 60 + (seed % 140);  /* 60-200 */
+                }
+
                 seed = STAGE_RAND(seed);
-                s_speed[i] = 3 + (seed % 10);     /* 3-12 step per 20ms tick */
+                s_speed[i] = 6 + (seed % 22);     /* 6-27 step per 20ms = 120-540ms full swing */
+
                 seed = STAGE_RAND(seed);
-                s_hold[i] = seed % 15;             /* 0-14 ticks hold (0-280ms) */
+                s_hold[i] = 15 + (seed % 50);     /* 300-1300ms hold (dramatic pause) */
             }
         }
     }
 
-    /* Apply brightness to Main strip (6 LEDs) */
+    /* Apply to Main strip */
     for (int i = 0; i < 6; i++) {
         uint8_t b = s_current[i];
         drv_led_set_pixel(0, LED_MAIN_START + i,
@@ -729,7 +735,7 @@ static void throttle_fx_stage(uint8_t spd)
             (uint8_t)((uint16_t)cb * b / 255));
     }
 
-    /* Apply brightness to Tail strip (3 LEDs) */
+    /* Apply to Tail strip */
     for (int i = 0; i < LED_TAIL_COUNT; i++) {
         uint8_t b = s_current[6 + i];
         drv_led_set_pixel(1, LED_TAIL_START + i,
