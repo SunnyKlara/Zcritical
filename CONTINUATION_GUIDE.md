@@ -32,6 +32,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 | **仓库瘦身+上线** | git filter-repo 清理历史大文件，push 到 GitHub (SunnyKlara/Zcritical)，v1.0.0 tag 已打 |
 | **v1.0.0 发版** | GitHub Release 创建，APK(74.6MB)+固件bin(2.9MB) 上传，app_version.json 配置完成 |
 | **编译工程化** | build.ps1 快速编译脚本（增量 2s），IRAM 溢出修复，build-environment.md 环境文档 |
+| **OTA 协议对齐** | Flutter 改为 binary mode 传输，ESP32 加 OTA_VERSION 命令，创建 firmware.json |
 
 ## 当前阻塞
 
@@ -42,11 +43,10 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 ## 下一步
 
 1. **P0 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
-2. **P1 引擎音效调参** — RC Engine 方案待烧录验证最终效果
-3. **P2 DeviceConnectScreen 拆分**
-4. **P3 OTA App 端** — Flutter BLE OTA 页面（下载 bin + 传输 + 进度条）
+2. **P1 OTA 实机验证** — 烧录新固件后测试 BLE OTA 全流程（本地+远程）
+3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
+4. **P3 DeviceConnectScreen 拆分**
 5. **P4 go_router + 国际化 + CI/CD**
-6. **P5 网络优化** — 考虑切换 Git remote 到 SSH 协议（更稳定）
 
 ## OTA 实现进度（Phase 10, 2026-05-21）
 
