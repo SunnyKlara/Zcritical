@@ -37,13 +37,6 @@ class ThrottleEffectSelector {
       isPro: true,
     ),
     _EffectOption(
-      mode: 3,
-      icon: Icons.auto_awesome,
-      name: '流水灯',
-      description: '光点追逐奔跑，穿越整条灯带',
-      isPro: false,
-    ),
-    _EffectOption(
       mode: 8,
       icon: Icons.theater_comedy,
       name: '舞台灯光秀',
@@ -213,8 +206,12 @@ class _EffectSheetState extends State<_EffectSheet> {
               ),
             ),
           ),
-          // 效果列表
-          ...ThrottleEffectSelector._effects.map((effect) {
+          // 效果列表（可滚动，未来加更多效果时自动支持上下滑动）
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: ThrottleEffectSelector._effects.map((effect) {
             final isSelected = effect.mode == _previewing;
             return GestureDetector(
               onTap: () => _onTap(effect),
@@ -330,7 +327,9 @@ class _EffectSheetState extends State<_EffectSheet> {
                 ),
               ),
             );
-          }),
+          }).toList(),
+            ),
+          ),
           const SizedBox(height: 12),
           // PRO 预览提示
           if (_isProPreviewing)
