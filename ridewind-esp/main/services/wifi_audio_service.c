@@ -407,8 +407,21 @@ void wifi_audio_service_connect(const char *ssid, const char *password)
 void wifi_audio_service_auto_connect(void)
 {
     if (s_saved_ssid[0] != '\0') {
-        ESP_LOGI(TAG, "Auto-connecting to saved WiFi: \"%s\"", s_saved_ssid);
+        ESP_LOGI(TAG, "Auto-connecting to saved WiFi: \"%s\" (blocking, max 10s)", s_saved_ssid);
         wifi_do_connect(s_saved_ssid, s_saved_pass);
+
+        /* Block until connected or timeout (10 seconds).
+         * This is called at boot BEFORE BLE starts, so blocking is safe.
+         * Ensures WiFi is fully connected before BLE init to avoid RF contention. */
+        EventBits_t bits = xEventGroupWaitBits(
+            s_wifi_event_group, WIFI_CONNECTED_BIT,
+            pdFALSE, pdFALSE, pdMS_TO_TICKS(10000));
+
+        if (bits & WIFI_CONNECTED_BIT) {
+            ESP_LOGI(TAG, "WiFi auto-connect SUCCESS: %s", s_ip_addr);
+        } else {
+            ESP_LOGW(TAG, "WiFi auto-connect TIMEOUT (10s) — will retry in background");
+        }
     } else {
         ESP_LOGI(TAG, "No saved WiFi to auto-connect");
     }
