@@ -19,6 +19,7 @@
 #include "wifi_audio_service.h"
 #include "audio_engine.h"
 #include "ble_service.h"
+#include "wifi_comm_service.h"
 
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -111,6 +112,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             s_wifi_connected = false;
             xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
 
+            /* Stop WebSocket server when WiFi is lost */
+            wifi_comm_service_stop();
+
             if (s_retry_count < WIFI_MAX_RETRY) {
                 s_retry_count++;
                 ESP_LOGI(TAG, "Retry %d/%d...", s_retry_count, WIFI_MAX_RETRY);
@@ -137,6 +141,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         char buf[48];
         snprintf(buf, sizeof(buf), "WIFI_IP:%s\r\n", s_ip_addr);
         ble_service_notify_str(buf);
+
+        /* Start WebSocket communication server */
+        wifi_comm_service_start();
     }
 }
 
