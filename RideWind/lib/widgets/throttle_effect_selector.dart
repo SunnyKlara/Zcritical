@@ -43,6 +43,13 @@ class ThrottleEffectSelector {
       description: '光点追逐奔跑，穿越整条灯带',
       isPro: false,
     ),
+    _EffectOption(
+      mode: 8,
+      icon: Icons.theater_comedy,
+      name: '舞台灯光秀',
+      description: '每颗灯独立明暗变化，不规则的呼吸感',
+      isPro: false,
+    ),
   ];
 
   /// 从 SharedPreferences 读取上次选择的 mode
