@@ -5,7 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/sound_wave_scanner.dart';
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
-import 'device_connect_screen.dart';
+import 'main_pager_screen.dart';
 
 class DeviceScanScreen extends StatefulWidget {
   const DeviceScanScreen({super.key});
@@ -504,13 +504,13 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                     height: 58,
                     child: ElevatedButton(
                       onPressed: () {
-                        // 替换 ScanScreen 为 DeviceConnectScreen
-                        // 栈变为: [NoDevice, Connect]
-                        // 回退: Connect → NoDevice
+                        // 替换 ScanScreen 为 MainPagerScreen
+                        // 栈变为: [NoDevice, MainPager]
+                        // 回退: MainPager → NoDevice
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (_) =>
-                                DeviceConnectScreen(device: _foundDevice!),
+                                MainPagerScreen(device: _foundDevice!),
                           ),
                         );
                       },

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../models/device_model.dart';
 import '../utils/responsive_utils.dart';
-import 'device_connect_screen.dart';
+import 'main_pager_screen.dart';
 import 'no_device_screen.dart';
 
 class DeviceListScreen extends StatelessWidget {
@@ -226,7 +226,7 @@ class DeviceListScreen extends StatelessWidget {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) =>
-                                  DeviceConnectScreen(device: targetDevice),
+                                  MainPagerScreen(device: targetDevice),
                             ),
                           );
                         },

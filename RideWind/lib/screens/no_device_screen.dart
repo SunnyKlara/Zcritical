@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'device_scan_screen.dart';
-import 'device_connect_screen.dart';
+import 'main_pager_screen.dart';
 import 'device_list_screen.dart';
 import 'settings_screen.dart';
 import '../models/device_model.dart';
@@ -321,8 +321,8 @@ class NoDeviceScreen extends StatelessWidget {
                     rssi: -50,
                     isConnected: true,
                   );
-                  // 先 push DeviceListScreen，再 push DeviceConnectScreen
-                  // 栈: [NoDevice, DeviceList, Connect]
+                  // 先 push DeviceListScreen，再 push MainPagerScreen
+                  // 栈: [NoDevice, DeviceList, MainPager(含Garage+Connect)]
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const DeviceListScreen(),
@@ -330,7 +330,7 @@ class NoDeviceScreen extends StatelessWidget {
                   );
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => DeviceConnectScreen(device: mockDevice),
+                      builder: (_) => MainPagerScreen(device: mockDevice),
                     ),
                   );
                 },
