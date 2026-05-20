@@ -64,6 +64,7 @@ fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/comman
 | `GET:STREAMLIGHT\n` | `STREAMLIGHT:x\r\n` |
 | `GET:LOGO_SLOTS\n` | `LOGO_SLOTS:v0:v1:v2:active\r\n` |
 | `GET:AUDIO\n` | `AUDIO_STATUS:v0:v1:v2:v3:custom\r\n` |
+| `OTA_VERSION\n` | `OTA_VERSION:<fw_version>\r\n` |
 
 ### WiFi 音频投射
 

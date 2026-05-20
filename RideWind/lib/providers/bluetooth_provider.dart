@@ -74,6 +74,7 @@ class BluetoothProvider with ChangeNotifier {
 
   // WiFi
   String? _esp32IpAddress;
+  bool _isWifiProvisioning = false;
 
   // ── 转发流（从 ResponseRouter 转发到 UI 层）──
   // 这些流保持与旧版完全相同的公开接口
@@ -89,6 +90,7 @@ class BluetoothProvider with ChangeNotifier {
   DeviceModel? get connectedDevice => _connectedDevice;
   bool get isConnected => _bleService.isConnected;
   Stream<bool> get connectionStream => _bleService.connectionStream;
+  int? get effectiveMtu => _bleService.isConnected ? _bleService.effectiveMtu : null;
   int? get currentSpeed => _currentSpeed;
   bool get wuhuaqiStatus => _wuhuaqiStatus;
   bool get streamlightStatus => _streamlightStatus;
@@ -97,6 +99,7 @@ class BluetoothProvider with ChangeNotifier {
   int get currentVolume => _currentVolume;
   LogoSlotStatus? get logoSlotStatus => _logoSlotStatus;
   String? get esp32IpAddress => _esp32IpAddress;
+  bool get isWifiProvisioning => _isWifiProvisioning;
 
   // ── 事件流（直接暴露 ResponseRouter 的流）──
   Stream<int> get knobDeltaStream => _router.knobDeltaStream;
@@ -210,10 +213,22 @@ class BluetoothProvider with ChangeNotifier {
       if (!connected) {
         _connectedDevice?.isConnected = false;
         _resetReceiveBuffers();
-        notifyListeners();
+        // During WiFi provisioning, BLE disconnect is expected (ESP32 stops BLE
+        // to avoid RF contention). Don't clear _connectedDevice so UI stays.
+        if (!_isWifiProvisioning) {
+          notifyListeners();
+        } else {
+          debugPrint('📶 BLE disconnected during WiFi provisioning — expected, not clearing device');
+          notifyListeners();
+        }
       } else if (_connectedDevice != null) {
         _resetReceiveBuffers();
         _connectedDevice!.isConnected = true;
+        // If we were provisioning and BLE reconnected, clear the flag
+        if (_isWifiProvisioning) {
+          debugPrint('📶 BLE reconnected after WiFi provisioning');
+          _isWifiProvisioning = false;
+        }
         notifyListeners();
         debugPrint('🔄 检测到重连，同步硬件状态...');
         await _syncHardwareStateOnReconnect();
@@ -457,7 +472,15 @@ class BluetoothProvider with ChangeNotifier {
 
   Future<bool> sendWifiCredentials(String ssid, String password) async {
     if (!isConnected) return false;
+    _isWifiProvisioning = true;
+    notifyListeners();
     return _cmd.sendWifiCredentials(ssid, password);
+  }
+
+  /// Clear the WiFi provisioning flag (called when provisioning completes or is cancelled)
+  void clearWifiProvisioningFlag() {
+    _isWifiProvisioning = false;
+    notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════════

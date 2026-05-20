@@ -242,11 +242,8 @@ void ui_speed_enter(void)
         led_effects_throttle_start();
     }
 
-    /* Only start engine sound if speed is already non-zero */
-    if (g_app_state.current_speed_kmh > 0) {
-        audio_player_start_engine();
-        audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
-    }
+    /* Normal mode: no engine sound. WiFi audio plays normally.
+     * Engine sound only starts when entering throttle mode. */
 }
 
 void ui_speed_update(void)
@@ -280,8 +277,8 @@ void ui_speed_update(void)
                 if (g_app_state.wuhuaqi_state == 0)
                     drv_gpio_set_humidifier(false);
                 audio_engine_set_throttle_mode(false);
-                /* Stop engine sound if speed dropped to 0 already */
-                if (g_app_state.current_speed_kmh == 0 && audio_player_is_playing()) {
+                /* Stop engine sound — normal mode uses WiFi audio only */
+                if (audio_player_is_playing()) {
                     audio_player_stop_engine();
                 }
                 ble_service_notify_str("THROTTLE_REPORT:0\n");
@@ -341,17 +338,8 @@ void ui_speed_update(void)
             g_app_state.fan_speed = (uint8_t)g_app_state.current_speed_kmh;
             drv_pwm_set_duty(g_app_state.fan_speed);
 
-            /* Engine sound: start when speed goes above 0, stop when it hits 0 */
-            if (g_app_state.current_speed_kmh > 0) {
-                if (!audio_player_is_playing()) {
-                    audio_player_start_engine();
-                }
-                audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
-            } else {
-                if (audio_player_is_playing()) {
-                    audio_player_stop_engine();
-                }
-            }
+            /* Normal mode: no engine sound — WiFi audio plays uninterrupted.
+             * Engine sound is only used in throttle mode. */
             {
                 char buf[48];
                 int16_t disp = g_app_state.speed_unit == 0
