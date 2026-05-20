@@ -10,6 +10,7 @@
 功能全部跑通，进入打磨阶段。用户以产品经理身份提需求，AI 深入理解后设计实现。
 
 **Git**：main 单分支 + tag 发版。当前 tag: `v1.0.0`。
+WiFi 主通道分支 `feat/wifi-main-channel` 已合并回 main（2026-05-21）。
 Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/release）。
 详见 `.kiro/steering/git-and-release.md`。
 
