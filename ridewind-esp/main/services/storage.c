@@ -39,13 +39,13 @@ uint32_t storage_crc32(const uint8_t *data, uint32_t len)
  * ═══════════════════════════════════════════════════════════════ */
 static const nvs_settings_t s_defaults = {
     .led_colors = {
-        {150, 20, 0},     /* Main */
-        {255, 0, 0},      /* Left */
-        {33, 126, 222},   /* Right */
-        {255, 0, 0},      /* Tail */
+        {255, 255, 255},  /* Main — white */
+        {255, 255, 255},  /* Left — white */
+        {255, 255, 255},  /* Right — white */
+        {255, 255, 255},  /* Tail — white */
     },
     .brightness = 100,
-    .volume = 80,
+    .volume = 0,          /* Muted — engine audio still in dev */
     .preset_index = 1,
     .speed_unit = 0,
     .streamlight = 0,
