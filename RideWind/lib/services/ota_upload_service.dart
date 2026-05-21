@@ -489,48 +489,92 @@ class OtaUploadService {
         throw Exception('OTA 启动异常: $readyResp');
       }
 
-      // 3. 发送固件数据 — 4KB binary frames
+      // 3. 发送固件数据 — streaming mode (no per-chunk ACK wait)
+      // TCP flow control handles backpressure automatically.
+      // ESP32 still sends OTA_ACK every ~4KB for progress tracking,
+      // but we don't block on them — just update progress asynchronously.
       _setState(OtaState.uploading);
       final totalSize = firmwareData.length;
       int sent = 0;
+      int lastAckedBytes = 0;
       final sw = Stopwatch()..start();
 
-      _log('开始 WiFi 传输: total=$totalSize bytes, chunk=$wifiChunkSize');
+      _log('开始 WiFi 流式传输: total=$totalSize bytes, chunk=$wifiChunkSize');
 
+      // Listen for ACKs asynchronously (update progress from ACK values)
+      // Replace the pendingResponse mechanism with a stream-based approach
+      Completer<String>? otaEndResponse;
+      String? otaError;
+
+      // Swap listener to async ACK consumer
+      wsSub?.cancel();
+      wsSub = ws.listen((data) {
+        if (data is String) {
+          final trimmed = data.trim();
+          if (trimmed.startsWith('OTA_ACK:')) {
+            // Parse received bytes from ACK for accurate progress
+            final acked = int.tryParse(trimmed.substring(8)) ?? 0;
+            if (acked > lastAckedBytes) {
+              lastAckedBytes = acked;
+              onProgress?.call(lastAckedBytes / totalSize);
+            }
+          } else if (trimmed.startsWith('OTA_OK:') || trimmed.startsWith('OTA_FAIL:')) {
+            _log('← $trimmed');
+            if (otaEndResponse != null && !otaEndResponse!.isCompleted) {
+              otaEndResponse!.complete(trimmed);
+            }
+          } else if (trimmed.startsWith('OTA_')) {
+            _log('← $trimmed');
+          }
+        }
+      }, onError: (e) {
+        otaError = 'WebSocket 错误: $e';
+        if (otaEndResponse != null && !otaEndResponse!.isCompleted) {
+          otaEndResponse!.complete('WS_ERROR:$e');
+        }
+      }, onDone: () {
+        if (otaEndResponse != null && !otaEndResponse!.isCompleted) {
+          otaEndResponse!.complete('WS_CLOSED');
+        }
+      });
+
+      // Stream all chunks without waiting for ACK
       while (sent < totalSize) {
         if (_cancelled) throw Exception('升级已取消');
+        if (otaError != null) throw Exception(otaError);
 
         final end = (sent + wifiChunkSize).clamp(0, totalSize);
         final chunk = firmwareData.sublist(sent, end);
 
-        // Send as binary WebSocket frame
         ws.add(chunk);
         sent += chunk.length;
 
-        // Update progress
+        // Update send progress (ACK-based progress also updates via listener)
         onProgress?.call(sent / totalSize);
 
-        // Wait for ACK every ~4KB (ESP32 sends OTA_ACK after each flash write)
-        final ackResp = await waitWsResponse(const Duration(seconds: 10));
-        if (ackResp.startsWith('OTA_ACK:')) {
-          // Good, continue
-        } else if (ackResp.startsWith('OTA_FAIL:')) {
-          throw Exception('传输失败: ${ackResp.substring(9)}');
-        } else if (ackResp == 'TIMEOUT') {
-          throw Exception('OTA_ACK 超时 (sent=$sent/$totalSize)');
+        // Yield to event loop every 64KB to allow ACK processing
+        if (sent % (64 * 1024) == 0 || sent >= totalSize) {
+          await Future.delayed(Duration.zero);
         }
       }
 
       sw.stop();
       final speed = (totalSize / 1024) / (sw.elapsedMilliseconds / 1000);
-      _log('数据传输完成: ${sw.elapsedMilliseconds}ms (${speed.toStringAsFixed(1)} KB/s)');
+      _log('数据发送完成: ${sw.elapsedMilliseconds}ms (${speed.toStringAsFixed(1)} KB/s)');
 
-      // 4. 发送 OTA_END
+      // 4. 发送 OTA_END — wait for final verification response
       _setState(OtaState.verifying);
       _log('发送 OTA_END');
+      otaEndResponse = Completer<String>();
       ws.add('OTA_END\n');
 
-      final endResp = await waitWsResponse(const Duration(seconds: 15));
+      // Wait for OTA_OK or OTA_FAIL (ESP32 flushes buffer + validates image)
+      String endResp;
+      try {
+        endResp = await otaEndResponse!.future.timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        endResp = 'TIMEOUT';
+      }
       if (endResp.startsWith('OTA_OK:')) {
         final version = endResp.substring(7).replaceAll('\r\n', '');
         _log('✅ WiFi OTA 成功！新固件版本: $version');
