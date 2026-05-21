@@ -4,85 +4,114 @@ inclusion: manual
 
 # Release Playbook — 实操经验记录
 
-> 本文件记录 v1.0.0 发版时跑通的完整流程，供后续发版自动化参考。
+> 本文件记录发版完整流程，供后续发版参考。
 
 ## 前置条件
 
 - `gh` CLI 已安装（`winget install GitHub.cli`）
-- `gh auth login` 已完成（浏览器 OAuth 流程，token 存 keyring）
+- `gh auth login` 已完成
 - Flutter SDK 可用（当前 3.41.6）
-- Android SDK 可用（Gradle 构建 release APK）
+- SSH 密钥：`C:\Users\Klara\Downloads\apk.pem`
+- 阿里云服务器：`47.107.143.4`（APK 分发）
 
-## APP 发版完整命令序列
+## APP 发版完整流程
 
 ```powershell
-# 0. 设置 PATH（新安装的工具可能不在当前 session PATH 中）
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+# ═══ 1. 更新版本号 ═══
+# RideWind/pubspec.yaml → version: X.Y.Z+BUILD
+# RideWind/app_version.json → 更新 latest_version + download_url
 
-# 1. 更新版本号
-# - RideWind/pubspec.yaml → version: X.Y.Z+BUILD
-# - CHANGELOG.md → 新增版本条目
-
-# 2. Commit 版本变更
-git add RideWind/pubspec.yaml CHANGELOG.md
-git commit -m "release: APP vX.Y.Z"
-
-# 3. 打 tag
-git tag app-vX.Y.Z
-# 或联合发版用 git tag vX.Y.Z
-
-# 4. 构建 Release APK
+# ═══ 2. 构建 Release APK ═══
 cd RideWind
-flutter clean
-flutter pub get
 flutter build apk --release
-# 产物: build\app\outputs\flutter-apk\app-release.apk (约 74MB)
-# ⚠️ "Building with plugins requires symlink support" 警告可忽略，不影响 APK 构建
+# 产物: build\app\outputs\flutter-apk\app-release.apk
 
-# 5. 重命名 APK
+# ═══ 3. 重命名 APK ═══
 copy build\app\outputs\flutter-apk\app-release.apk build\app\outputs\flutter-apk\ridewind-vX.Y.Z.apk
 
-# 6. 创建 GitHub Release + 上传 APK
-gh release create vX.Y.Z --title "vX.Y.Z — 标题" --notes "Release notes 内容"
-gh release upload vX.Y.Z "build\app\outputs\flutter-apk\ridewind-vX.Y.Z.apk" --clobber
+# ═══ 4. 上传 APK 到阿里云服务器（国内加速） ═══
+scp -i "C:\Users\Klara\Downloads\apk.pem" "build\app\outputs\flutter-apk\ridewind-vX.Y.Z.apk" root@47.107.143.4:/www/wwwroot/sunnyklara.com/releases/
 
-# 7. 更新 app_version.json（触发 APP 自动升级检测）
-# downloadUrl → https://github.com/SunnyKlara/Zcritical/releases/download/vX.Y.Z/ridewind-vX.Y.Z.apk
+# ═══ 5. 验证下载链接 ═══
+# 浏览器访问: http://47.107.143.4/releases/ridewind-vX.Y.Z.apk
 
-# 8. Commit + Push
-git add RideWind/app_version.json
-git commit -m "chore: 更新 app_version.json 下载链接 → vX.Y.Z"
+# ═══ 6. 更新 app_version.json ═══
+# download_url → http://47.107.143.4/releases/ridewind-vX.Y.Z.apk
+# latest_version → X.Y.Z
+
+# ═══ 7. Commit + Tag + Push ═══
+cd ..
+git add RideWind/pubspec.yaml RideWind/app_version.json
+git commit -m "release: APP vX.Y.Z"
+git tag vX.Y.Z
 git push origin main --tags
+
+# ═══ 8. 创建 GitHub Release（备份） ═══
+gh release create vX.Y.Z --title "vX.Y.Z — 标题" --notes "Release notes"
+gh release upload vX.Y.Z "RideWind\build\app\outputs\flutter-apk\ridewind-vX.Y.Z.apk" --clobber
 ```
+
+## 关键路径
+
+| 用途 | 路径/地址 |
+|------|-----------|
+| APK 产物 | `RideWind/build/app/outputs/flutter-apk/app-release.apk` |
+| 版本配置 | `RideWind/pubspec.yaml` |
+| 自动升级配置 | `RideWind/app_version.json` |
+| **APK 下载地址** | `http://47.107.143.4/releases/ridewind-vX.Y.Z.apk` |
+| 服务器 APK 目录 | `/www/wwwroot/sunnyklara.com/releases/` |
+| SSH 密钥 | `C:\Users\Klara\Downloads\apk.pem` |
+| GitHub Release | `https://github.com/SunnyKlara/Zcritical/releases` |
+| 版本检测 URL | `https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/RideWind/app_version.json` |
+
+## app_version.json 格式
+
+```json
+{
+  "latest_version": "X.Y.Z",
+  "latest_build": N,
+  "min_version": "1.0.0",
+  "download_url": "http://47.107.143.4/releases/ridewind-vX.Y.Z.apk",
+  "release_notes": "更新内容...",
+  "force_update": false,
+  "version": "X.Y.Z",
+  "buildNumber": N,
+  "minSupportedVersion": "1.0.0",
+  "downloadUrl": "http://47.107.143.4/releases/ridewind-vX.Y.Z.apk",
+  "changelog": "更新内容...",
+  "releaseDate": "YYYY-MM-DD",
+  "forceUpdate": false
+}
+```
+
+> ⚠️ 必须同时包含 snake_case 和 camelCase 字段（兼容两个 UpdateService）
+
+## 服务器信息
+
+| 项目 | 值 |
+|------|-----|
+| IP | 47.107.143.4 |
+| 系统 | Alibaba Cloud Linux 3.21.04 |
+| 带宽 | 200 Mbps |
+| Web 服务 | nginx 1.26.1 |
+| SSH 用户 | root（密钥登录） |
+| APK 目录 | `/www/wwwroot/sunnyklara.com/releases/` |
+| nginx server_name | `sunnyklara.com www.sunnyklara.com 47.107.143.4` |
 
 ## 踩坑记录
 
 | 问题 | 解决方案 |
 |------|----------|
-| `gh` 未安装 | `winget install GitHub.cli` 一行搞定 |
-| `gh` 安装后当前 session 找不到 | 刷新 PATH：`$env:Path = [System.Environment]::GetEnvironmentVariable(...)` |
-| `gh auth login` 需要交互 | 用 `--web` 走浏览器 OAuth，复制 one-time code 到 github.com/login/device |
-| `git push` 网络超时 | GitHub 443 端口偶发连接重置，重试即可（可能是 VPN/防火墙） |
-| `flutter pub get` 报 symlink 错误 | 需要 Windows Developer Mode，但不影响 APK 构建 |
-| `flutter build apk` Java 警告 | "源值 8 已过时" 是 Gradle 兼容性警告，不影响产物 |
-| APK 体积 74MB | 正常（含 Flutter engine + 所有 assets），后续可用 `--split-per-abi` 减小 |
+| GitHub Releases 国内下载极慢/超时 | APK 放阿里云服务器，国内直连 |
+| `app_version.json` 字段名不匹配 | 同时包含 snake_case 和 camelCase |
+| nginx 404（IP 访问走错 server block） | APK 放 `/www/wwwroot/sunnyklara.com/releases/`（IP 对应的 root） |
+| GitHub raw 缓存延迟 | 等 5-10 分钟，或用 `?t=timestamp` 参数 |
+| SSH Permission denied | 用密钥：`ssh -i apk.pem root@47.107.143.4` |
+| APK 体积 165MB | 含 car_thumbnails 资源，后续可用 `--split-per-abi` 减小 |
 
-## 关键路径
+## 自动更新触发条件
 
-| 用途 | 路径 |
-|------|------|
-| APK 产物 | `RideWind/build/app/outputs/flutter-apk/app-release.apk` |
-| 版本配置 | `RideWind/pubspec.yaml` |
-| 自动升级配置 | `RideWind/app_version.json` |
-| Release 地址 | `https://github.com/SunnyKlara/Zcritical/releases` |
-
-## gh CLI 常用命令速查
-
-```powershell
-gh auth status                    # 查看登录状态
-gh release list                   # 列出所有 release
-gh release create TAG --title T --notes N   # 创建 release
-gh release upload TAG FILE --clobber        # 上传/覆盖附件
-gh release delete TAG --yes                 # 删除 release
-gh release view TAG                         # 查看 release 详情
-```
+- APP 在 `device_connect_screen` 连接设备后自动检查
+- 从 GitHub raw 读取 `app_version.json`
+- 比较 `latest_version` 和本地 `PackageInfo.version`
+- 新版本 → 弹窗提示 → 用户点"立即更新" → 从阿里云下载 APK → 安装
