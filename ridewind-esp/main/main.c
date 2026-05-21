@@ -38,6 +38,7 @@
 #include "storage.h"
 #include "boot_logo_240.h"
 #include "ota_service.h"
+#include "selftest.h"
 #include "esp_app_desc.h"
 
 static const char *TAG = "MAIN";
@@ -1034,6 +1035,11 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    /* Production self-test: hold encoder button at power-on to enter */
+    if (selftest_check_entry()) {
+        selftest_run();  /* Never returns — device must be power-cycled */
+    }
 
     /* 1. AppState init (factory defaults) */
     app_state_init();
