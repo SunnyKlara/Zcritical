@@ -45,7 +45,7 @@ void app_state_init(void)
     }
 
     g_app_state.brightness       = 100;
-    g_app_state.volume           = 80;
+    g_app_state.volume           = 0;       /* Muted by default — engine audio still in dev */
     g_app_state.preset_index     = 1;
     g_app_state.speed_unit       = 0;       /* km/h */
     g_app_state.wuhuaqi_state    = 0;       /* Humidifier off by default — user activates via APP or throttle */
