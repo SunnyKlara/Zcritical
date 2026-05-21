@@ -17,25 +17,25 @@ void app_state_init(void)
 
     /* ── Factory defaults (matching STM32 deng_init) ── */
 
-    /* Main strip: deep orange-red */
-    g_app_state.led_colors[0][0] = 150;
-    g_app_state.led_colors[0][1] = 20;
-    g_app_state.led_colors[0][2] = 0;
+    /* Main strip: white */
+    g_app_state.led_colors[0][0] = 255;
+    g_app_state.led_colors[0][1] = 255;
+    g_app_state.led_colors[0][2] = 255;
 
-    /* Left strip: pure red */
+    /* Left strip: white */
     g_app_state.led_colors[1][0] = 255;
-    g_app_state.led_colors[1][1] = 0;
-    g_app_state.led_colors[1][2] = 0;
+    g_app_state.led_colors[1][1] = 255;
+    g_app_state.led_colors[1][2] = 255;
 
-    /* Right strip: blue */
-    g_app_state.led_colors[2][0] = 33;
-    g_app_state.led_colors[2][1] = 126;
-    g_app_state.led_colors[2][2] = 222;
+    /* Right strip: white */
+    g_app_state.led_colors[2][0] = 255;
+    g_app_state.led_colors[2][1] = 255;
+    g_app_state.led_colors[2][2] = 255;
 
-    /* Tail strip: pure red */
+    /* Tail strip: white */
     g_app_state.led_colors[3][0] = 255;
-    g_app_state.led_colors[3][1] = 0;
-    g_app_state.led_colors[3][2] = 0;
+    g_app_state.led_colors[3][1] = 255;
+    g_app_state.led_colors[3][2] = 255;
 
     /* Copy to edit buffer */
     for (int i = 0; i < 4; i++) {
