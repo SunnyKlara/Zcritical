@@ -56,6 +56,15 @@ void drv_audio_write(const int16_t *samples, uint32_t sample_count)
 {
     if (!s_tx_handle || sample_count == 0) return;
 
+    /* Apply volume scaling (software gain) */
+    if (s_volume < 100) {
+        int16_t *buf = (int16_t *)samples;  /* OK: caller buffers are writable */
+        uint32_t total = sample_count * 2;  /* stereo: L+R per sample */
+        for (uint32_t i = 0; i < total; i++) {
+            buf[i] = (int16_t)((int32_t)buf[i] * s_volume / 100);
+        }
+    }
+
     size_t bytes_written = 0;
     /* Each stereo sample = 4 bytes (2 × int16_t) */
     i2s_channel_write(s_tx_handle, samples, sample_count * sizeof(int16_t) * 2,
