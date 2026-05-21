@@ -28,6 +28,7 @@ idf_component_register(
         "app/app_state.c"
         "app/led_effects.c"
         "app/encoder_handler.c"
+        "app/selftest.c"
         "resources/menu_icons.c"
         "resources/ui_images.c"
         "resources/colored_digits.c"

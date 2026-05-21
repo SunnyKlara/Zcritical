@@ -9,8 +9,9 @@
 
 功能全部跑通，进入打磨阶段。用户以产品经理身份提需求，AI 深入理解后设计实现。
 
-**Git**：main 单分支 + tag 发版。当前 tag: `v1.0.0`。
+**Git**：main 单分支 + tag 发版。当前 tag: `v1.1.0`。
 WiFi 主通道分支 `feat/wifi-main-channel` 已合并回 main（2026-05-21）。
+v1.1.0 已发布到 GitHub Releases（APK 165.6MB）。
 Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/release）。
 详见 `.kiro/steering/git-and-release.md`。
 
@@ -44,10 +45,12 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 - **WiFi 配网已验证通过** — 实机测试成功（2026-05-21），全流程秒级完成
 - **WiFi OTA 全流程验证通过** — APP 端 WebSocket OTA 成功（2.95MB，含擦除约 83s），Rollback 自检通过，设备正常重启
 - **车库 Logo WiFi 上传验证通过** — Python 脚本测试成功：115KB / 3.0s / 29 ACKs / LOGO_OK:0。CRC=0 跳过应用层校验（WiFi TCP 已保证完整性）。ESP32 日志确认 `Logo slot 0 written OK`。APP 端待实测。
+- **APP 自动更新完成** — 检测弹窗通过 + APK 下载链接改为阿里云轻量服务器（`http://47.107.143.4/releases/`，200Mbps 带宽，国内直连）。服务器 nginx 已配置，APK 已上传验证（HTTP 200）。
 - **死代码清理完成** — 删除 4 文件 ~600 行：`image_preprocessing_service.dart` + `image_compression_service.dart` + `transmission_benchmark.dart` + `test/image_preprocessing_test.dart`。`logo_transmission_manager.dart`(1373行) 不再被 Logo 页面使用，仅被测试文件引用，后续可删。
 
 ## 最近修复（2026-05-21）
 
+- **产测自检未集成** — `selftest.c` 已实现但 `app_main()` 未调用 `selftest_check_entry()`/`selftest_run()`，导致开机长按编码器无法进入自检。已修复：在 NVS 初始化后、`app_state_init()` 前插入入口调用 + `#include "selftest.h"` + CMakeLists.txt 添加 `app/selftest.c`。编译通过 ✅
 - **WiFi OTA 实现** — APP 通过 WebSocket 推送固件到 ESP32（方案 B）：
   - `ota_upload_service.dart`：新增 `uploadViaWifi()` 方法（ws://ip:81/ws, 4KB binary frames）
   - `ota_upgrade_screen.dart`：自动检测 WiFi IP，有则走 WiFi，无则 fallback BLE
