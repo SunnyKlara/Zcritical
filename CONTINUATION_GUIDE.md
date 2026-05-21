@@ -9,7 +9,7 @@
 
 功能全部跑通，进入打磨阶段。用户以产品经理身份提需求，AI 深入理解后设计实现。
 
-**Git**：main 单分支 + tag 发版。当前 tag: `v1.1.0`。
+**Git**：main 单分支 + tag 发版。当前 tag: `v1.1.1`。
 WiFi 主通道分支 `feat/wifi-main-channel` 已合并回 main（2026-05-21）。
 v1.1.0 已发布到 GitHub Releases（APK 165.6MB）。
 Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/release）。
@@ -142,7 +142,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 ## 编译状态
 
 ```
-ESP32-S3 固件：idf.py build — ✅ 通过（2026-05-21，v1.0.0，target=esp32s3，bin 2.94MB，分区余量 4%）
+ESP32-S3 固件：idf.py build — ✅ 通过（2026-05-21，v1.1.1，target=esp32s3，bin 3.04MB，分区余量 3%）
   分支 feat/wifi-main-channel
   变更：WiFi 配网正式版（生产启动序列 + provision task + BLE 恢复）
   ⚠️ 烧录需全量（含 bootloader）：idf.py -p COMx flash
