@@ -81,7 +81,7 @@
 /* Menu */
 #define MENU_SWITCH_DEBOUNCE_MS     150
 #define MENU_DELTA_THRESHOLD        1
-#define MENU_PAGE_COUNT             5
+#define MENU_PAGE_COUNT             6
 
 /* Menu layout (matching F4 parameters) */
 #define MENU_ICON_CENTER_Y          90
