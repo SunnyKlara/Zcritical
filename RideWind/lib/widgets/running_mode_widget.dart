@@ -8,7 +8,7 @@ import '../utils/throttle_accelerator.dart'; // 🚀 乱序加速器
 import '../utils/speed_bounce_animation.dart'; // 🎯 弹跳动画
 import '../models/speed_report.dart'; // 🏎️ 速度报告模型
 import 'volume_overlay.dart'; // 🔊 悬浮音量条
-import 'driving_style_sheet.dart'; // ⚙️ 驾驶风格设置弹窗
+import 'garage_control_sheet.dart'; // 🚗 车库联动控制弹窗
 
 /// 📱 响应式布局配置类
 ///
@@ -793,9 +793,15 @@ class RunningModeWidgetState extends State<RunningModeWidget>
                 widget.onEmergencyStop();
               },
               onLongPress: () {
-                debugPrint('⚙️ 长按紧急停止 → 打开驾驶风格设置');
+                debugPrint('⚙️ 长按紧急停止 → 打开车库联动控制');
                 HapticFeedback.mediumImpact();
-                DrivingStyleSheet.show(context);
+                GarageControlSheet.show(
+                  context,
+                  onSettingsApplied: (settings) {
+                    debugPrint('🚗 车库设置已应用: maxSpeed=${settings.maxSpeed}, fan=${settings.fanSpeed}, vol=${settings.volume}');
+                    // TODO: 将 settings.maxSpeed 传递给父组件更新 RunningModeWidget.maxSpeed
+                  },
+                );
               },
               child: Container(
                 height: config.emergencyStopHeight,
