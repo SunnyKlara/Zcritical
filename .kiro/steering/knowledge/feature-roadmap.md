@@ -18,7 +18,7 @@ inclusion: auto
 - 引擎音效 RC Engine 方案（idle/rev/knock/start）
 - LED 14 预设 + RGB + 波浪 + 舞台灯光秀
 - Logo WiFi 上传已验证（115KB/3s）
-- 风扇硬件限制：GPIO 40 PWM 无效，仅 GPIO 10 开关
+- 风扇 PWM 调速已实现（IO10 LEDC，非线性曲线+平滑加减速），待实机验证
 
 **推进顺序**（每步一个对话或多步一个对话，看复杂度）：
 1. 车辆数据结构设计 — car_specs.json 扩展（品牌分类、参数映射字段）

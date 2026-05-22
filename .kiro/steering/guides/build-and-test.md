@@ -1,6 +1,5 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "ridewind-esp/**/*.c,ridewind-esp/**/*.h,RideWind/lib/**/*.dart,**/CMakeLists.txt,**/pubspec.yaml"
+inclusion: auto
 ---
 
 # 构建与测试速查
@@ -43,7 +42,7 @@ flutter run                      # 运行（需连接设备）
 
 | 指标 | 当前值 | 警戒线 |
 |------|--------|--------|
-| 固件体积 | 2.43MB / 3MB (22% free) | <10% free 需优化 |
+| 固件体积 | 3.04MB / 3.14MB (3% free) | <10% free 需优化 |
 | Flutter 最大单文件 | ~3500行 | >1000行需拆分 |
 | 协议测试覆盖 | 51/51 | 新命令必须有测试 |
 | ESP32 编译警告 | 0 | >0 需处理 |

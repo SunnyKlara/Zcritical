@@ -1,6 +1,5 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "ridewind-esp/**/*.c,ridewind-esp/**/*.h,RideWind/lib/**/*.dart"
+inclusion: auto
 ---
 
 <!-- last-verified: 2026-05-12 -->

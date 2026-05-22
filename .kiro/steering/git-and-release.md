@@ -233,3 +233,42 @@ chore: 更新配置             ← 更新了什么配置？为什么？
 | Release | `flutter build apk --release` | 无调试日志、ProGuard 混淆 |
 
 不搞 staging（单人 + 单硬件，无意义）。
+
+---
+
+## 紧急恢复
+
+```bash
+# 回退最近一次提交（保留文件变更）
+git reset --soft HEAD~1
+
+# 回退最近一次提交（丢弃文件变更）
+git reset --hard HEAD~1
+
+# 保存当前状态但不提交
+git stash
+git stash pop
+
+# 创建安全快照
+git tag snapshot-YYYYMMDD-描述
+```
+
+---
+
+## AI 协作中的 Git 规则
+
+### AI 可以直接做的
+- commit（用户确认满意后）
+- 创建分支
+- 查看 diff/status/log
+- push（常规推送）
+
+### AI 不做的（需要用户明确确认）
+- `git reset --hard`（不可逆）
+- `git force-push`（覆盖远程历史）
+- `git branch -D`（删除分支）
+
+### 每次对话结束前的 Git 自检
+- [ ] 有未提交的代码变更吗？→ 建议提交
+- [ ] 变更是否可编译？→ 不可编译不提交
+- [ ] CONTINUATION_GUIDE.md 是否需要更新？
