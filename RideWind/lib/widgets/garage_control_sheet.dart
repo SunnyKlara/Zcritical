@@ -67,11 +67,18 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   bool _isPlaying = false;
   double _wavePhase = 0;
 
+  // 控制轮播
+  late PageController _controlPageController;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(
       viewportFraction: 0.72,
+      initialPage: 0,
+    );
+    _controlPageController = PageController(
+      viewportFraction: 0.7,
       initialPage: 0,
     );
 
@@ -91,6 +98,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   @override
   void dispose() {
     _pageController.dispose();
+    _controlPageController.dispose();
     _waveController.dispose();
     if (_isAdjustingVolume) _onVolumeAdjustEnd();
     super.dispose();
@@ -269,8 +277,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
                   const SizedBox(height: 28),
 
-                  // ═══ 参数面板 (2×2 进度条) ═══
-                  if (_cars.isNotEmpty) _buildStatsGrid(),
+                  // ═══ 参数面板 — 去掉独立面板，合并到控制轮播中 ═══
 
                   const SizedBox(height: 36),
 
@@ -279,8 +286,8 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
                   const SizedBox(height: 36),
 
-                  // ═══ 速度 / 音量 / 风力 — 三列并排 ═══
-                  _buildControlRow(),
+                  // ═══ 控制轮播 — 速度/音量/风力 中间大两边小循环滚动 ═══
+                  _buildControlCarousel(),
 
                   const SizedBox(height: 32),
 
@@ -402,111 +409,233 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  参数面板 — 三列联动进度条（与下方控制 Slider 对应）
-  //  速度 ↔ TOP SPEED | 音量 ↔ HP（马力） | 风力 ↔ TORQUE（扭矩）
+  //  控制轮播 — 速度/音量/风力 中间大两边小，循环滚动
+  //  每个卡片：标签 + 大数字 + Slider + 对应车辆参数进度条
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildStatsGrid() {
-    final car = _cars[_selectedCarIndex];
-    final specs = car.specs;
-    if (specs == null) return const SizedBox.shrink();
+  Widget _buildControlCarousel() {
+    return SizedBox(
+      height: 180,
+      child: PageView.builder(
+        controller: _controlPageController,
+        // 用大数模拟无限循环（3项）
+        itemCount: 300,
+        onPageChanged: (_) {
+          HapticFeedback.selectionClick();
+        },
+        itemBuilder: (context, index) {
+          final int realIndex = index % 3;
+          return AnimatedBuilder(
+            animation: _controlPageController,
+            builder: (context, child) {
+              double page = 0;
+              if (_controlPageController.position.haveDimensions) {
+                page = _controlPageController.page ?? 0;
+              }
+              final double diff = (index - page);
+              final double absDiff = diff.abs().clamp(0.0, 2.0);
 
-    // 速度进度：当前 _maxSpeed 相对于车辆极速的比例
-    final int topSpeed = specs.topSpeedKmh ?? 300;
-    final double speedProgress = (_maxSpeed / topSpeed.toDouble()).clamp(0.0, 1.5);
+              final double scale = 1.0 - absDiff * 0.25;
+              final double opacity = (1.0 - absDiff * 0.5).clamp(0.3, 1.0);
 
-    // 音量进度：当前 _volume 映射到马力比例
-    final int hp = specs.horsepower ?? 200;
-    final double volumeProgress = (_volume / 100.0).clamp(0.0, 1.0);
+              return Transform.scale(
+                scale: scale,
+                child: Opacity(
+                  opacity: opacity,
+                  child: _buildControlCard(realIndex),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
-    // 风力进度：当前 _windPower 映射到扭矩比例
-    final int torque = specs.torqueLbft ?? 200;
-    final double windProgress = (_windPower / 100.0).clamp(0.0, 1.0);
+  Widget _buildControlCard(int controlIndex) {
+    final car = _cars.isNotEmpty ? _cars[_selectedCarIndex] : null;
+    final specs = car?.specs;
+
+    // 三个控制项的数据
+    late String label;
+    late int value;
+    late String unit;
+    late String refLabel;
+    late String refValue;
+    late double progress;
+
+    switch (controlIndex) {
+      case 0: // 速度 ↔ TOP SPEED
+        label = '速度';
+        value = _maxSpeed;
+        unit = 'km/h';
+        final int topSpeed = specs?.topSpeedKmh ?? 300;
+        refLabel = 'TOP SPEED';
+        refValue = '$topSpeed km/h';
+        progress = (_maxSpeed / topSpeed.toDouble()).clamp(0.0, 1.0);
+        break;
+      case 1: // 音量 ↔ HP
+        label = '音量';
+        value = _volume;
+        unit = '%';
+        final int hp = specs?.horsepower ?? 200;
+        refLabel = 'HORSEPOWER';
+        refValue = '$hp hp';
+        progress = (_volume / 100.0).clamp(0.0, 1.0);
+        break;
+      case 2: // 风力 ↔ TORQUE
+        label = '风力';
+        value = _windPower;
+        unit = '%';
+        final int torque = specs?.torqueLbft ?? 200;
+        refLabel = 'TORQUE';
+        refValue = '$torque lb·ft';
+        progress = (_windPower / 100.0).clamp(0.0, 1.0);
+        break;
+    }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(child: _buildLinkedStatBar(
-            label: 'TOP SPEED',
-            displayText: '$topSpeed km/h',
-            progress: speedProgress,
-          )),
-          const SizedBox(width: 16),
-          Expanded(child: _buildLinkedStatBar(
-            label: 'HP',
-            displayText: '$hp hp',
-            progress: volumeProgress,
-          )),
-          const SizedBox(width: 16),
-          Expanded(child: _buildLinkedStatBar(
-            label: 'TORQUE',
-            displayText: '$torque lb·ft',
-            progress: windProgress,
-          )),
+          // 标签
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.25),
+              fontSize: 10,
+              letterSpacing: 3,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 大数字
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$value',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 52,
+                  fontWeight: FontWeight.w100,
+                  letterSpacing: -2,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                unit,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.2),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Slider
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: SliderTheme(
+              data: _sliderTheme(context),
+              child: _buildSliderForIndex(controlIndex),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 对应车辆参数 + 进度条
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      refLabel,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.2),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    Text(
+                      refValue,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double barWidth = constraints.maxWidth * progress;
+                    return Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOutCubic,
+                        width: barWidth,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLinkedStatBar({
-    required String label,
-    required String displayText,
-    required double progress,
-  }) {
-    // 超过 1.0 时用不同颜色提示"超出车辆参考值"
-    final bool isOver = progress > 1.0;
-    final double clampedProgress = progress.clamp(0.0, 1.0);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 8,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.5,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          displayText,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final double barWidth = constraints.maxWidth * clampedProgress;
-            return Container(
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(2),
-              ),
-              alignment: Alignment.centerLeft,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutCubic,
-                width: barWidth,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isOver
-                      ? Colors.white.withOpacity(0.95)
-                      : Colors.white.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            );
+  Widget _buildSliderForIndex(int index) {
+    switch (index) {
+      case 0:
+        return Slider(
+          value: _maxSpeed.toDouble(),
+          min: 0,
+          max: 999,
+          onChanged: (v) {
+            HapticFeedback.selectionClick();
+            setState(() => _maxSpeed = v.round());
           },
-        ),
-      ],
-    );
+        );
+      case 1:
+        return Slider(
+          value: _volume.toDouble(),
+          min: 0,
+          max: 100,
+          onChangeStart: (_) => _onVolumeAdjustStart(),
+          onChanged: (v) => _onVolumeChanged(v.round()),
+          onChangeEnd: (_) => _onVolumeAdjustEnd(),
+        );
+      case 2:
+        return Slider(
+          value: _windPower.toDouble(),
+          min: 0,
+          max: 100,
+          onChanged: (v) => _onWindChanged(v.round()),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -587,123 +716,6 @@ class _GarageControlSheetState extends State<GarageControlSheet>
           ],
         ),
       ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  控制面板 — 速度/音量/风力 三列并排
-  // ═══════════════════════════════════════════════════════════════
-
-  Widget _buildControlRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 速度
-          Expanded(child: _buildControlColumn(
-            label: '速度',
-            value: _maxSpeed,
-            unit: 'km/h',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _maxSpeed.toDouble(),
-                min: 0,
-                max: 999,
-                onChanged: (v) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _maxSpeed = v.round());
-                },
-              ),
-            ),
-          )),
-          // 音量
-          Expanded(child: _buildControlColumn(
-            label: '音量',
-            value: _volume,
-            unit: '%',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _volume.toDouble(),
-                min: 0,
-                max: 100,
-                onChangeStart: (_) => _onVolumeAdjustStart(),
-                onChanged: (v) => _onVolumeChanged(v.round()),
-                onChangeEnd: (_) => _onVolumeAdjustEnd(),
-              ),
-            ),
-          )),
-          // 风力
-          Expanded(child: _buildControlColumn(
-            label: '风力',
-            value: _windPower,
-            unit: '%',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _windPower.toDouble(),
-                min: 0,
-                max: 100,
-                onChanged: (v) => _onWindChanged(v.round()),
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlColumn({
-    required String label,
-    required int value,
-    required String unit,
-    required double fontSize,
-    required Widget slider,
-  }) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.2),
-            fontSize: 10,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w200,
-                letterSpacing: -1,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              unit,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.2),
-                fontSize: 10,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        slider,
-      ],
     );
   }
 
