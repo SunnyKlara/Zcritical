@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../models/car_model.dart';
 import '../services/engine_sound_service.dart';
 import 'logo_management_screen.dart';
@@ -25,6 +26,10 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   /// 引擎声音 Profile
   EngineSoundProfile? _soundProfile;
 
+  /// 引擎声音试听播放器
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+
   CarModel get car => widget.car;
 
   @override
@@ -45,6 +50,34 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
       setState(() {
         _soundProfile = service.getProfileForCar(car.fullName);
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  /// 试听引擎声音
+  Future<void> _toggleEngineSound() async {
+    if (_soundProfile == null) return;
+
+    if (_isPlaying) {
+      await _audioPlayer.stop();
+      if (mounted) setState(() => _isPlaying = false);
+    } else {
+      try {
+        final assetPath = 'sound/engine/${_soundProfile!.profileId}.wav';
+        await _audioPlayer.play(AssetSource(assetPath));
+        if (mounted) setState(() => _isPlaying = true);
+        // 播放完毕自动重置状态
+        _audioPlayer.onPlayerComplete.listen((_) {
+          if (mounted) setState(() => _isPlaying = false);
+        });
+      } catch (e) {
+        if (mounted) setState(() => _isPlaying = false);
+      }
     }
   }
 
@@ -479,81 +512,98 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     final profileName = _soundProfile?.displayName ?? 'Loading...';
     final engineType = _soundProfile?.engineType ?? '';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141414),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasSound
-              ? Colors.white.withOpacity(0.08)
-              : Colors.white.withOpacity(0.05),
+    return GestureDetector(
+      onTap: hasSound ? _toggleEngineSound : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _isPlaying
+              ? Colors.white.withOpacity(0.04)
+              : const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _isPlaying
+                ? Colors.white.withOpacity(0.15)
+                : hasSound
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.white.withOpacity(0.05),
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: hasSound
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              hasSound ? Icons.volume_up_rounded : Icons.music_note,
-              color: hasSound
-                  ? Colors.white.withOpacity(0.6)
-                  : Colors.white.withOpacity(0.3),
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Engine Sound',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  profileName,
-                  style: TextStyle(
-                    color: hasSound
-                        ? Colors.white.withOpacity(0.5)
-                        : Colors.white.withOpacity(0.3),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (engineType.isNotEmpty)
+        child: Row(
+          children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(6),
+                color: _isPlaying
+                    ? Colors.white.withOpacity(0.12)
+                    : hasSound
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                engineType,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
+              child: Icon(
+                _isPlaying
+                    ? Icons.stop_rounded
+                    : hasSound
+                        ? Icons.play_arrow_rounded
+                        : Icons.music_note,
+                color: _isPlaying
+                    ? Colors.white.withOpacity(0.9)
+                    : hasSound
+                        ? Colors.white.withOpacity(0.6)
+                        : Colors.white.withOpacity(0.3),
+                size: 18,
               ),
             ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isPlaying ? 'Playing...' : 'Engine Sound',
+                    style: TextStyle(
+                      color: _isPlaying
+                          ? Colors.white.withOpacity(0.9)
+                          : Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasSound ? profileName : 'Tap to preview',
+                    style: TextStyle(
+                      color: hasSound
+                          ? Colors.white.withOpacity(0.5)
+                          : Colors.white.withOpacity(0.3),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (engineType.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  engineType,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
