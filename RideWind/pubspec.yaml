@@ -108,6 +108,7 @@ flutter:
     - assets/icon/
     - assets/sound/
     - assets/sound/engine/
+    - assets/sound/engine_individual/
     - assets/bmp/
     - assets/car_thumbnails/car_index.json
     - assets/car_thumbnails/car_specs.json

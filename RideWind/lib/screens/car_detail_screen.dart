@@ -118,10 +118,19 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
       if (mounted) setState(() => _isPlaying = false);
     } else {
       try {
-        final assetPath = 'sound/engine/${_soundProfile!.profileId}.wav';
-        await _audioPlayer.play(AssetSource(assetPath));
+        // 优先播放独立引擎声文件
+        final safeName = car.fullName.replaceAll(RegExp(r'[<>:"/\\|?*\x27]'), '');
+        final individualPath = 'sound/engine_individual/$safeName.wav';
+
+        // 尝试独立文件，失败则 fallback 到通用 profile
+        try {
+          await _audioPlayer.play(AssetSource(individualPath));
+        } catch (_) {
+          final profilePath = 'sound/engine/${_soundProfile!.profileId}.wav';
+          await _audioPlayer.play(AssetSource(profilePath));
+        }
+
         if (mounted) setState(() => _isPlaying = true);
-        // 播放完毕自动重置状态
         _audioPlayer.onPlayerComplete.listen((_) {
           if (mounted) setState(() => _isPlaying = false);
         });
