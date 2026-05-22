@@ -25,7 +25,7 @@ class _RunningModeConfig {
   double get _screenHeight => MediaQuery.of(context).size.height;
   double get _safeAreaBottom => MediaQuery.of(context).padding.bottom;
 
-  bool get _isSmallScreen => _screenHeight < 700 || _screenWidth < 375;
+  bool get _isSmallScreen => _screenHeight < 700 || _screenWidth < 380;
   bool get _isLargeScreen => _screenHeight > 900 || _screenWidth > 428;
 
   /// 下半部分容器高度（从分界线到屏幕底部）
