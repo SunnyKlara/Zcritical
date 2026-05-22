@@ -865,6 +865,29 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             });
           },
         ),
+        // 车模识别选项 — 仅 Android（TFLite + ONNX Runtime）
+        if (Platform.isAndroid)
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text(
+                '车模识别',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          onTap: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                ScaffoldMessenger.of(parentContext).showSnackBar(
+                  const SnackBar(content: Text('车模识别功能开发中')),
+                );
+              }
+            });
+          },
+        ),
         // 移除设备选项
         PopupMenuItem(
           child: const Row(
