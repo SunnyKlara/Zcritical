@@ -96,12 +96,12 @@ class _RunningModeConfig {
     return available > 200 ? available : 200.0;
   }
 
-  /// 🔑 滚轮项目高度 - 动态计算确保始终显示5个数字
+  /// 🔑 滚轮项目高度 - 动态计算确保始终显示合适数量的数字
+  /// 大屏显示5个，小屏显示3个
+  int get _visibleItemCount => _isCompactWidth ? 3 : 5;
+
   double get wheelItemExtent {
-    // 可用高度 / 5 = 每个数字的高度（包含间隙）
-    final calculated = wheelAvailableHeight / 5.0;
-    // 🔧 减小上限，让数字更紧凑，给底部按钮留空间
-    // 🔧 确保最小值为 40，防止数字太小
+    final calculated = wheelAvailableHeight / _visibleItemCount;
     return calculated.clamp(40.0, 75.0);
   }
 
@@ -995,8 +995,8 @@ class RunningModeWidgetState extends State<RunningModeWidget>
   // ╚══════════════════════════════════════════════════════════════╝
 
   Widget _buildSpeedControlInline(_RunningModeConfig config) {
-    // 🔑 计算滚轮高度，严格显示5个数字
-    final wheelHeight = config.wheelItemExtent * 5;
+    // 🔑 计算滚轮高度，根据屏幕大小显示3或5个数字
+    final wheelHeight = config.wheelItemExtent * config._visibleItemCount;
     
     // 🔧 调试信息：打印布局参数
     debugPrint('🎡 _buildSpeedControlInline: wheelHeight=$wheelHeight, bottomButtonAreaHeight=${config.bottomButtonAreaHeight}');
