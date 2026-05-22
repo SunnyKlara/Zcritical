@@ -30,7 +30,7 @@ class GarageControlSheet extends StatefulWidget {
       isDismissible: true,
       enableDrag: true,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       builder: (context) => GarageControlSheet(
         onSettingsApplied: onSettingsApplied,
@@ -268,28 +268,26 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                 children: [
                   // ═══ 赛车轮播 ═══
                   SizedBox(
-                    height: 180,
+                    height: 160,
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator(
                             color: Colors.white12, strokeWidth: 1.5))
                         : _buildCarCarousel(),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
 
-                  // ═══ 参数面板 — 去掉独立面板，合并到控制轮播中 ═══
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 36),
-
-                  // ═══ 引擎波形（充当分隔线，全宽拉长） ═══
+                  // ═══ 引擎波形（充当分隔线） ═══
                   if (_cars.isNotEmpty) _buildEngineWaveform(),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 24),
 
                   // ═══ 控制轮播 — 速度/音量/风力 中间大两边小循环滚动 ═══
                   _buildControlCarousel(),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // ═══ 启动按钮 ═══
                   _buildActivateButton(),
@@ -415,7 +413,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
   Widget _buildControlCarousel() {
     return SizedBox(
-      height: 180,
+      height: 170,
       child: PageView.builder(
         controller: _controlPageController,
         // 用大数模拟无限循环（3项）
