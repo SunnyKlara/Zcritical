@@ -277,6 +277,11 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
                   const SizedBox(height: 16),
 
+                  // ═══ 车辆参数面板（HP/TORQUE/TOP SPEED/0-100） ═══
+                  if (_cars.isNotEmpty) _buildStatsGrid(),
+
+                  const SizedBox(height: 16),
+
                   // ═══ 引擎波形（充当分隔线） ═══
                   if (_cars.isNotEmpty) _buildEngineWaveform(),
 
@@ -399,6 +404,84 @@ class _GarageControlSheetState extends State<GarageControlSheet>
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  参数面板 — 2×2 网格 + 动画进度条
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildStatsGrid() {
+    final car = _cars[_selectedCarIndex];
+    final specs = car.specs;
+    if (specs == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"} hp')),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"} lb·ft')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"} km/h')),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(
+                label: '0-100',
+                value: specs.acceleration0100 != null ? (14.0 - specs.acceleration0100!).clamp(0, 14).toInt() : 0,
+                maxValue: 12,
+                displayText: specs.acceleration0100 != null ? '${specs.acceleration0100}s' : '—',
+              )),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatBar({
+    required String label,
+    required int value,
+    required int maxValue,
+    required String displayText,
+  }) {
+    final double progress = (value / maxValue).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 1.5)),
+            Text(displayText, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 5),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double barWidth = constraints.maxWidth * progress;
+            return Container(
+              height: 4,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(2)),
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                width: barWidth,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(2)),
+              ),
+            );
+          },
         ),
       ],
     );
