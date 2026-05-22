@@ -39,7 +39,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 当前阻塞
 
-- **⚠️ 风扇无法调速（硬件限制）** — GPIO 40 PWM 对风扇转速无影响，风扇只受 GPIO 10 开关控制
+- **~~风扇无法调速~~（已修复）** — 引脚已修正：PIN_FAN=IO10（LEDC PWM），PIN_HUMIDIFIER=IO40。`drv_pwm.c` 非线性曲线+平滑加减速已实现。待实机验证最终效果。
 - **LED 偶发闪烁** — RMT DMA 通道不足已回退，暂搁
 - **DeviceConnectScreen ~3500 行** — 暂缓
 - **WiFi 配网已验证通过** — 实机测试成功（2026-05-21），全流程秒级完成

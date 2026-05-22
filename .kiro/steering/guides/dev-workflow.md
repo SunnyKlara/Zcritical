@@ -37,10 +37,23 @@ inclusion: auto
 
 ## 新对话启动行为
 
-每个新对话必须：
+每个新对话必须按顺序执行：
 1. 读 `START-HERE.md` → 了解项目
-2. 读 `CONTINUATION_GUIDE.md` → 了解当前状态
-3. **等用户说要做什么**，不要自作主张开始设计或创建文件
+2. 读 `CONTINUATION_GUIDE.md` → 了解当前状态和阻塞项
+3. 读 `knowledge/known-pitfalls.md` → 了解踩过的坑（auto inclusion 会自动加载）
+4. 读 `knowledge/lessons-learned.md` → 了解历史教训（auto inclusion 会自动加载）
+5. `git status` → 确认工作区干净
+6. **等用户说要做什么**，不要自作主张开始设计或创建文件
+
+## 开始新功能前的强制 checklist
+
+AI 在动手写任何代码之前，必须完成：
+- [ ] 确认当前在正确的分支上（main 或对应 feature 分支）
+- [ ] 确认工作区干净（git status = clean）
+- [ ] 读了相关模块的现有代码（不是猜，是真的读了）
+- [ ] 检查 known-pitfalls.md 中是否有相关坑位
+- [ ] 提出方案并等用户确认
+- [ ] 方案中明确列出要改哪些文件（不超过 3-5 个/步）
 
 ## 禁止事项
 
