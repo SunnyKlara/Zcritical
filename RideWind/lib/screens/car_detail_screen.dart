@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -30,6 +31,9 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
 
+  /// 车辆故事
+  Map<String, dynamic>? _carStory;
+
   CarModel get car => widget.car;
 
   @override
@@ -41,6 +45,8 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     });
     // 加载引擎声音映射
     _loadSoundProfile();
+    // 加载车辆故事
+    _loadCarStory();
   }
 
   Future<void> _loadSoundProfile() async {
@@ -50,6 +56,25 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
       setState(() {
         _soundProfile = service.getProfileForCar(car.fullName);
       });
+    }
+  }
+
+  Future<void> _loadCarStory() async {
+    try {
+      final jsonStr = await rootBundle.loadString(
+        'assets/car_thumbnails/car_stories.json',
+      );
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      final stories = data['stories'] as Map<String, dynamic>?;
+      if (stories != null && mounted) {
+        // 尝试用 full_name 匹配
+        final story = stories[car.fullName] ?? stories['${car.brand} ${car.model}'];
+        if (story != null) {
+          setState(() => _carStory = story as Map<String, dynamic>);
+        }
+      }
+    } catch (_) {
+      // 静默失败
     }
   }
 
@@ -224,6 +249,12 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                       // 音效状态
                       _buildEngineSoundCard(),
                       const SizedBox(height: 24),
+
+                      // 车辆故事
+                      if (_carStory != null) ...[
+                        _buildStoryCard(),
+                        const SizedBox(height: 24),
+                      ],
 
                       // 设为 Logo 按钮（WiFi 上传）
                       if (_isUploading) ...[
@@ -604,6 +635,98 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  车辆故事卡片 — 展示该车的专属传奇
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildStoryCard() {
+    final title = _carStory!['title'] as String? ?? '';
+    final story = _carStory!['story'] as String? ?? '';
+    final funFact = _carStory!['fun_fact'] as String? ?? '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0D0D),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题行
+          Row(
+            children: [
+              Icon(
+                Icons.auto_stories_rounded,
+                size: 16,
+                color: Colors.white.withOpacity(0.4),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 故事正文
+          Text(
+            story,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 13,
+              height: 1.6,
+            ),
+          ),
+
+          // 趣味冷知识
+          if (funFact.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '💡',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      funFact,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                        height: 1.5,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
