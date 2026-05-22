@@ -83,7 +83,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
       initialPage: 0,
     );
     _controlPageController = PageController(
-      viewportFraction: 0.45,
+      viewportFraction: 0.55,
       initialPage: 0,
     );
 
@@ -252,54 +252,67 @@ class _GarageControlSheetState extends State<GarageControlSheet>
         color: Colors.black,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: ListView(
-        controller: widget.scrollController,
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          // 拖拽条
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 24),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(2),
-              ),
+          // 可滚动内容区域
+          Expanded(
+            child: ListView(
+              controller: widget.scrollController,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.zero,
+              children: [
+                // 拖拽条
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // ═══ 赛车轮播 ═══
+                SizedBox(
+                  height: 180,
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(
+                          color: Colors.white12, strokeWidth: 1.5))
+                      : _buildCarCarousel(),
+                ),
+
+                const SizedBox(height: 28),
+
+                // ═══ 参数面板 (2×2 进度条) ═══
+                if (_cars.isNotEmpty) _buildStatsGrid(),
+
+                const SizedBox(height: 36),
+
+                // ═══ 引擎波形（充当分隔线，全宽拉长） ═══
+                if (_cars.isNotEmpty) _buildEngineWaveform(),
+
+                const SizedBox(height: 36),
+
+                // ═══ 控制轮播 — 速度/音量/风力 中间大两边小 ═══
+                _buildControlRow(),
+
+                const SizedBox(height: 20),
+              ],
             ),
           ),
 
-          // ═══ 赛车轮播 ═══
-          SizedBox(
-            height: 180,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(
-                    color: Colors.white12, strokeWidth: 1.5))
-                : _buildCarCarousel(),
+          // ═══ 固定底部：ACTIVATE 按钮 ═══
+          Padding(
+            padding: EdgeInsets.only(
+              left: 40,
+              right: 40,
+              top: 12,
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+            ),
+            child: _buildActivateButton(),
           ),
-
-          const SizedBox(height: 28),
-
-          // ═══ 参数面板 (2×2 进度条) ═══
-          if (_cars.isNotEmpty) _buildStatsGrid(),
-
-          const SizedBox(height: 36),
-
-          // ═══ 引擎波形（充当分隔线，全宽拉长） ═══
-          if (_cars.isNotEmpty) _buildEngineWaveform(),
-
-          const SizedBox(height: 36),
-
-          // ═══ 控制轮播 — 速度/音量/风力 中间大两边小 ═══
-          _buildControlRow(),
-
-          const SizedBox(height: 48),
-
-          // ═══ 启动按钮 ═══
-          _buildActivateButton(),
-
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
         ],
       ),
     );
@@ -323,7 +336,8 @@ class _GarageControlSheetState extends State<GarageControlSheet>
           animation: _pageController,
           builder: (context, child) {
             double page = 0;
-            if (_pageController.position.haveDimensions) {
+            if (_pageController.hasClients &&
+                _pageController.position.haveDimensions) {
               page = _pageController.page ?? 0;
             }
             final double diff = (index - page);
@@ -575,7 +589,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
   Widget _buildControlRow() {
     return SizedBox(
-      height: 100,
+      height: 120,
       child: PageView.builder(
         controller: _controlPageController,
         itemCount: 300,
@@ -586,13 +600,14 @@ class _GarageControlSheetState extends State<GarageControlSheet>
             animation: _controlPageController,
             builder: (context, child) {
               double page = 0;
-              if (_controlPageController.position.haveDimensions) {
+              if (_controlPageController.hasClients &&
+                  _controlPageController.position.haveDimensions) {
                 page = _controlPageController.page ?? 0;
               }
               final double diff = (index - page);
               final double absDiff = diff.abs().clamp(0.0, 2.0);
-              final double scale = 1.0 - absDiff * 0.15;
-              final double opacity = (1.0 - absDiff * 0.4).clamp(0.3, 1.0);
+              final double scale = 1.0 - absDiff * 0.25;
+              final double opacity = (1.0 - absDiff * 0.5).clamp(0.2, 1.0);
 
               return Transform.scale(
                 scale: scale,
