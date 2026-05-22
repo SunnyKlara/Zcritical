@@ -204,7 +204,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           // ═══ 赛车轮播 ═══
           SizedBox(
-            height: 220,
+            height: 250,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(
                     color: Colors.white12, strokeWidth: 1.5))
@@ -317,21 +317,19 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
         ],
         const SizedBox(height: 8),
 
-        // 图片 — 用 cover 填满固定区域，大车小车视觉统一
+        // 图片 — contain 保持完整车身，不裁剪
         Expanded(
-          child: ClipRect(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Image.asset(
-                car.assetPath,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                errorBuilder: (_, __, ___) => Center(
-                  child: Icon(
-                    Icons.directions_car_outlined,
-                    color: Colors.white.withOpacity(0.04),
-                    size: 40,
-                  ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Image.asset(
+              car.assetPath,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              errorBuilder: (_, __, ___) => Center(
+                child: Icon(
+                  Icons.directions_car_outlined,
+                  color: Colors.white.withOpacity(0.04),
+                  size: 40,
                 ),
               ),
             ),
