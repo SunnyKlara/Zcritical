@@ -142,8 +142,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
         return !excludeKeywords.any((kw) => name.contains(kw));
       }).toList();
 
-      racingCars.sort((a, b) =>
-        (b.specs!.horsepower ?? 0).compareTo(a.specs!.horsepower ?? 0));
+      racingCars.shuffle();
 
       setState(() {
         _cars = racingCars.take(50).toList();
