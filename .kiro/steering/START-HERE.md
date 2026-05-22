@@ -29,6 +29,7 @@ inclusion: auto
 3. **对话结束更新 handoff** — 更新 `CONTINUATION_GUIDE.md` 的当前状态和下一步
 4. **有担忧就说** — 对用户方案有疑虑时必须提出，最多争论 2 轮，用户坚持后记录分歧并执行
 5. **ESP 固件分层不可破** — drivers/ 不调 services/，services/ 不调 ui/，所有状态走 AppState
+6. **不创建 spec 文件** — 不要在 `.kiro/specs/` 下创建任何文件。设计在对话中讨论，不走形式化流程。详见 `guides/dev-workflow.md`
 
 ## 项目结构
 

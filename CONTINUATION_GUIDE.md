@@ -79,9 +79,11 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 1. **P0 四大功能分支开发** — 从 v1.2.0-baseline 创建对应 feature 分支：
    - `feat/garage-v2` — 车库大更新（联动风扇/灯光/音效/Logo）
-   - `feat/colorize-v2` — Colorize 灯光系统升级
+   - `feat/colorize-v2` — Colorize 灯光系统升级 **← Spec 需求文档已创建（2026-05-22）**
    - `feat/audio-casting-v2` — 音频投射升级（类蓝牙音箱）
    - `feat/ios-platform` — iOS 开发体系建立
+   
+   **Colorize Mode Spec 进度**：`.kiro/specs/colorize-mode-upgrade/requirements.md` 已完成初稿（13 条需求，P0-P3 分级）。下一步：用户确认需求 → 进入 design.md 技术设计 → tasks.md 拆分实现任务。
 2. **P1 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
 3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
 4. **P3 DeviceConnectScreen 拆分**
