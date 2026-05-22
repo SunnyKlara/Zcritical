@@ -51,6 +51,8 @@ class CarSpecs {
   final String? gears;
   final String? weightDist;
   final String? carClass;
+  final int? topSpeedKmh;
+  final double? acceleration0100;
 
   const CarSpecs({
     this.year,
@@ -67,6 +69,8 @@ class CarSpecs {
     this.gears,
     this.weightDist,
     this.carClass,
+    this.topSpeedKmh,
+    this.acceleration0100,
   });
 
   factory CarSpecs.fromJson(Map<String, dynamic> json) {
@@ -85,6 +89,8 @@ class CarSpecs {
       gears: json['gears'] as String?,
       weightDist: json['weight_dist'] as String?,
       carClass: json['class'] as String?,
+      topSpeedKmh: json['top_speed_kmh'] as int?,
+      acceleration0100: (json['acceleration_0_100'] as num?)?.toDouble(),
     );
   }
 }

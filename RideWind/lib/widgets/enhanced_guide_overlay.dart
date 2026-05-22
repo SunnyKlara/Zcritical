@@ -61,7 +61,7 @@ class EnhancedGuideOverlayState extends State<EnhancedGuideOverlay>
 
   Rect? _targetRect;
   static const double _highlightPadding = 12.0;
-  static const double _tooltipWidth = 280.0;
+  static const double _tooltipWidth = 260.0;
   static const double _tooltipHeight = 80.0;
   bool _demoCancelled = false; // 用于取消正在进行的演示
 

@@ -58,6 +58,10 @@ class BLEService {
   static const int _maxReconnectAttempts = 5;
   bool _userDisconnected = false;
 
+  // ── 连接失败原因 ──
+  /// 最近一次连接失败的原因（供 UI 层读取）
+  String? lastConnectionError;
+
   // ── UUID ──
   static const String serviceUuid = '0000ffe0-0000-1000-8000-00805f9b34fb';
   static const String charUuid = '0000ffe1-0000-1000-8000-00805f9b34fb';
@@ -153,8 +157,17 @@ class BLEService {
   Future<bool> connect(BluetoothDevice device) async {
     _userDisconnected = false;
     _reconnectAttempt = 0;
+    lastConnectionError = null;
     _cancelReconnect();
     return _connectInternal(device);
+  }
+
+  /// 重置自动重连状态（用于从后台恢复时强制刷新连接）
+  void resetReconnectState() {
+    _cancelReconnect();
+    _reconnectAttempt = 0;
+    _userDisconnected = false;
+    lastConnectionError = null;
   }
 
   /// 内部连接流程（首次连接 + 自动重连共用）
@@ -259,6 +272,20 @@ class BLEService {
       return true;
     } catch (e) {
       print('❌ 连接异常: $e');
+      // 分析连接失败原因
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('already connected') ||
+          errorStr.contains('connection rejected') ||
+          errorStr.contains('gatt_error') ||
+          errorStr.contains('133')) {
+        // Android error 133 通常表示设备忙/已被占用
+        lastConnectionError = 'device_busy';
+        print('⚠️ 设备可能已被其他手机连接');
+      } else if (errorStr.contains('timeout')) {
+        lastConnectionError = 'timeout';
+      } else {
+        lastConnectionError = 'unknown';
+      }
       _cleanupConnection();
       _setState(BleConnectionState.disconnected);
       return false;
@@ -297,6 +324,12 @@ class BLEService {
       return;
     }
 
+    // 如果设备被其他手机占用，不再自动重试
+    if (lastConnectionError == 'device_busy') {
+      print('🔴 设备已被其他手机连接，停止自动重连');
+      return;
+    }
+
     final delay = Duration(seconds: 1 << _reconnectAttempt);
     _reconnectAttempt++;
     print('🔄 ${delay.inSeconds}s 后第 $_reconnectAttempt 次重连...');
@@ -308,6 +341,11 @@ class BLEService {
 
       final ok = await _connectInternal(_device!);
       if (!ok && !_userDisconnected) {
+        // 如果连接失败且原因是设备忙，停止重试
+        if (lastConnectionError == 'device_busy') {
+          print('🔴 设备已被其他手机连接，停止自动重连');
+          return;
+        }
         _scheduleReconnect();
       }
     });

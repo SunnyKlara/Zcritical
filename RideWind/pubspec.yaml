@@ -71,6 +71,13 @@ dependencies:
   path_provider: ^2.1.2
 
   image: any
+  
+  # 相机（车模识别需要）
+  camera: ^0.11.0+2
+  
+  # 车模识别插件（本地 YOLOv5 + MobileNetV3）— 暂时禁用，GPU Delegate 依赖待修复
+  # car_brand_recognition:
+  #   path: ../RideWind-yolov5/RideWind-yolov5-master/car_brand_recognition
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -100,9 +107,13 @@ flutter:
     - assets/svg/
     - assets/icon/
     - assets/sound/
+    - assets/sound/engine/
+    - assets/sound/engine_individual/
     - assets/bmp/
     - assets/car_thumbnails/car_index.json
     - assets/car_thumbnails/car_specs.json
+    - assets/car_thumbnails/engine_sound_map.json
+    - assets/car_thumbnails/car_stories.json
     - assets/car_thumbnails/
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -8,7 +8,7 @@ import '../utils/throttle_accelerator.dart'; // 🚀 乱序加速器
 import '../utils/speed_bounce_animation.dart'; // 🎯 弹跳动画
 import '../models/speed_report.dart'; // 🏎️ 速度报告模型
 import 'volume_overlay.dart'; // 🔊 悬浮音量条
-import 'driving_style_sheet.dart'; // ⚙️ 驾驶风格设置弹窗
+import 'garage_control_sheet.dart'; // 🚗 车库联动控制弹窗
 
 /// 📱 响应式布局配置类
 ///
@@ -96,12 +96,12 @@ class _RunningModeConfig {
     return available > 200 ? available : 200.0;
   }
 
-  /// 🔑 滚轮项目高度 - 动态计算确保始终显示合适数量的数字
-  /// 大屏显示5个，小屏显示3个
-  int get _visibleItemCount => _isCompactWidth ? 3 : 5;
-
+  /// 🔑 滚轮项目高度 - 动态计算确保始终显示5个数字
   double get wheelItemExtent {
-    final calculated = wheelAvailableHeight / _visibleItemCount;
+    // 可用高度 / 5 = 每个数字的高度（包含间隙）
+    final calculated = wheelAvailableHeight / 5.0;
+    // 🔧 减小上限，让数字更紧凑，给底部按钮留空间
+    // 🔧 确保最小值为 40，防止数字太小
     return calculated.clamp(40.0, 75.0);
   }
 
@@ -111,14 +111,14 @@ class _RunningModeConfig {
 
   /// 非选中数字字体大小 - 根据屏幕宽度动态计算
   double get speedFontSize {
-    if (_isCompactWidth) return 26.0;
+    if (_isCompactWidth) return 26.0; // 375px 屏幕用更小字号
     final baseSize = wheelItemExtent * 0.5;
     return baseSize.clamp(32.0, 50.0);
   }
 
   /// 🔑 选中数字的字体大小（更大更突出）— 按屏幕宽度缩放
   double get selectedSpeedFontSize {
-    if (_isCompactWidth) return 55.0;
+    if (_isCompactWidth) return 55.0; // 375px 屏幕：55px 足够大又不溢出
     final baseSize = wheelItemExtent * 1.1;
     return baseSize.clamp(65.0, 100.0);
   }
@@ -152,6 +152,7 @@ class RunningModeWidget extends StatefulWidget {
   final VoidCallback onEmergencyStop;
   final Function(bool isShowing)?
   onSpeedControlVisibilityChanged; // 调速界面显示/隐藏回调
+  final Function(GarageSettings settings)? onGarageSettingsApplied; // 🚗 车库设置回调
   final bool debugMode;
 
   // 🏎️ 外部速度流（来自硬件旋钮）
@@ -183,6 +184,7 @@ class RunningModeWidget extends StatefulWidget {
     this.onThrottleStatusChanged, // ✅ 传入回调
     required this.onEmergencyStop,
     this.onSpeedControlVisibilityChanged,
+    this.onGarageSettingsApplied, // 🚗 车库设置回调
     this.debugMode = false,
     this.externalSpeedStream, // 🏎️ 外部速度流
     this.externalThrottleStream, // 🔥 外部油门流
@@ -312,6 +314,28 @@ class RunningModeWidgetState extends State<RunningModeWidget>
         'emergencyStop': _emergencyStopKey,
       });
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant RunningModeWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 🚗 maxSpeed 变化时，重新映射当前速度并重建滚轮
+    if (oldWidget.maxSpeed != widget.maxSpeed && widget.maxSpeed > 0) {
+      debugPrint('🚗 maxSpeed 变化: ${oldWidget.maxSpeed} → ${widget.maxSpeed}');
+      // 将当前显示速度按比例映射到新范围
+      final oldMax = oldWidget.maxSpeed > 0 ? oldWidget.maxSpeed : 340;
+      final ratio = _currentSpeed / oldMax;
+      final newSpeed = (ratio * widget.maxSpeed).round().clamp(0, widget.maxSpeed);
+      setState(() {
+        _currentSpeed = newSpeed;
+      });
+      // 重建滚轮控制器以适应新范围
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_speedScrollController != null && _speedScrollController!.hasClients) {
+          _speedScrollController!.jumpToItem(_currentSpeed);
+        }
+      });
+    }
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -527,7 +551,11 @@ class RunningModeWidgetState extends State<RunningModeWidget>
     // 设置标志，防止循环更新
     _isReceivingExternalSpeed = true;
 
-    final targetSpeed = report.speed.clamp(0, widget.maxSpeed);
+    // 🚗 正向映射：硬件步数 (0-340) → 显示值 (0-maxSpeed)
+    final int displaySpeed = widget.maxSpeed == 340
+        ? report.speed
+        : (report.speed * widget.maxSpeed / 340).round();
+    final targetSpeed = displaySpeed.clamp(0, widget.maxSpeed);
 
     // 更新速度状态
     setState(() {
@@ -547,8 +575,8 @@ class RunningModeWidgetState extends State<RunningModeWidget>
       _speedScrollController!.jumpToItem(targetSpeed);
     }
 
-    _addDebugLog('✅ 速度已同步: $_currentSpeed');
-    debugPrint('🏎️ 外部速度同步: ${report.speed} ${report.unitString}');
+    _addDebugLog('✅ 速度已同步: $_currentSpeed (硬件步数: ${report.speed})');
+    debugPrint('🏎️ 外部速度同步: 硬件=${report.speed} → 显示=$targetSpeed');
 
     // ✅ 延长标志保持时间到 300ms，确保不会误触发回传
     Future.delayed(const Duration(milliseconds: 300), () {
@@ -796,9 +824,16 @@ class RunningModeWidgetState extends State<RunningModeWidget>
                 widget.onEmergencyStop();
               },
               onLongPress: () {
-                debugPrint('⚙️ 长按紧急停止 → 打开驾驶风格设置');
+                debugPrint('⚙️ 长按紧急停止 → 打开车库联动控制');
                 HapticFeedback.mediumImpact();
-                DrivingStyleSheet.show(context);
+                GarageControlSheet.show(
+                  context,
+                  onSettingsApplied: (settings) {
+                    debugPrint('🚗 车库设置已应用: maxSpeed=${settings.maxSpeed}, vol=${settings.volume}');
+                    // 🚗 将设置传递给父组件（DeviceConnectScreen）更新 maxSpeed
+                    widget.onGarageSettingsApplied?.call(settings);
+                  },
+                );
               },
               child: Container(
                 height: config.emergencyStopHeight,
@@ -995,8 +1030,8 @@ class RunningModeWidgetState extends State<RunningModeWidget>
   // ╚══════════════════════════════════════════════════════════════╝
 
   Widget _buildSpeedControlInline(_RunningModeConfig config) {
-    // 🔑 计算滚轮高度，根据屏幕大小显示3或5个数字
-    final wheelHeight = config.wheelItemExtent * config._visibleItemCount;
+    // 🔑 计算滚轮高度，严格显示5个数字
+    final wheelHeight = config.wheelItemExtent * 5;
     
     // 🔧 调试信息：打印布局参数
     debugPrint('🎡 _buildSpeedControlInline: wheelHeight=$wheelHeight, bottomButtonAreaHeight=${config.bottomButtonAreaHeight}');

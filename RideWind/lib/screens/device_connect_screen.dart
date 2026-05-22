@@ -73,7 +73,8 @@ class DeviceConnectScreen extends StatefulWidget {
   State<DeviceConnectScreen> createState() => _DeviceConnectScreenState();
 }
 
-class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
+class _DeviceConnectScreenState extends State<DeviceConnectScreen>
+    with WidgetsBindingObserver {
   // ╔══════════════════════════════════════════════════════════════╗
   // ║          🔄 简化后的状态变量                                  ║
   // ╚══════════════════════════════════════════════════════════════╝
@@ -88,7 +89,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
   // ========== 🏃 Running Mode 专用状态 ==========
   int _currentSpeed = 0;
-  final int _maxSpeed = 340;
+  int _maxSpeed = 340; // 🚗 可由车库联动动态更新（车辆极速值）
   DateTime _lastCommandTime = DateTime.now();
 
   // ========== 🎨 Colorize Mode 专用状态 ==========
@@ -131,6 +132,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   StreamSubscription<int>? _presetReportSub;
   StreamSubscription<bool>? _streamlightReportSub; // 🔄 流水灯状态订阅
   bool _navigatedOnDisconnect = false;
+  bool _disconnectedByBackground = false; // 后台主动断开标记
+  Timer? _disconnectDebounceTimer; // 断开去抖计时器
 
   // ========== 🐛 调试模式 ==========
   static const bool _debugMode = false; // 🔧 调试模式已关闭
@@ -156,6 +159,9 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
   void initState() {
     super.initState();
     debugPrint('🚀🚀🚀 DeviceConnectScreen initState 开始');
+    
+    // 🔄 注册应用生命周期监听（处理后台恢复重连）
+    WidgetsBinding.instance.addObserver(this);
     
     // 🎨 初始化 Colorize 控制器
     _colorize = sl<ColorizeController>();
@@ -194,11 +200,32 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     _connectionSub = btProvider.connectionStream.listen((connected) {
       debugPrint('🔗 蓝牙连接状态变化: $connected');
       if (!connected && mounted && !_navigatedOnDisconnect) {
-        // 💾 保存设备设置（断连前）
-        _saveDeviceSettings();
-        _navigatedOnDisconnect = true;
-        _showDisconnectDialog();
+        // 如果是后台主动断开，不弹对话框（回前台时会自动重连）
+        if (_disconnectedByBackground) {
+          debugPrint('⏸️ 后台主动断开，不弹对话框');
+          return;
+        }
+        // 🔄 断开去抖：等 2 秒确认真的断了再弹对话框
+        // BLE 瞬间抖动（信号波动/系统挂起）会在 1-2 秒内恢复
+        _disconnectDebounceTimer?.cancel();
+        _disconnectDebounceTimer = Timer(const Duration(seconds: 2), () {
+          if (!mounted || _navigatedOnDisconnect) return;
+          // 2 秒后再次检查：如果已经重连成功了，忽略这次断开
+          final currentProvider = Provider.of<BluetoothProvider>(context, listen: false);
+          if (currentProvider.isConnected) {
+            debugPrint('🔄 断开去抖：2s 内已恢复连接，忽略');
+            return;
+          }
+          // 确认真的断了
+          debugPrint('🔴 断开去抖：确认断开，弹出对话框');
+          _saveDeviceSettings();
+          _navigatedOnDisconnect = true;
+          _showDisconnectDialog();
+        });
       } else if (connected && mounted) {
+        // 连接恢复：取消去抖计时器
+        _disconnectDebounceTimer?.cancel();
+        _disconnectDebounceTimer = null;
         // 🔁 重连成功：把当前选中的胶囊（含自定义色）重新铺到硬件，
         //     防止 ESP32 复位后硬件 LED 与 app 选中不一致。
         //     强制清空 _lastSentHardwareUI 让 setHardwareUI 重新发一次，
@@ -416,22 +443,39 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
   /// 显示重连失败提示
   void _showReconnectFailedDialog() {
+    final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+    final errorReason = btProvider.lastConnectionError;
+    
+    String title;
+    String content;
+    if (errorReason == 'device_busy') {
+      title = '设备已被占用';
+      content = '该设备可能已被其他手机连接，请先断开另一台手机的连接后重试。';
+    } else {
+      title = '连接失败';
+      content = '无法重新连接到设备，请检查设备状态后重试。';
+    }
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.grey[900],
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 24),
-            SizedBox(width: 8),
-            Text('连接失败', style: TextStyle(color: Colors.white, fontSize: 18)),
+            Icon(
+              errorReason == 'device_busy' ? Icons.phone_android : Icons.error_outline,
+              color: errorReason == 'device_busy' ? Colors.orange : Colors.red,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
           ],
         ),
-        content: const Text(
-          '无法重新连接到设备，请检查设备状态后重试。',
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+        content: Text(
+          content,
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
         actions: [
           ElevatedButton(
@@ -718,6 +762,13 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
   @override
   void dispose() {
+    // 🔄 移除应用生命周期监听
+    WidgetsBinding.instance.removeObserver(this);
+    
+    // ⏸️ 取消后台断开计时
+    _cancelBackgroundDisconnect();
+    _disconnectDebounceTimer?.cancel();
+    
     // 🔧 先停止流水灯动画（不发送命令）
     _colorize.stopCycleAnimation(sendCommand: false);
     
@@ -734,6 +785,88 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
     _guideOverlayEntry?.remove();
     _guideOverlayEntry = null;
     super.dispose();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  🔄 应用生命周期处理（后台恢复重连）
+  // ═══════════════════════════════════════════════════════════════
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('🔄 App 从后台恢复，检查蓝牙连接状态...');
+      _cancelBackgroundDisconnect();
+      _handleAppResumed();
+    } else if (state == AppLifecycleState.paused) {
+      debugPrint('⏸️ App 进入后台，启动延迟断开计时...');
+      _scheduleBackgroundDisconnect();
+    }
+  }
+
+  // ── 后台延迟断开 ──
+  Timer? _backgroundDisconnectTimer;
+  static const Duration _backgroundGracePeriod = Duration(seconds: 10);
+
+  /// App 进后台后 10 秒主动断开 BLE，释放设备给其他手机
+  void _scheduleBackgroundDisconnect() {
+    _cancelBackgroundDisconnect();
+    _backgroundDisconnectTimer = Timer(_backgroundGracePeriod, () {
+      debugPrint('⏸️ 后台 ${_backgroundGracePeriod.inSeconds}s 已到，主动断开 BLE');
+      final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+      if (btProvider.isConnected) {
+        // 标记为后台主动断开，回前台时静默重连而不弹对话框
+        _disconnectedByBackground = true;
+        btProvider.disconnect();
+      }
+    });
+  }
+
+  /// 取消后台断开计时（回前台时调用）
+  void _cancelBackgroundDisconnect() {
+    _backgroundDisconnectTimer?.cancel();
+    _backgroundDisconnectTimer = null;
+  }
+
+  /// App 从后台恢复时的处理逻辑
+  Future<void> _handleAppResumed() async {
+    final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+    
+    // 如果已经连接，无需处理
+    if (btProvider.isConnected) {
+      debugPrint('✅ App 恢复后蓝牙仍然连接');
+      _disconnectedByBackground = false;
+      return;
+    }
+    
+    // 如果已经断开且已经显示了断开对话框，无需重复处理
+    if (_navigatedOnDisconnect) {
+      debugPrint('⚠️ 已经在处理断开状态');
+      _disconnectedByBackground = false;
+      return;
+    }
+    
+    // 蓝牙断开了（可能是后台主动断开或固件超时踢掉），静默重连
+    final wasBackgroundDisconnect = _disconnectedByBackground;
+    _disconnectedByBackground = false;
+    
+    debugPrint('⚠️ App 恢复后发现蓝牙已断开${wasBackgroundDisconnect ? "（后台主动断开）" : ""}，尝试重新连接...');
+    
+    // 重置 BLE 服务的重连状态（清除可能卡住的重连计时器）
+    btProvider.resetBleReconnectState();
+    
+    // 尝试重新连接
+    final success = await btProvider.connectToDevice(widget.device);
+    if (mounted) {
+      if (success) {
+        debugPrint('✅ 后台恢复后重连成功');
+        _navigatedOnDisconnect = false;
+      } else {
+        debugPrint('❌ 后台恢复后重连失败');
+        _navigatedOnDisconnect = true;
+        _showDisconnectDialog();
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -860,6 +993,29 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
                 Navigator.push(
                   parentContext,
                   MaterialPageRoute(builder: (_) => const AudioManagementScreen()),
+                );
+              }
+            });
+          },
+        ),
+        // 车模识别选项 — 仅 Android（TFLite + ONNX Runtime）
+        if (Platform.isAndroid)
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text(
+                '车模识别',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          onTap: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                ScaffoldMessenger.of(parentContext).showSnackBar(
+                  const SnackBar(content: Text('车模识别功能开发中')),
                 );
               }
             });
@@ -1211,6 +1367,12 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
               bool success = await btProvider.setWuhuaqiStatus(newState);
               if (success) {
                 setState(() => _isAirflowStarted = newState);
+                // 使用控制器显示指示器（自动1.5秒后隐藏）
+                if (newState) {
+                  _airflowController.showOnIndicator();
+                } else {
+                  _airflowController.showOffIndicator();
+                }
                 debugPrint('✅ 雾化器${newState ? "开启" : "关闭"}');
               }
             },
@@ -1265,30 +1427,59 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             ),
           ),
 
-        // ========== 🌫️ 雾化器状态指示器 ==========
-        if (_isAirflowStarted)
-          Positioned(
-            top: config.topButtonTop + 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(204),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.water_drop, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text('雾化器已开启', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-            ),
+        // ========== 🌫️ 雾化器状态指示器（自动隐藏）==========
+        Positioned(
+          top: config.topButtonTop + 60,
+          left: 0,
+          right: 0,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _airflowController.isVisible,
+            builder: (context, isVisible, child) {
+              if (!isVisible) return const SizedBox.shrink();
+              return ValueListenableBuilder<bool>(
+                valueListenable: _airflowController.isOn,
+                builder: (context, isOn, _) {
+                  return Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(230),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isOn ? Icons.water_drop : Icons.water_drop_outlined,
+                            color: Colors.black87,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isOn ? '雾化器已开启' : '雾化器已关闭',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
+        ),
 
         // ========== 🎨 RGB 详细调节面板（仅在 RGB 顶层页上变为可见）==========
         if (_currentMode == ControlMode.rgb)
@@ -1465,6 +1656,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
           if (shouldSend) {
             _lastCommandTime = now;
+            // 🚗 直接发送显示值，固件用 speed_max_display 动态转换
             await btProvider.setRunningSpeed(speed);
           }
         },
@@ -1497,6 +1689,13 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           await btProvider.setFanSpeed(0);
         },
         onSpeedControlVisibilityChanged: null, // 🔑 不需要这个回调了
+        onGarageSettingsApplied: (settings) {
+          // 🚗 车库联动：更新速度范围为车辆极速值
+          debugPrint('🚗 DeviceConnectScreen 收到车库设置: maxSpeed=${settings.maxSpeed}');
+          setState(() {
+            _maxSpeed = settings.maxSpeed;
+          });
+        },
           );
         },
       );

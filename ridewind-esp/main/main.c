@@ -292,35 +292,53 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         ble_service_notify_str("OK:FAN\r\n");
         break;
 
+    /* ── SPEED_MAX:xxx — 设置极速上限显示值 ── */
+    case CMD_SPEED_MAX:
+        g_app_state.speed_max_display = (uint16_t)cmd->param.i16_val;
+        app_state_save_config();
+        ble_service_notify_str("OK:SPEED_MAX\r\n");
+        break;
+
+    /* ── FAN_RANGE:min,max — 设置风力区间 ── */
+    case CMD_FAN_RANGE:
+        g_app_state.fan_range_min = cmd->param.led.r;
+        g_app_state.fan_range_max = cmd->param.led.g;
+        /* Immediately apply fan based on current speed */
+        if (g_app_state.wuhuaqi_state != 2) {
+            uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
+            uint8_t fan = g_app_state.fan_range_min +
+                (uint8_t)((uint16_t)(g_app_state.fan_range_max - g_app_state.fan_range_min) * spd / 100);
+            g_app_state.fan_speed = fan;
+            drv_pwm_set_duty(fan);
+        }
+        app_state_save_config();
+        ble_service_notify_str("OK:FAN_RANGE\r\n");
+        break;
+
     /* ── SPEED:xxx ── */
     case CMD_SPEED: {
+        /* 油门模式下忽略 APP 速度命令 — 油门只由硬件按钮控制 */
+        if (g_app_state.wuhuaqi_state == 2) {
+            break;
+        }
         int16_t spd = cmd->param.i16_val;
-        /* APP sends display value (0-340 km/h or 0-211 mph).
+        /* APP sends display value (0-max km/h or mph).
          * Convert back to internal value (0-100) for storage.
-         * display = internal * 3.4, so internal = display / 3.4 */
-        int16_t internal_spd = (int16_t)(spd / 3.4f + 0.5f);
+         * display = internal * (speed_max_display / 100) */
+        float scale = g_app_state.speed_max_display / 100.0f;
+        int16_t internal_spd = (scale > 0) ? (int16_t)(spd / scale + 0.5f) : 0;
         if (internal_spd < 0) internal_spd = 0;
         if (internal_spd > 100) internal_spd = 100;
         g_app_state.current_speed_kmh = internal_spd;
         g_app_state.last_reported_speed = spd;  /* Keep display value for reporting */
-        /* Map speed to fan: proportional 0-100 */
-        if (g_app_state.wuhuaqi_state == 2) {
-            /* Throttle mode: proportional fan */
-            g_app_state.fan_speed = (uint8_t)internal_spd;
-            drv_pwm_set_duty((uint8_t)internal_spd);
-            g_app_state.remote_active_tick = xTaskGetTickCount();
+        /* Normal mode: apply fan_range mapping */
+        {
+            uint8_t fan = g_app_state.fan_range_min +
+                (uint8_t)((uint16_t)(g_app_state.fan_range_max - g_app_state.fan_range_min) * internal_spd / 100);
+            g_app_state.fan_speed = fan;
+            drv_pwm_set_duty(fan);
         }
-        /* Update engine sound based on speed */
-        if (internal_spd > 0) {
-            if (!audio_player_is_playing()) {
-                audio_player_start_engine();
-            }
-            audio_player_set_target_rpm((uint8_t)internal_spd);
-        } else {
-            if (audio_player_is_playing()) {
-                audio_player_stop_engine();
-            }
-        }
+        g_app_state.remote_active_tick = xTaskGetTickCount();
         /* No OK response for SPEED (matches STM32 behavior) */
         break;
     }
@@ -496,6 +514,8 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
     case CMD_VOLUME:
         g_app_state.volume = cmd->param.u8_val;
         audio_engine_set_volume(cmd->param.u8_val);
+        audio_player_set_master_volume(cmd->param.u8_val);  /* 油门引擎音量同步 */
+        app_state_save_config();
         ble_service_notify_str("OK:VOL\r\n");
         break;
 

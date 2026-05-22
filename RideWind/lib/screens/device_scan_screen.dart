@@ -154,11 +154,21 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
 
       if (!connected) {
         _log('❌ 连接失败');
-        setState(() {
-          _statusText = '连接失败';
-          _hintText = '请重试或检查设备';
-          _isError = true;
-        });
+        // 检查是否是设备被其他手机占用
+        final errorReason = btProvider.lastConnectionError;
+        if (errorReason == 'device_busy') {
+          setState(() {
+            _statusText = '设备已被占用';
+            _hintText = '该设备可能已被其他手机连接，请先断开另一台手机的连接';
+            _isError = true;
+          });
+        } else {
+          setState(() {
+            _statusText = '连接失败';
+            _hintText = '请重试或检查设备';
+            _isError = true;
+          });
+        }
         return;
       }
 

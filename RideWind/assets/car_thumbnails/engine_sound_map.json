@@ -1,0 +1,5919 @@
+{
+  "version": "1.0.0",
+  "description": "RideWind Engine Sound Map - 915 cars mapped to sound profiles",
+  "profiles": [
+    {
+      "profile_id": "ferrari_v12",
+      "display_name": "Ferrari V12 (LaFerrari)",
+      "engine_type": "V12",
+      "aspiration": "NA",
+      "character": "high_rev_exotic",
+      "files": {
+        "idle": "LaFerrariIdle.h",
+        "rev": "LaFerrariRev.h",
+        "knock": "LaFerrariKnock.h",
+        "start": "LaFerrariStart.h"
+      },
+      "config": {
+        "cylinders": 12,
+        "knock_interval": 12,
+        "v_type": "V12"
+      }
+    },
+    {
+      "profile_id": "jaguar_v12",
+      "display_name": "Jaguar V12 (XJS)",
+      "engine_type": "V12",
+      "aspiration": "NA",
+      "character": "smooth_gt",
+      "files": {
+        "idle": "JaguarXJSidle2.h",
+        "rev": "JaguarXJSrev2.h",
+        "knock": "LaFerrariKnock.h",
+        "start": "JaguarXJSstart.h"
+      },
+      "config": {
+        "cylinders": 12,
+        "knock_interval": 12,
+        "v_type": "V12"
+      }
+    },
+    {
+      "profile_id": "muscle_v8_classic",
+      "display_name": "Classic Muscle V8 (1965 Mustang)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "muscle_rumble",
+      "files": {
+        "idle": "1965FordMustangV8idle.h",
+        "rev": "1965FordMustangV8rev.h",
+        "knock": "1965FordMustangV8knock.h",
+        "start": "1965FordMustangV8start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "muscle_v8_modern",
+      "display_name": "Modern Muscle V8 (Supercharged)",
+      "engine_type": "V8",
+      "aspiration": "Supercharged",
+      "character": "supercharged_roar",
+      "files": {
+        "idle": "JeepGrandCherokeeTrackhawkIdle.h",
+        "rev": "JeepWranglerRubicon392V8Rev.h",
+        "knock": "JeepGrandCherokeeTrackhawkKnock.h",
+        "start": "JeepGrandCherokeeTrackhawkStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "chevy_bigblock_v8",
+      "display_name": "Chevy Big Block V8 (468)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "deep_rumble",
+      "files": {
+        "idle": "468ChevyBigBlockIdle.h",
+        "rev": "468ChevyBigBlockRev.h",
+        "knock": "468ChevyBigBlockKnock.h",
+        "start": "468ChevyBigBlockStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "chevy_smallblock_v8",
+      "display_name": "Chevy Small Block V8 (Nova)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "sporty_v8",
+      "files": {
+        "idle": "ChevyNovaCoupeV8idle.h",
+        "rev": "ChevyNovaCoupeV8rev.h",
+        "knock": "ChevyNovaCoupeV8knock.h",
+        "start": "468ChevyBigBlockStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "ls3_v8",
+      "display_name": "LS3 V8 (6.2L Modern)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "modern_v8",
+      "files": {
+        "idle": "62LS3Idle.h",
+        "rev": "62LS3Rev.h",
+        "knock": "62LS3Knock.h",
+        "start": "62LS3Start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "jeep_v8",
+      "display_name": "Jeep Wrangler V8 (392)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "offroad_v8",
+      "files": {
+        "idle": "JeepWranglerRubicon392V8Idle.h",
+        "rev": "JeepWranglerRubicon392V8Rev.h",
+        "knock": "JeepWranglerRubicon392V8Knock.h",
+        "start": "JeepWranglerRubicon392V8Start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "british_v8",
+      "display_name": "British V8 (Defender Open Pipe)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "british_burble",
+      "files": {
+        "idle": "DefenderV8OpenPipeIdle.h",
+        "rev": "DefenderV8OpenPipeRev.h",
+        "knock": "DefenderV8OpenPipeKnock.h",
+        "start": "DefenderV8OpenPipeStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "mgb_v8",
+      "display_name": "MGB GT V8 (Light British)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "light_v8",
+      "files": {
+        "idle": "MGBGtV8idle.h",
+        "rev": "MGBGtV8rev.h",
+        "knock": "MGBGtV8knock.h",
+        "start": "MGBGtV8start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "dodge_v8",
+      "display_name": "Dodge HEMI V8 (Challenger)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "hemi_rumble",
+      "files": {
+        "idle": "DodgeChallenger70Idle.h",
+        "rev": "ChevyNovaCoupeV8rev.h",
+        "knock": "demonhawkKnock.h",
+        "start": "1965FordMustangV8start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "gmc_pickup_v8",
+      "display_name": "GMC Sierra Pickup V8",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "truck_v8",
+      "files": {
+        "idle": "GMCSierraPickupIdle.h",
+        "rev": "GMCSierraPickupRev.h",
+        "knock": "GMCSierraPickupKnock.h",
+        "start": "ChevyPickupV8SoundStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "chevy_pickup_v8",
+      "display_name": "Chevy Pickup V8",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "pickup_rumble",
+      "files": {
+        "idle": "ChevyPickupV8SoundIdle.h",
+        "rev": "ChevyPickupV8SoundRev.h",
+        "knock": "ChevyPickupV8SoundKnock.h",
+        "start": "ChevyPickupV8SoundStart.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "straightpipe_v8",
+      "display_name": "Straight-Piped V8 (Race Exhaust)",
+      "engine_type": "V8",
+      "aspiration": "NA",
+      "character": "race_exhaust",
+      "files": {
+        "idle": "ChevyNovaCoupeV8idle.h",
+        "rev": "straightPipedCompilationRev.h",
+        "knock": "straightPipedCompilationKnock.h",
+        "start": "1965FordMustangV8start.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "harley_vtwin",
+      "display_name": "Harley-Davidson V-Twin",
+      "engine_type": "V2",
+      "aspiration": "NA",
+      "character": "vtwin_potato",
+      "files": {
+        "idle": "HarleyDavidsonFXSBIdle.h",
+        "rev": "HarleyDavidsonFXSBrev.h",
+        "knock": "HarleyDavidsonFXSBKnock.h",
+        "start": "HarleyDavidsonFXSBStart.h"
+      },
+      "config": {
+        "cylinders": 2,
+        "knock_interval": 4,
+        "v_type": "V2"
+      }
+    },
+    {
+      "profile_id": "vw_flat4",
+      "display_name": "VW Beetle Flat-4 (Air-Cooled)",
+      "engine_type": "F4",
+      "aspiration": "NA",
+      "character": "aircooled_buzz",
+      "files": {
+        "idle": "VWBeetleIdle.h",
+        "rev": "VWBeetleRev.h",
+        "knock": "VWBeetleKnock.h",
+        "start": "VWBeetleStart.h"
+      },
+      "config": {
+        "cylinders": 4,
+        "knock_interval": 4,
+        "v_type": "F4"
+      }
+    },
+    {
+      "profile_id": "toyota_i6",
+      "display_name": "Toyota I6 (FJ40 Land Cruiser)",
+      "engine_type": "I6",
+      "aspiration": "NA",
+      "character": "smooth_i6",
+      "files": {
+        "idle": "FJ40idle.h",
+        "rev": "FJ40rev.h",
+        "knock": "FJ40knock.h",
+        "start": "LaFerrariStart.h"
+      },
+      "config": {
+        "cylinders": 6,
+        "knock_interval": 6,
+        "v_type": "I6"
+      }
+    },
+    {
+      "profile_id": "scania_v8_turbo",
+      "display_name": "Scania V8 1000HP (Twin-Turbo)",
+      "engine_type": "V8",
+      "aspiration": "Twin-Turbo",
+      "character": "turbo_v8",
+      "files": {
+        "idle": "1000HpScaniaV8idle.h",
+        "rev": "1000HpScaniaV8rev.h",
+        "knock": "1000HpScaniaV8knock.h",
+        "start": "Scania143start4.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "cummins_diesel",
+      "display_name": "Cummins 6BTA Diesel I6",
+      "engine_type": "I6",
+      "aspiration": "Turbocharged",
+      "character": "diesel_i6",
+      "files": {
+        "idle": "Cummins6BTAIdle.h",
+        "rev": "Cummins6BTARev.h",
+        "knock": "Cummins6BTAKnock.h",
+        "start": "Cummins6BTAStart.h"
+      },
+      "config": {
+        "cylinders": 6,
+        "knock_interval": 6,
+        "v_type": "I6"
+      }
+    },
+    {
+      "profile_id": "defender_td5",
+      "display_name": "Land Rover Td5 Diesel I5",
+      "engine_type": "I5",
+      "aspiration": "Turbocharged",
+      "character": "diesel_suv",
+      "files": {
+        "idle": "DefenderTd5idle.h",
+        "rev": "DefenderTd5rev.h",
+        "knock": "DefenderTd5knock.h",
+        "start": "DefenderTd5start.h"
+      },
+      "config": {
+        "cylinders": 5,
+        "knock_interval": 5,
+        "v_type": "I5"
+      }
+    },
+    {
+      "profile_id": "powerstroke_diesel",
+      "display_name": "Ford Powerstroke Diesel V8",
+      "engine_type": "V8",
+      "aspiration": "Turbocharged",
+      "character": "diesel_truck",
+      "files": {
+        "idle": "POWERSTROKEidle.h",
+        "rev": "POWERSTROKErev2.h",
+        "knock": "POWERSTROKEknock.h",
+        "start": "POWERSTROKEstart2.h"
+      },
+      "config": {
+        "cylinders": 8,
+        "knock_interval": 8,
+        "v_type": "V8"
+      }
+    },
+    {
+      "profile_id": "electric",
+      "display_name": "Electric Motor (EV)",
+      "engine_type": "Electric",
+      "aspiration": "Electric",
+      "character": "ev_whine",
+      "files": {
+        "idle": "idleDummy.h",
+        "rev": "idleDummy.h",
+        "knock": "DieselKnockDummy.h",
+        "start": "idleDummy.h"
+      },
+      "config": {
+        "cylinders": 0,
+        "knock_interval": 1,
+        "v_type": "EV"
+      }
+    }
+  ],
+  "car_assignments": [
+    {
+      "full_name": "AMC Gremlin X",
+      "brand": "AMC",
+      "model": "Gremlin X",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "AMC Javelin AMX",
+      "brand": "AMC",
+      "model": "Javelin AMX",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "AMC Rebel 'The Machine'",
+      "brand": "AMC",
+      "model": "Rebel 'The Machine'",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "ATS GT 2018 Large",
+      "brand": "ATS",
+      "model": "GT 2018 Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Abarth 595 esseesse",
+      "brand": "Abarth",
+      "model": "595 esseesse",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Abarth 695 Biposto",
+      "brand": "Abarth",
+      "model": "695 Biposto",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Abarth Fiat 131",
+      "brand": "Abarth",
+      "model": "Fiat 131",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Acura Integra Type-R",
+      "brand": "Acura",
+      "model": "Integra Type-R",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Acura NSX 2017",
+      "brand": "Acura",
+      "model": "NSX 2017",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Acura RSX Type-S",
+      "brand": "Acura",
+      "model": "RSX Type-S",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Alfa Romeo Giulia Quadrifoglio",
+      "brand": "Alfa Romeo",
+      "model": "Giulia Quadrifoglio",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Alpine A110",
+      "brand": "Alpine",
+      "model": "A110",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Alpine A110 1600s",
+      "brand": "Alpine",
+      "model": "A110 1600s",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Alumicraft 122 Class 1 Buggy Large",
+      "brand": "Alumicraft",
+      "model": "122 Class 1 Buggy Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Alumicraft 6165 Trick Truck Large",
+      "brand": "Alumicraft",
+      "model": "6165 Trick Truck Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Apollo Intensa Emozione",
+      "brand": "Apollo",
+      "model": "Intensa Emozione",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Apollo Intensa Emozione WP Large",
+      "brand": "Apollo",
+      "model": "Intensa Emozione WP Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ascari KZ1R 2012 Large",
+      "brand": "Ascari",
+      "model": "KZ1R 2012 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Aston Martin DBR1",
+      "brand": "Aston Martin",
+      "model": "DBR1",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin DBS",
+      "brand": "Aston Martin",
+      "model": "DBS",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin DBS Superleggera",
+      "brand": "Aston Martin",
+      "model": "DBS Superleggera",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin DBX 2021 Large",
+      "brand": "Aston Martin",
+      "model": "DBX 2021 Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Lagonda",
+      "brand": "Aston Martin",
+      "model": "Lagonda",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Valhalla Concept Car Large",
+      "brand": "Aston Martin",
+      "model": "Valhalla Concept Car Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Valkyrie",
+      "brand": "Aston Martin",
+      "model": "Valkyrie",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Valkyrie AMR Pro",
+      "brand": "Aston Martin",
+      "model": "Valkyrie AMR Pro",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Vanquish Zagato",
+      "brand": "Aston Martin",
+      "model": "Vanquish Zagato",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Vantage 2019",
+      "brand": "Aston Martin",
+      "model": "Vantage 2019",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Aston Martin Vulcan AMR Pro",
+      "brand": "Aston Martin",
+      "model": "Vulcan AMR Pro",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Audi R8 Coupe V10 Plus",
+      "brand": "Audi",
+      "model": "R8 Coupe V10 Plus",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Audi R8 Coupe V10 Plus 5.2 FSI quattro",
+      "brand": "Audi",
+      "model": "R8 Coupe V10 Plus 5.2 FSI quattro",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Audi RS 2 Avant",
+      "brand": "Audi",
+      "model": "RS 2 Avant",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi RS 3 Sportback",
+      "brand": "Audi",
+      "model": "RS 3 Sportback",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi RS 4",
+      "brand": "Audi",
+      "model": "RS 4",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Audi RS 4 Avant 2001",
+      "brand": "Audi",
+      "model": "RS 4 Avant 2001",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Audi RS 4 Avant 2013",
+      "brand": "Audi",
+      "model": "RS 4 Avant 2013",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Audi RS 5 Coupe",
+      "brand": "Audi",
+      "model": "RS 5 Coupe",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Audi RS 6 2003",
+      "brand": "Audi",
+      "model": "RS 6 2003",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Audi RS 6 2009",
+      "brand": "Audi",
+      "model": "RS 6 2009",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Audi RS 6 Avant 2015",
+      "brand": "Audi",
+      "model": "RS 6 Avant 2015",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Audi RS 6 Avant 2021 Large",
+      "brand": "Audi",
+      "model": "RS 6 Avant 2021 Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Audi RS 7 Sportback 2013",
+      "brand": "Audi",
+      "model": "RS 7 Sportback 2013",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Audi RS3 Sedan 2020 Large",
+      "brand": "Audi",
+      "model": "RS3 Sedan 2020 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi RS4 Avant 2018 Large",
+      "brand": "Audi",
+      "model": "RS4 Avant 2018 Large",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Audi RS5 Coupe 2018 Large",
+      "brand": "Audi",
+      "model": "RS5 Coupe 2018 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Audi S1",
+      "brand": "Audi",
+      "model": "S1",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi Sport quattro",
+      "brand": "Audi",
+      "model": "Sport quattro",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi TT RS 2018 Large",
+      "brand": "Audi",
+      "model": "TT RS 2018 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi TT RS Coupe 2010",
+      "brand": "Audi",
+      "model": "TT RS Coupe 2010",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi TT RS Coupe 2020",
+      "brand": "Audi",
+      "model": "TT RS Coupe 2020",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Audi TTS Coupe",
+      "brand": "Audi",
+      "model": "TTS Coupe",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Austin-Healey Sprite MkI",
+      "brand": "Austin-Healey",
+      "model": "Sprite MkI",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Automobili Pininfarina Battista",
+      "brand": "Automobili",
+      "model": "Pininfarina Battista",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Autozam AZ-1",
+      "brand": "Autozam",
+      "model": "AZ-1",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "BAC Mono",
+      "brand": "BAC",
+      "model": "Mono",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "BMW 1 M8 GTE",
+      "brand": "BMW",
+      "model": "1 M8 GTE",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW 1 Series M Coupe",
+      "brand": "BMW",
+      "model": "1 Series M Coupe",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "BMW 2002 Turbo",
+      "brand": "BMW",
+      "model": "2002 Turbo",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "BMW 635CSi",
+      "brand": "BMW",
+      "model": "635CSi",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "BMW 850CSi",
+      "brand": "BMW",
+      "model": "850CSi",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "BMW Isetta 300 Export",
+      "brand": "BMW",
+      "model": "Isetta 300 Export",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "BMW M1",
+      "brand": "BMW",
+      "model": "M1",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "BMW M2 2023",
+      "brand": "BMW",
+      "model": "M2 2023",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "BMW M2 Coupe",
+      "brand": "BMW",
+      "model": "M2 Coupe",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "BMW M3 1991",
+      "brand": "BMW",
+      "model": "M3 1991",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3 1997",
+      "brand": "BMW",
+      "model": "M3 1997",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3 2005",
+      "brand": "BMW",
+      "model": "M3 2005",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3 2008",
+      "brand": "BMW",
+      "model": "M3 2008",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3 Competition Sedan 2021",
+      "brand": "BMW",
+      "model": "M3 Competition Sedan 2021",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3 GTS 2010",
+      "brand": "BMW",
+      "model": "M3 GTS 2010",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M3-GTR",
+      "brand": "BMW",
+      "model": "M3-GTR",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M4 Coupe",
+      "brand": "BMW",
+      "model": "M4 Coupe",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M4 GTS",
+      "brand": "BMW",
+      "model": "M4 GTS",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 1988",
+      "brand": "BMW",
+      "model": "M5 1988",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 1995",
+      "brand": "BMW",
+      "model": "M5 1995",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 2003",
+      "brand": "BMW",
+      "model": "M5 2003",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 2009",
+      "brand": "BMW",
+      "model": "M5 2009",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 2012",
+      "brand": "BMW",
+      "model": "M5 2012",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 2018",
+      "brand": "BMW",
+      "model": "M5 2018",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M5 CS",
+      "brand": "BMW",
+      "model": "M5 CS",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW M6 Coupe 2013",
+      "brand": "BMW",
+      "model": "M6 Coupe 2013",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW M8 Coupe 2020 Large",
+      "brand": "BMW",
+      "model": "M8 Coupe 2020 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "BMW X5 M",
+      "brand": "BMW",
+      "model": "X5 M",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW X5 M 2011 FE Large",
+      "brand": "BMW",
+      "model": "X5 M 2011 FE Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW X5 M Traffic",
+      "brand": "BMW",
+      "model": "X5 M Traffic",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW X6 M",
+      "brand": "BMW",
+      "model": "X6 M",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "BMW Z3 M Coupe",
+      "brand": "BMW",
+      "model": "Z3 M Coupe",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "BMW Z4 M Coupe",
+      "brand": "BMW",
+      "model": "Z4 M Coupe",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "BMW Z4 Roadster",
+      "brand": "BMW",
+      "model": "Z4 Roadster",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "BMW i4 eDrive40 2022",
+      "brand": "BMW",
+      "model": "i4 eDrive40 2022",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "BMW i8",
+      "brand": "BMW",
+      "model": "i8",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "BMW iX xDrive50 2022",
+      "brand": "BMW",
+      "model": "iX xDrive50 2022",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Bentley 4-Half Liter Supercharged",
+      "brand": "Bentley",
+      "model": "4-Half Liter Supercharged",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Bentley 8 Litre",
+      "brand": "Bentley",
+      "model": "8 Litre",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Bentley Bentayga",
+      "brand": "Bentley",
+      "model": "Bentayga",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bentley Continental GT Convertible",
+      "brand": "Bentley",
+      "model": "Continental GT Convertible",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bentley Continental Supersports",
+      "brand": "Bentley",
+      "model": "Continental Supersports",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bentley Flying Spur",
+      "brand": "Bentley",
+      "model": "Flying Spur",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bentley Turbo R",
+      "brand": "Bentley",
+      "model": "Turbo R",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Brabham BT62 Large",
+      "brand": "Brabham",
+      "model": "BT62 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Bugatti Chiron",
+      "brand": "Bugatti",
+      "model": "Chiron",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bugatti Divo",
+      "brand": "Bugatti",
+      "model": "Divo",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bugatti EB110 Super Sport",
+      "brand": "Bugatti",
+      "model": "EB110 Super Sport",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bugatti Type 35 C",
+      "brand": "Bugatti",
+      "model": "Type 35 C",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Bugatti Veyron Super Sport",
+      "brand": "Bugatti",
+      "model": "Veyron Super Sport",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Buick GSX",
+      "brand": "Buick",
+      "model": "GSX",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Buick Regal GNX",
+      "brand": "Buick",
+      "model": "Regal GNX",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Cadillac 3 ATS-VR",
+      "brand": "Cadillac",
+      "model": "3 ATS-VR",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Cadillac ATS-V",
+      "brand": "Cadillac",
+      "model": "ATS-V",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Cadillac CT4-V 2022",
+      "brand": "Cadillac",
+      "model": "CT4-V 2022",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Cadillac CTS-V Sedan",
+      "brand": "Cadillac",
+      "model": "CTS-V Sedan",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Cadillac CTS-V Sport Wagon",
+      "brand": "Cadillac",
+      "model": "CTS-V Sport Wagon",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Cadillac XTS Limousine",
+      "brand": "Cadillac",
+      "model": "XTS Limousine",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Can-Am Maverick",
+      "brand": "Can-Am",
+      "model": "Maverick",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Casey Currie Motorsports 4402 Ultra4 Trophy Jeep Large",
+      "brand": "Casey",
+      "model": "Currie Motorsports 4402 Ultra4 Trophy Jeep Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Caterham Superlight R500",
+      "brand": "Caterham",
+      "model": "Superlight R500",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Chevrolet 150 Utility Sedan",
+      "brand": "Chevrolet",
+      "model": "150 Utility Sedan",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet 3 Corvette C8R",
+      "brand": "Chevrolet",
+      "model": "3 Corvette C8R",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Bel Air",
+      "brand": "Chevrolet",
+      "model": "Bel Air",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro Jordan Luka 3",
+      "brand": "Chevrolet",
+      "model": "Camaro Jordan Luka 3",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro Super Sport 1969",
+      "brand": "Chevrolet",
+      "model": "Camaro Super Sport 1969",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro Z28 1970",
+      "brand": "Chevrolet",
+      "model": "Camaro Z28 1970",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro Z28 1979",
+      "brand": "Chevrolet",
+      "model": "Camaro Z28 1979",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro Z28 2015",
+      "brand": "Chevrolet",
+      "model": "Camaro Z28 2015",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro ZL1 1LE",
+      "brand": "Chevrolet",
+      "model": "Camaro ZL1 1LE",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Camaro ZL1 2017",
+      "brand": "Chevrolet",
+      "model": "Camaro ZL1 2017",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Chevelle Super Sport 454",
+      "brand": "Chevrolet",
+      "model": "Chevelle Super Sport 454",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Colorado ZR2",
+      "brand": "Chevrolet",
+      "model": "Colorado ZR2",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Chevrolet Colorado ZR2 Traffic",
+      "brand": "Chevrolet",
+      "model": "Colorado ZR2 Traffic",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette 1953",
+      "brand": "Chevrolet",
+      "model": "Corvette 1953",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette 1953 FE Large",
+      "brand": "Chevrolet",
+      "model": "Corvette 1953 FE Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette 1960",
+      "brand": "Chevrolet",
+      "model": "Corvette 1960",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette E-Ray 2024",
+      "brand": "Chevrolet",
+      "model": "Corvette E-Ray 2024",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette EV Barbie Movie Large",
+      "brand": "Chevrolet",
+      "model": "Corvette EV Barbie Movie Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette Stingray 427",
+      "brand": "Chevrolet",
+      "model": "Corvette Stingray 427",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette Stingray Coupe",
+      "brand": "Chevrolet",
+      "model": "Corvette Stingray Coupe",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette Z06 2002",
+      "brand": "Chevrolet",
+      "model": "Corvette Z06 2002",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette Z06 2015",
+      "brand": "Chevrolet",
+      "model": "Corvette Z06 2015",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette Z06 2023 Promo",
+      "brand": "Chevrolet",
+      "model": "Corvette Z06 2023 Promo",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette ZR-1 1970",
+      "brand": "Chevrolet",
+      "model": "Corvette ZR-1 1970",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette ZR-1 1995",
+      "brand": "Chevrolet",
+      "model": "Corvette ZR-1 1995",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette ZR1 2009",
+      "brand": "Chevrolet",
+      "model": "Corvette ZR1 2009",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Corvette ZR1 2019",
+      "brand": "Chevrolet",
+      "model": "Corvette ZR1 2019",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet El Camino Super Sport 454",
+      "brand": "Chevrolet",
+      "model": "El Camino Super Sport 454",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Hot Wheels COPO Camaro Large",
+      "brand": "Chevrolet",
+      "model": "Hot Wheels COPO Camaro Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Impala Super Sport 1996",
+      "brand": "Chevrolet",
+      "model": "Impala Super Sport 1996",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Impala Super Sport 409",
+      "brand": "Chevrolet",
+      "model": "Impala Super Sport 409",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Chevrolet K10 Custom Large",
+      "brand": "Chevrolet",
+      "model": "K10 Custom Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Monte Carlo Super Sport",
+      "brand": "Chevrolet",
+      "model": "Monte Carlo Super Sport",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Nova Super Sport",
+      "brand": "Chevrolet",
+      "model": "Nova Super Sport",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Chevrolet Nova Super Sport 396",
+      "brand": "Chevrolet",
+      "model": "Nova Super Sport 396",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Pro Stock Camaro",
+      "brand": "Chevrolet",
+      "model": "Pro Stock Camaro",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Chevrolet Silverado LT Trail Boss 2020",
+      "brand": "Chevrolet",
+      "model": "Silverado LT Trail Boss 2020",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Citroën BX 4TC",
+      "brand": "Citroën",
+      "model": "BX 4TC",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Citroën DS 23",
+      "brand": "Citroën",
+      "model": "DS 23",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Cupra Formentor VZ5 Large",
+      "brand": "Cupra",
+      "model": "Formentor VZ5 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Cupra Tavascan Concept Large",
+      "brand": "Cupra",
+      "model": "Tavascan Concept Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Cupra UrbanRebel Concept Large",
+      "brand": "Cupra",
+      "model": "UrbanRebel Concept Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Czinger 21C 2024",
+      "brand": "Czinger",
+      "model": "21C 2024",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Datsun 510",
+      "brand": "Datsun",
+      "model": "510",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "DeBerti Chevrolet C10 Slayer",
+      "brand": "DeBerti",
+      "model": "Chevrolet C10 Slayer",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "DeBerti Chevrolet Silverado 1500 DT",
+      "brand": "DeBerti",
+      "model": "Chevrolet Silverado 1500 DT",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "DeBerti F-150 Prerunner",
+      "brand": "DeBerti",
+      "model": "F-150 Prerunner",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "DeBerti Ford Econoline 1961",
+      "brand": "DeBerti",
+      "model": "Ford Econoline 1961",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "DeBerti Ford Mustang GT",
+      "brand": "DeBerti",
+      "model": "Ford Mustang GT",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "DeBerti Toyota Tacoma TRD The Performance Truck Large",
+      "brand": "DeBerti",
+      "model": "Toyota Tacoma TRD The Performance Truck Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "DeBerti Wrangler Unlimited",
+      "brand": "DeBerti",
+      "model": "Wrangler Unlimited",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "DeLorean DMC-12 Large",
+      "brand": "DeLorean",
+      "model": "DMC-12 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Deberti Transformer Large",
+      "brand": "Deberti",
+      "model": "Transformer Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Dodge Challenger RT",
+      "brand": "Dodge",
+      "model": "Challenger RT",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Challenger SRT Demon",
+      "brand": "Dodge",
+      "model": "Challenger SRT Demon",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Challenger SRT Hellcat",
+      "brand": "Dodge",
+      "model": "Challenger SRT Hellcat",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Challenger SRT Super Stock",
+      "brand": "Dodge",
+      "model": "Challenger SRT Super Stock",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Charger Daytona HEMI",
+      "brand": "Dodge",
+      "model": "Charger Daytona HEMI",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Charger RT",
+      "brand": "Dodge",
+      "model": "Charger RT",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Charger RT FE Large",
+      "brand": "Dodge",
+      "model": "Charger RT FE Large",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Charger SRT Hellcat",
+      "brand": "Dodge",
+      "model": "Charger SRT Hellcat",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Coronet Super Bee 1970 Large",
+      "brand": "Dodge",
+      "model": "Coronet Super Bee 1970 Large",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Dart HEMI",
+      "brand": "Dodge",
+      "model": "Dart HEMI",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Durango SRT",
+      "brand": "Dodge",
+      "model": "Durango SRT",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Durango SRT Hellcat",
+      "brand": "Dodge",
+      "model": "Durango SRT Hellcat",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Magnum 2008 Large",
+      "brand": "Dodge",
+      "model": "Magnum 2008 Large",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge SRT Viper GTS",
+      "brand": "Dodge",
+      "model": "SRT Viper GTS",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge SRT Viper GTS AE Large",
+      "brand": "Dodge",
+      "model": "SRT Viper GTS AE Large",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Viper ACR",
+      "brand": "Dodge",
+      "model": "Viper ACR",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Viper GTS ACR",
+      "brand": "Dodge",
+      "model": "Viper GTS ACR",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Dodge Viper SRT10 ACR",
+      "brand": "Dodge",
+      "model": "Viper SRT10 ACR",
+      "sound_profile": "dodge_v8"
+    },
+    {
+      "full_name": "Donkervoort D8 GTO",
+      "brand": "Donkervoort",
+      "model": "D8 GTO",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Eagle Speedster",
+      "brand": "Eagle",
+      "model": "Speedster",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Elemental RP1 2019",
+      "brand": "Elemental",
+      "model": "RP1 2019",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Exomotive Exocet Off-Road",
+      "brand": "Exomotive",
+      "model": "Exocet Off-Road",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Exomotive Exocet Off-Road FE Large",
+      "brand": "Exomotive",
+      "model": "Exocet Off-Road FE Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 125 ABT Cupra XE Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 125 ABT Cupra XE Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 22 JBXE Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 22 JBXE Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 23 Genesys Andretti United Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 23 Genesys Andretti United Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 42 XITE Racing Team Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 42 XITE Racing Team Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 44 X44 Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 44 X44 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 5 Veloce Racing Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 5 Veloce Racing Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 55 Acciona Sainz XE Team Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 55 Acciona Sainz XE Team Large",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 58 McLaren Racing Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 58 McLaren Racing Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 6 Rosberg X Racing Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 6 Rosberg X Racing Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Extreme E Odyseey 21 e-SUV 99 Chip Ganassi Racing GMC Hummer EV Large",
+      "brand": "Extreme",
+      "model": "E Odyseey 21 e-SUV 99 Chip Ganassi Racing GMC Hummer EV Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "FIAT 124 Sport Spider",
+      "brand": "FIAT",
+      "model": "124 Sport Spider",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Fast & Furious Chevy Impala Fast X Large",
+      "brand": "Fast",
+      "model": "& Furious Chevy Impala Fast X Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Fast & Furious Datsun 240Z Fast X Large",
+      "brand": "Fast",
+      "model": "& Furious Datsun 240Z Fast X Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Fast & Furious Dodge Charger 22 Fast X Large",
+      "brand": "Fast",
+      "model": "& Furious Dodge Charger 22 Fast X Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Fast & Furious Dodge Charger 70 Fast X Large",
+      "brand": "Fast",
+      "model": "& Furious Dodge Charger 70 Fast X Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Fast & Furious Flip Car 2.0 Fast X Large",
+      "brand": "Fast",
+      "model": "& Furious Flip Car 2.0 Fast X Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Ferrari 25 Corse Clienti 488 Challenge 2017 Large",
+      "brand": "Ferrari",
+      "model": "25 Corse Clienti 488 Challenge 2017 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 250 California",
+      "brand": "Ferrari",
+      "model": "250 California",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 250 GT Berlinetta Lusso",
+      "brand": "Ferrari",
+      "model": "250 GT Berlinetta Lusso",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 250 GTO",
+      "brand": "Ferrari",
+      "model": "250 GTO",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 250 Testa Rossa",
+      "brand": "Ferrari",
+      "model": "250 Testa Rossa",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 288 GTO",
+      "brand": "Ferrari",
+      "model": "288 GTO",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 296 GTB 2022 Large",
+      "brand": "Ferrari",
+      "model": "296 GTB 2022 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 330 P4",
+      "brand": "Ferrari",
+      "model": "330 P4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 360 Challenge Stradale",
+      "brand": "Ferrari",
+      "model": "360 Challenge Stradale",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 365 GTB-4",
+      "brand": "Ferrari",
+      "model": "365 GTB-4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 430 Scuderia",
+      "brand": "Ferrari",
+      "model": "430 Scuderia",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 458 Italia",
+      "brand": "Ferrari",
+      "model": "458 Italia",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 458 Speciale",
+      "brand": "Ferrari",
+      "model": "458 Speciale",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 488 GTB",
+      "brand": "Ferrari",
+      "model": "488 GTB",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 488 Pista",
+      "brand": "Ferrari",
+      "model": "488 Pista",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 512 S",
+      "brand": "Ferrari",
+      "model": "512 S",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 512 TR",
+      "brand": "Ferrari",
+      "model": "512 TR",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 575M",
+      "brand": "Ferrari",
+      "model": "575M",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 599 GTO",
+      "brand": "Ferrari",
+      "model": "599 GTO",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 599XX",
+      "brand": "Ferrari",
+      "model": "599XX",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 599XX Evolution",
+      "brand": "Ferrari",
+      "model": "599XX Evolution",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 62 488 GTE",
+      "brand": "Ferrari",
+      "model": "62 488 GTE",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 62 488 GTE Promo",
+      "brand": "Ferrari",
+      "model": "62 488 GTE Promo",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari 812 Superfast",
+      "brand": "Ferrari",
+      "model": "812 Superfast",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari California T",
+      "brand": "Ferrari",
+      "model": "California T",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari Dino 246 GT",
+      "brand": "Ferrari",
+      "model": "Dino 246 GT",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari Enzo",
+      "brand": "Ferrari",
+      "model": "Enzo",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F12tdf",
+      "brand": "Ferrari",
+      "model": "F12tdf",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F355 Berlinetta",
+      "brand": "Ferrari",
+      "model": "F355 Berlinetta",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F40",
+      "brand": "Ferrari",
+      "model": "F40",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F40 Competizione",
+      "brand": "Ferrari",
+      "model": "F40 Competizione",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F50",
+      "brand": "Ferrari",
+      "model": "F50",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F50 GT",
+      "brand": "Ferrari",
+      "model": "F50 GT",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari F8 Tributo 2020 Large",
+      "brand": "Ferrari",
+      "model": "F8 Tributo 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari FXX",
+      "brand": "Ferrari",
+      "model": "FXX",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari FXX-K",
+      "brand": "Ferrari",
+      "model": "FXX-K",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari FXX-K Evo 2018 Large",
+      "brand": "Ferrari",
+      "model": "FXX-K Evo 2018 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari GTC4Lusso",
+      "brand": "Ferrari",
+      "model": "GTC4Lusso",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari J50 2017 Large",
+      "brand": "Ferrari",
+      "model": "J50 2017 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari LaFerrari",
+      "brand": "Ferrari",
+      "model": "LaFerrari",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari Monza SP2 2019 Large",
+      "brand": "Ferrari",
+      "model": "Monza SP2 2019 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari Portofino",
+      "brand": "Ferrari",
+      "model": "Portofino",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari Roma 2020 Large",
+      "brand": "Ferrari",
+      "model": "Roma 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ferrari SF90 Stradale 2020 Large",
+      "brand": "Ferrari",
+      "model": "SF90 Stradale 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Fh5 Chevrolet Corvette Z06 2023",
+      "brand": "Fh5",
+      "model": "Chevrolet Corvette Z06 2023",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Fiat 124 Spider 17",
+      "brand": "Fiat",
+      "model": "124 Spider 17",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Fiat Dino 2.4 Coupe",
+      "brand": "Fiat",
+      "model": "Dino 2.4 Coupe",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Ford 11 Rockstar F-150 Trophy Truck",
+      "brand": "Ford",
+      "model": "11 Rockstar F-150 Trophy Truck",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Ford 14 Rahal Letterman Lanigan Racing GRC Fiesta",
+      "brand": "Ford",
+      "model": "14 Rahal Letterman Lanigan Racing GRC Fiesta",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford 2 GT40 Mk II",
+      "brand": "Ford",
+      "model": "2 GT40 Mk II",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Ford 2069 Ford Performance Bronco R",
+      "brand": "Ford",
+      "model": "2069 Ford Performance Bronco R",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Ford 2069 Ford Performance Bronco R 2020 WP Large",
+      "brand": "Ford",
+      "model": "2069 Ford Performance Bronco R 2020 WP Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Ford 25 Brocky Ultra4 Bronco RTR Large",
+      "brand": "Ford",
+      "model": "25 Brocky Ultra4 Bronco RTR Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Ford 4 Ford Focus RS Large",
+      "brand": "Ford",
+      "model": "4 Ford Focus RS Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford 5 Escort RS1800 MK II",
+      "brand": "Ford",
+      "model": "5 Escort RS1800 MK II",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford 66 GTLM",
+      "brand": "Ford",
+      "model": "66 GTLM",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Ford Anglia 105E",
+      "brand": "Ford",
+      "model": "Anglia 105E",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Bronco",
+      "brand": "Ford",
+      "model": "Bronco",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Ford Bronco 2021 Large",
+      "brand": "Ford",
+      "model": "Bronco 2021 Large",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Ford Bronco Raptor 2022",
+      "brand": "Ford",
+      "model": "Bronco Raptor 2022",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Ford Bronco Traffic",
+      "brand": "Ford",
+      "model": "Bronco Traffic",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Ford Capri RS3100",
+      "brand": "Ford",
+      "model": "Capri RS3100",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Ford Crown Victoria Police Interceptor",
+      "brand": "Ford",
+      "model": "Crown Victoria Police Interceptor",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford De Luxe Coupe",
+      "brand": "Ford",
+      "model": "De Luxe Coupe",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford De Luxe Five-Window Coupe",
+      "brand": "Ford",
+      "model": "De Luxe Five-Window Coupe",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford De Luxe Five-Window Coupe 1932 FE Large",
+      "brand": "Ford",
+      "model": "De Luxe Five-Window Coupe 1932 FE Large",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford Escort RS Cosworth",
+      "brand": "Ford",
+      "model": "Escort RS Cosworth",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Escort RS Turbo",
+      "brand": "Ford",
+      "model": "Escort RS Turbo",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Escort RS1600",
+      "brand": "Ford",
+      "model": "Escort RS1600",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Escort RS1800",
+      "brand": "Ford",
+      "model": "Escort RS1800",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford F-100",
+      "brand": "Ford",
+      "model": "F-100",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford F-150 Lightning Platinum Large",
+      "brand": "Ford",
+      "model": "F-150 Lightning Platinum Large",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F-150 Raptor 2017",
+      "brand": "Ford",
+      "model": "F-150 Raptor 2017",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F-150 Raptor 2017 Traffic",
+      "brand": "Ford",
+      "model": "F-150 Raptor 2017 Traffic",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F-150 Raptor R",
+      "brand": "Ford",
+      "model": "F-150 Raptor R",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F-150 SVT Raptor",
+      "brand": "Ford",
+      "model": "F-150 SVT Raptor",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F-150 XLT Lariat 1986",
+      "brand": "Ford",
+      "model": "F-150 XLT Lariat 1986",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Ford F150 SVT Lightning 2003 Large",
+      "brand": "Ford",
+      "model": "F150 SVT Lightning 2003 Large",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Ford FPV Limited Edition Pursuit Ute",
+      "brand": "Ford",
+      "model": "FPV Limited Edition Pursuit Ute",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Ford Falcon GT F 351",
+      "brand": "Ford",
+      "model": "Falcon GT F 351",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Falcon XA GT-HO",
+      "brand": "Ford",
+      "model": "Falcon XA GT-HO",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Fiesta ST",
+      "brand": "Ford",
+      "model": "Fiesta ST",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Fiesta ST 2023",
+      "brand": "Ford",
+      "model": "Fiesta ST 2023",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Fiesta XR2",
+      "brand": "Ford",
+      "model": "Fiesta XR2",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Fiesta Zetec S",
+      "brand": "Ford",
+      "model": "Fiesta Zetec S",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Focus RS 2003",
+      "brand": "Ford",
+      "model": "Focus RS 2003",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Focus RS 2009",
+      "brand": "Ford",
+      "model": "Focus RS 2009",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Focus RS 2017",
+      "brand": "Ford",
+      "model": "Focus RS 2017",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Focus ST 2022",
+      "brand": "Ford",
+      "model": "Focus ST 2022",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford GT 2005",
+      "brand": "Ford",
+      "model": "GT 2005",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ford GT 2017",
+      "brand": "Ford",
+      "model": "GT 2017",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ford GT OPI Edition 2017 Large",
+      "brand": "Ford",
+      "model": "GT OPI Edition 2017 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ford GT40 Mk1",
+      "brand": "Ford",
+      "model": "GT40 Mk1",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ford GT70",
+      "brand": "Ford",
+      "model": "GT70",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Ford Lotus Cortina",
+      "brand": "Ford",
+      "model": "Lotus Cortina",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford M-Sport Fiesta RS",
+      "brand": "Ford",
+      "model": "M-Sport Fiesta RS",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Mustang Boss 302",
+      "brand": "Ford",
+      "model": "Mustang Boss 302",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang Dark Horse",
+      "brand": "Ford",
+      "model": "Mustang Dark Horse",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang GT 2+2 Fastback",
+      "brand": "Ford",
+      "model": "Mustang GT 2+2 Fastback",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang GT 2018",
+      "brand": "Ford",
+      "model": "Mustang GT 2018",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang GT 2024",
+      "brand": "Ford",
+      "model": "Mustang GT 2024",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang GT Coupe 1965",
+      "brand": "Ford",
+      "model": "Mustang GT Coupe 1965",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang Mach 1",
+      "brand": "Ford",
+      "model": "Mustang Mach 1",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang MachE 1400 2021 Large",
+      "brand": "Ford",
+      "model": "Mustang MachE 1400 2021 Large",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang SVO 1986 Large",
+      "brand": "Ford",
+      "model": "Mustang SVO 1986 Large",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang SVT Cobra 2003",
+      "brand": "Ford",
+      "model": "Mustang SVT Cobra 2003",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang SVT Cobra R",
+      "brand": "Ford",
+      "model": "Mustang SVT Cobra R",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford Mustang Shelby GT500",
+      "brand": "Ford",
+      "model": "Mustang Shelby GT500",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Ford RS200 Evolution",
+      "brand": "Ford",
+      "model": "RS200 Evolution",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Racing Escort Mk1 Large",
+      "brand": "Ford",
+      "model": "Racing Escort Mk1 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Racing Puma",
+      "brand": "Ford",
+      "model": "Racing Puma",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Racing Puma FE Large",
+      "brand": "Ford",
+      "model": "Racing Puma FE Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Ford Ranger Raptor",
+      "brand": "Ford",
+      "model": "Ranger Raptor",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Ranger T6 Rally Raid",
+      "brand": "Ford",
+      "model": "Ranger T6 Rally Raid",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford SVT Cobra R 1993",
+      "brand": "Ford",
+      "model": "SVT Cobra R 1993",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford SVT Cobra R 2000",
+      "brand": "Ford",
+      "model": "SVT Cobra R 2000",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Shelby GT350R",
+      "brand": "Ford",
+      "model": "Shelby GT350R",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Shelby GT500 2013 Large",
+      "brand": "Ford",
+      "model": "Shelby GT500 2013 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Sierra Cosworth RS500",
+      "brand": "Ford",
+      "model": "Sierra Cosworth RS500",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford Super Deluxe Station Wagon",
+      "brand": "Ford",
+      "model": "Super Deluxe Station Wagon",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Ford Super Duty F-450 DRW Platinum Large",
+      "brand": "Ford",
+      "model": "Super Duty F-450 DRW Platinum Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Ford Supervan 3",
+      "brand": "Ford",
+      "model": "Supervan 3",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Ford Supervan 3 Donut Media Large",
+      "brand": "Ford",
+      "model": "Supervan 3 Donut Media Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Ford Supervan 4",
+      "brand": "Ford",
+      "model": "Supervan 4",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Transit",
+      "brand": "Ford",
+      "model": "Transit",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Ford Transit Diesel",
+      "brand": "Ford",
+      "model": "Transit Diesel",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ford Transit SuperSportVan",
+      "brand": "Ford",
+      "model": "Transit SuperSportVan",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Ford XB Falcon GT",
+      "brand": "Ford",
+      "model": "XB Falcon GT",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Formula Drift 117 599 GTB Fiorano",
+      "brand": "Formula",
+      "model": "Drift 117 599 GTB Fiorano",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Formula Drift 13 Ford Mustang",
+      "brand": "Formula",
+      "model": "Drift 13 Ford Mustang",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Formula Drift 151 Toyota GR Supra Large",
+      "brand": "Formula",
+      "model": "Drift 151 Toyota GR Supra Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Formula Drift 34 Toyota Supra MkIV Large",
+      "brand": "Formula",
+      "model": "Drift 34 Toyota Supra MkIV Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Formula Drift 357 Chevrolet Corvette Z06 Large",
+      "brand": "Formula",
+      "model": "Drift 357 Chevrolet Corvette Z06 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Formula Drift 411 Toyota Corolla Hatchback Large",
+      "brand": "Formula",
+      "model": "Drift 411 Toyota Corolla Hatchback Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Formula Drift 43 Dodge Viper SRT10",
+      "brand": "Formula",
+      "model": "Drift 43 Dodge Viper SRT10",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Formula Drift 530 HSV Maloo Gen-F",
+      "brand": "Formula",
+      "model": "Drift 530 HSV Maloo Gen-F",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Formula Drift 64 Nissan 370Z",
+      "brand": "Formula",
+      "model": "Drift 64 Nissan 370Z",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Formula Drift 777 Chevrolet Corvette",
+      "brand": "Formula",
+      "model": "Drift 777 Chevrolet Corvette",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Formula Drift 777 Nissan 240SX",
+      "brand": "Formula",
+      "model": "Drift 777 Nissan 240SX",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Formula Drift 91 BMW M2 Large",
+      "brand": "Formula",
+      "model": "Drift 91 BMW M2 Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Formula Drift 98 BMW 325i",
+      "brand": "Formula",
+      "model": "Drift 98 BMW 325i",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Formula Drift 99 Mazda RX8 Large",
+      "brand": "Formula",
+      "model": "Drift 99 Mazda RX8 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Formula Drift Forsberg Nissan Z Large",
+      "brand": "Formula",
+      "model": "Drift Forsberg Nissan Z Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Formula Drift Nissan Donut Media Large",
+      "brand": "Formula",
+      "model": "Drift Nissan Donut Media Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Forsberg Nissan Altimaniac Large",
+      "brand": "Forsberg",
+      "model": "Nissan Altimaniac Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Forsberg Racing Nissan 370Z Safari 2014 Large",
+      "brand": "Forsberg",
+      "model": "Racing Nissan 370Z Safari 2014 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Forsberg Racing Nissan Gold Leader Datsun 280Z Large",
+      "brand": "Forsberg",
+      "model": "Racing Nissan Gold Leader Datsun 280Z Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Forsberg Racing Toyota Gumout 2JZ Camry Stock Car Large",
+      "brand": "Forsberg",
+      "model": "Racing Toyota Gumout 2JZ Camry Stock Car Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Funco Motorsports F9",
+      "brand": "Funco",
+      "model": "Motorsports F9",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "GMC HUMMER EV Barbie Movie Large",
+      "brand": "GMC",
+      "model": "HUMMER EV Barbie Movie Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "GMC HUMMER EV Large",
+      "brand": "GMC",
+      "model": "HUMMER EV Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "GMC Jimmy Large",
+      "brand": "GMC",
+      "model": "Jimmy Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "GMC Syclone",
+      "brand": "GMC",
+      "model": "Syclone",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "GMC Typhoon",
+      "brand": "GMC",
+      "model": "Typhoon",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "GMC Vandura G-1500",
+      "brand": "GMC",
+      "model": "Vandura G-1500",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ginetta G10 RM",
+      "brand": "Ginetta",
+      "model": "G10 RM",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Gordon Murray Automotive T.50",
+      "brand": "Gordon",
+      "model": "Murray Automotive T.50",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "HDT VK Commodore Group A",
+      "brand": "HDT",
+      "model": "VK Commodore Group A",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "HOR XB1 100 Lynk & Co Cyan Racing 03",
+      "brand": "HOR",
+      "model": "XB1 100 Lynk & Co Cyan Racing 03",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "HOR XB1 Audi RS 7 21",
+      "brand": "HOR",
+      "model": "XB1 Audi RS 7 21",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "HOR XB1 Audi RS e-tron",
+      "brand": "HOR",
+      "model": "XB1 Audi RS e-tron",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "HOR XB1 BMW M4 21",
+      "brand": "HOR",
+      "model": "XB1 BMW M4 21",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "HOR XB1 Lamborghini Sian",
+      "brand": "HOR",
+      "model": "XB1 Lamborghini Sian",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "HOR XB1 Lynk & Co 03+",
+      "brand": "HOR",
+      "model": "XB1 Lynk & Co 03+",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "HOR XB1 MG 20 MG6 XPower",
+      "brand": "HOR",
+      "model": "XB1 MG 20 MG6 XPower",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "HOR XB1 MG MG6 XPower",
+      "brand": "HOR",
+      "model": "XB1 MG MG6 XPower",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "HOR XB1 Porsche 70 935",
+      "brand": "HOR",
+      "model": "XB1 Porsche 70 935",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "HOR XB1 Porsche Mission R",
+      "brand": "HOR",
+      "model": "XB1 Porsche Mission R",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "HOR XB1 Xpeng P7",
+      "brand": "HOR",
+      "model": "XB1 Xpeng P7",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "HSV GEN-F GTS",
+      "brand": "HSV",
+      "model": "GEN-F GTS",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "HSV Limited Edition Gen-F GTS Maloo",
+      "brand": "HSV",
+      "model": "Limited Edition Gen-F GTS Maloo",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Hennessey Camaro Exorcist Large",
+      "brand": "Hennessey",
+      "model": "Camaro Exorcist Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Hennessey Mammoth 6x6",
+      "brand": "Hennessey",
+      "model": "Mammoth 6x6",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Hennessey VelociRaptor 6x6",
+      "brand": "Hennessey",
+      "model": "VelociRaptor 6x6",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Hennessey Venom F5 Large",
+      "brand": "Hennessey",
+      "model": "Venom F5 Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Hennessey Venom GT",
+      "brand": "Hennessey",
+      "model": "Venom GT",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Holden HQ Monaro GTS 350",
+      "brand": "Holden",
+      "model": "HQ Monaro GTS 350",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Holden Sandman HQ Panelvan",
+      "brand": "Holden",
+      "model": "Sandman HQ Panelvan",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Holden Torana A9X",
+      "brand": "Holden",
+      "model": "Torana A9X",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Honda CR-X SiR",
+      "brand": "Honda",
+      "model": "CR-X SiR",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Honda Civic CRX Mugen",
+      "brand": "Honda",
+      "model": "Civic CRX Mugen",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Honda Civic Coupe",
+      "brand": "Honda",
+      "model": "Civic Coupe",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda Civic RS",
+      "brand": "Honda",
+      "model": "Civic RS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Honda Civic Type R 1997",
+      "brand": "Honda",
+      "model": "Civic Type R 1997",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda Civic Type R 2004",
+      "brand": "Honda",
+      "model": "Civic Type R 2004",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda Civic Type R 2007",
+      "brand": "Honda",
+      "model": "Civic Type R 2007",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda Civic Type R 2015",
+      "brand": "Honda",
+      "model": "Civic Type R 2015",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda Civic Type R 2018",
+      "brand": "Honda",
+      "model": "Civic Type R 2018",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Honda NSX-R 1992",
+      "brand": "Honda",
+      "model": "NSX-R 1992",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Honda NSX-R 2005",
+      "brand": "Honda",
+      "model": "NSX-R 2005",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Honda NSX-R GT",
+      "brand": "Honda",
+      "model": "NSX-R GT",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Honda Prelude Si",
+      "brand": "Honda",
+      "model": "Prelude Si",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Honda Ridgeline Baja Trophy Truck",
+      "brand": "Honda",
+      "model": "Ridgeline Baja Trophy Truck",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Honda S2000 2003",
+      "brand": "Honda",
+      "model": "S2000 2003",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Honda S2000 CR",
+      "brand": "Honda",
+      "model": "S2000 CR",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hoonigan Chevrolet Bel Air",
+      "brand": "Hoonigan",
+      "model": "Chevrolet Bel Air",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hoonigan Chevrolet Napalm Nova",
+      "brand": "Hoonigan",
+      "model": "Chevrolet Napalm Nova",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Hoonigan Ford Escort RS1800",
+      "brand": "Hoonigan",
+      "model": "Ford Escort RS1800",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hoonigan Ford Mustang",
+      "brand": "Hoonigan",
+      "model": "Ford Mustang",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Hoonigan Ford RS200 Evolution",
+      "brand": "Hoonigan",
+      "model": "Ford RS200 Evolution",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hoonigan GYMKHANA 9 Ford Focus RS RX",
+      "brand": "Hoonigan",
+      "model": "GYMKHANA 9 Ford Focus RS RX",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hoonigan Gymkhana 10 Ford Escort Cosworth Group A",
+      "brand": "Hoonigan",
+      "model": "Gymkhana 10 Ford Escort Cosworth Group A",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hoonigan Gymkhana 10 Ford F-150 Hoonitruck",
+      "brand": "Hoonigan",
+      "model": "Gymkhana 10 Ford F-150 Hoonitruck",
+      "sound_profile": "chevy_pickup_v8"
+    },
+    {
+      "full_name": "Hoonigan Gymkhana 10 Ford Focus RS RX",
+      "brand": "Hoonigan",
+      "model": "Gymkhana 10 Ford Focus RS RX",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hoonigan Gymkhana 10 Ford Hoonicorn Mustang",
+      "brand": "Hoonigan",
+      "model": "Gymkhana 10 Ford Hoonicorn Mustang",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Hoonigan Mazda RX-7 Twerkstallion",
+      "brand": "Hoonigan",
+      "model": "Mazda RX-7 Twerkstallion",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Hoonigan Rauh-Welt Begriff Porsche 911 Turbo",
+      "brand": "Hoonigan",
+      "model": "Rauh-Welt Begriff Porsche 911 Turbo",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hoonigan Volkswagen Baja Beetle Class 5-1600 Scumbug Large",
+      "brand": "Hoonigan",
+      "model": "Volkswagen Baja Beetle Class 5-1600 Scumbug Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hot Wheels 2JetZ 2018 Large",
+      "brand": "Hot Wheels",
+      "model": "2JetZ 2018 Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Hot Wheels Bad to the Blade Large",
+      "brand": "Hot Wheels",
+      "model": "Bad to the Blade Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hot Wheels Baja Bone Shaker Large",
+      "brand": "Hot Wheels",
+      "model": "Baja Bone Shaker Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hot Wheels Bone Shaker",
+      "brand": "Hot Wheels",
+      "model": "Bone Shaker",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hot Wheels Deora II Large",
+      "brand": "Hot Wheels",
+      "model": "Deora II Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hot Wheels Ford F5 Dually Custom Hot Rod 1949 Large",
+      "brand": "Hot Wheels",
+      "model": "Ford F5 Dually Custom Hot Rod 1949 Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Hot Wheels Ford Mustang",
+      "brand": "Hot Wheels",
+      "model": "Ford Mustang",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Hot Wheels Monster Trucks Bone Shaker",
+      "brand": "Hot Wheels",
+      "model": "Monster Trucks Bone Shaker",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Hot Wheels Pontiac Firebird Large",
+      "brand": "Hot Wheels",
+      "model": "Pontiac Firebird Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Hot Wheels Rip Rod",
+      "brand": "Hot Wheels",
+      "model": "Rip Rod",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Hot Wheels Twin Mill",
+      "brand": "Hot Wheels",
+      "model": "Twin Mill",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Hummer H1 Alpha",
+      "brand": "Hummer",
+      "model": "H1 Alpha",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Hyundai 98 Elantra N",
+      "brand": "Hyundai",
+      "model": "98 Elantra N",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hyundai IONIQ 5 N",
+      "brand": "Hyundai",
+      "model": "IONIQ 5 N",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hyundai IONIQ 6",
+      "brand": "Hyundai",
+      "model": "IONIQ 6",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hyundai Kona N",
+      "brand": "Hyundai",
+      "model": "Kona N",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hyundai N Vision 74",
+      "brand": "Hyundai",
+      "model": "N Vision 74",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Hyundai Veloster N",
+      "brand": "Hyundai",
+      "model": "Veloster N",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Hyundai i30 N",
+      "brand": "Hyundai",
+      "model": "i30 N",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Infiniti Q60 Concept",
+      "brand": "Infiniti",
+      "model": "Q60 Concept",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "International Scout 800A",
+      "brand": "International",
+      "model": "Scout 800A",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Italdesign DaVinci Concept 2019 Large",
+      "brand": "Italdesign",
+      "model": "DaVinci Concept 2019 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Italdesign Zerouno",
+      "brand": "Italdesign",
+      "model": "Zerouno",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Jaguar C-Type",
+      "brand": "Jaguar",
+      "model": "C-Type",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar C-X75 Large",
+      "brand": "Jaguar",
+      "model": "C-X75 Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar D-Type",
+      "brand": "Jaguar",
+      "model": "D-Type",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar E-Type",
+      "brand": "Jaguar",
+      "model": "E-Type",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar F-PACE S",
+      "brand": "Jaguar",
+      "model": "F-PACE S",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar F-TYPE Project 7",
+      "brand": "Jaguar",
+      "model": "F-TYPE Project 7",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar F-TYPE R Coupe",
+      "brand": "Jaguar",
+      "model": "F-TYPE R Coupe",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar F-TYPE SVR",
+      "brand": "Jaguar",
+      "model": "F-TYPE SVR",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar I-Pace",
+      "brand": "Jaguar",
+      "model": "I-Pace",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar Lightweight E-Type",
+      "brand": "Jaguar",
+      "model": "Lightweight E-Type",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar Mk II 3.8",
+      "brand": "Jaguar",
+      "model": "Mk II 3.8",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar Sport XJR-15 Large",
+      "brand": "Jaguar",
+      "model": "Sport XJR-15 Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XE SV Project 8",
+      "brand": "Jaguar",
+      "model": "XE SV Project 8",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XE-S",
+      "brand": "Jaguar",
+      "model": "XE-S",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XFR-S",
+      "brand": "Jaguar",
+      "model": "XFR-S",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XJ13 1966 Large",
+      "brand": "Jaguar",
+      "model": "XJ13 1966 Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XJ220",
+      "brand": "Jaguar",
+      "model": "XJ220",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XJ220S TWR 1993 Large",
+      "brand": "Jaguar",
+      "model": "XJ220S TWR 1993 Large",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XKR-S",
+      "brand": "Jaguar",
+      "model": "XKR-S",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jaguar XKR-S GT",
+      "brand": "Jaguar",
+      "model": "XKR-S GT",
+      "sound_profile": "jaguar_v12"
+    },
+    {
+      "full_name": "Jeep CJ5 Renegade",
+      "brand": "Jeep",
+      "model": "CJ5 Renegade",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Gladiator Rubicon",
+      "brand": "Jeep",
+      "model": "Gladiator Rubicon",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Grand Cherokee SRT",
+      "brand": "Jeep",
+      "model": "Grand Cherokee SRT",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Grand Cherokee Trackhawk",
+      "brand": "Jeep",
+      "model": "Grand Cherokee Trackhawk",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Trailcat",
+      "brand": "Jeep",
+      "model": "Trailcat",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Wrangler Rubicon",
+      "brand": "Jeep",
+      "model": "Wrangler Rubicon",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jeep Wrangler Rubicon Traffic",
+      "brand": "Jeep",
+      "model": "Wrangler Rubicon Traffic",
+      "sound_profile": "jeep_v8"
+    },
+    {
+      "full_name": "Jimco 179 Hammerhead Class 1 Large",
+      "brand": "Jimco",
+      "model": "179 Hammerhead Class 1 Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Jimco 240 Fastball Racing Spec Trophy Truck Large",
+      "brand": "Jimco",
+      "model": "240 Fastball Racing Spec Trophy Truck Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "KTM X-Bow GT2 2020",
+      "brand": "KTM",
+      "model": "X-Bow GT2 2020",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "KTM X-Bow GT4",
+      "brand": "KTM",
+      "model": "X-Bow GT4",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "KTM X-Bow GT4 2018 Large",
+      "brand": "KTM",
+      "model": "X-Bow GT4 2018 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "KTM X-Bow R",
+      "brand": "KTM",
+      "model": "X-Bow R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Kia EV6 GT",
+      "brand": "Kia",
+      "model": "EV6 GT",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Koenigsegg Agera",
+      "brand": "Koenigsegg",
+      "model": "Agera",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Koenigsegg Agera RS",
+      "brand": "Koenigsegg",
+      "model": "Agera RS",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Koenigsegg CC8S",
+      "brand": "Koenigsegg",
+      "model": "CC8S",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Koenigsegg CCGT",
+      "brand": "Koenigsegg",
+      "model": "CCGT",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Koenigsegg CCX",
+      "brand": "Koenigsegg",
+      "model": "CCX",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Koenigsegg Jesko",
+      "brand": "Koenigsegg",
+      "model": "Jesko",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Koenigsegg One-1",
+      "brand": "Koenigsegg",
+      "model": "One-1",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Koenigsegg Regera",
+      "brand": "Koenigsegg",
+      "model": "Regera",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lamborghini 63 Squadra Corse Huracán Super Trofeo Evo 2018 Large",
+      "brand": "Lamborghini",
+      "model": "63 Squadra Corse Huracán Super Trofeo Evo 2018 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Aventador J",
+      "brand": "Lamborghini",
+      "model": "Aventador J",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Aventador LP 700-4",
+      "brand": "Lamborghini",
+      "model": "Aventador LP 700-4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Aventador LP 780-4 Ultimae",
+      "brand": "Lamborghini",
+      "model": "Aventador LP 780-4 Ultimae",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Aventador SVJ 2019 Large",
+      "brand": "Lamborghini",
+      "model": "Aventador SVJ 2019 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Aventador Superveloce",
+      "brand": "Lamborghini",
+      "model": "Aventador Superveloce",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Centenario LP 770-4",
+      "brand": "Lamborghini",
+      "model": "Centenario LP 770-4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Countach 5000QV",
+      "brand": "Lamborghini",
+      "model": "Countach 5000QV",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Countach LPI 800-4",
+      "brand": "Lamborghini",
+      "model": "Countach LPI 800-4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Diablo GTR",
+      "brand": "Lamborghini",
+      "model": "Diablo GTR",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Diablo SV",
+      "brand": "Lamborghini",
+      "model": "Diablo SV",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Espada 400 GT 1973 Large",
+      "brand": "Lamborghini",
+      "model": "Espada 400 GT 1973 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Essenza SCV12 2020 Large",
+      "brand": "Lamborghini",
+      "model": "Essenza SCV12 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Gallarado LP 570-4 Superleggera",
+      "brand": "Lamborghini",
+      "model": "Gallarado LP 570-4 Superleggera",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Gallardo LP570-4 Spyder Performante",
+      "brand": "Lamborghini",
+      "model": "Gallardo LP570-4 Spyder Performante",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracan EVO 2020 Large",
+      "brand": "Lamborghini",
+      "model": "Huracan EVO 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracan LP 610-4",
+      "brand": "Lamborghini",
+      "model": "Huracan LP 610-4",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracan STO 2020 Large",
+      "brand": "Lamborghini",
+      "model": "Huracan STO 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracán Performante",
+      "brand": "Lamborghini",
+      "model": "Huracán Performante",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracán Sterrato",
+      "brand": "Lamborghini",
+      "model": "Huracán Sterrato",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Huracán Tecnica 2023 Large",
+      "brand": "Lamborghini",
+      "model": "Huracán Tecnica 2023 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini LM002",
+      "brand": "Lamborghini",
+      "model": "LM002",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Miura P400",
+      "brand": "Lamborghini",
+      "model": "Miura P400",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Murcielago SV",
+      "brand": "Lamborghini",
+      "model": "Murcielago SV",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Reventón",
+      "brand": "Lamborghini",
+      "model": "Reventón",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Revuelto",
+      "brand": "Lamborghini",
+      "model": "Revuelto",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini SC20 2020 Large",
+      "brand": "Lamborghini",
+      "model": "SC20 2020 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Sesto Elemento",
+      "brand": "Lamborghini",
+      "model": "Sesto Elemento",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Sesto Elemento FE Large",
+      "brand": "Lamborghini",
+      "model": "Sesto Elemento FE Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Urus",
+      "brand": "Lamborghini",
+      "model": "Urus",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lamborghini Veneno",
+      "brand": "Lamborghini",
+      "model": "Veneno",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lancia 037 Stradale",
+      "brand": "Lancia",
+      "model": "037 Stradale",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lancia Delta HF Integrale",
+      "brand": "Lancia",
+      "model": "Delta HF Integrale",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Lancia Delta S4",
+      "brand": "Lancia",
+      "model": "Delta S4",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lancia Fulvia Coupe Rallye 16 HF Large",
+      "brand": "Lancia",
+      "model": "Fulvia Coupe Rallye 16 HF Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lancia Stratos HF Stradale",
+      "brand": "Lancia",
+      "model": "Stratos HF Stradale",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Land Rover Defender 110 X Large",
+      "brand": "Land Rover",
+      "model": "Defender 110 X Large",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Land Rover Defender 90",
+      "brand": "Land Rover",
+      "model": "Defender 90",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Land Rover Range Rover",
+      "brand": "Land Rover",
+      "model": "Range Rover",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Land Rover Range Rover Sport SVR",
+      "brand": "Land Rover",
+      "model": "Range Rover Sport SVR",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Land Rover Range Rover Velar",
+      "brand": "Land Rover",
+      "model": "Range Rover Velar",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Land Rover Series III",
+      "brand": "Land Rover",
+      "model": "Series III",
+      "sound_profile": "british_v8"
+    },
+    {
+      "full_name": "Leaked Audi R8 Coupe 5.2 FSI quattro",
+      "brand": "Leaked",
+      "model": "Audi R8 Coupe 5.2 FSI quattro",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Leaked Chevrolet Chevelle Super Sport 396",
+      "brand": "Leaked",
+      "model": "Chevrolet Chevelle Super Sport 396",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Leaked Chrysler 300 SRT8",
+      "brand": "Leaked",
+      "model": "Chrysler 300 SRT8",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Leaked Dodge Coronet W023",
+      "brand": "Leaked",
+      "model": "Dodge Coronet W023",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Leaked Ford GTX1",
+      "brand": "Leaked",
+      "model": "Ford GTX1",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Leaked Ford Thunderbird",
+      "brand": "Leaked",
+      "model": "Ford Thunderbird",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Leaked Plymouth GTX 426 HEMI",
+      "brand": "Leaked",
+      "model": "Plymouth GTX 426 HEMI",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Leaked Porsche Boxster S 2010",
+      "brand": "Leaked",
+      "model": "Porsche Boxster S 2010",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lexus 14 RC F GT3",
+      "brand": "Lexus",
+      "model": "14 RC F GT3",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lexus LC500 2021 Large",
+      "brand": "Lexus",
+      "model": "LC500 2021 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lexus LFA",
+      "brand": "Lexus",
+      "model": "LFA",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Lexus RC F",
+      "brand": "Lexus",
+      "model": "RC F",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lexus RCF Track Edition 2020 Large",
+      "brand": "Lexus",
+      "model": "RCF Track Edition 2020 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lexus SC300",
+      "brand": "Lexus",
+      "model": "SC300",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Lincoln Continental 1962",
+      "brand": "Lincoln",
+      "model": "Continental 1962",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Local Motors Rally Fighter",
+      "brand": "Local Motors",
+      "model": "Rally Fighter",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Lola 6 Penske Sunoco T70 MkIIIB",
+      "brand": "Lola",
+      "model": "6 Penske Sunoco T70 MkIIIB",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lotus 2-Eleven",
+      "brand": "Lotus",
+      "model": "2-Eleven",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lotus 3-Eleven",
+      "brand": "Lotus",
+      "model": "3-Eleven",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Lotus 340R",
+      "brand": "Lotus",
+      "model": "340R",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lotus Elan",
+      "brand": "Lotus",
+      "model": "Elan",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lotus Elise GT1",
+      "brand": "Lotus",
+      "model": "Elise GT1",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Lotus Elise S1 Sport 190",
+      "brand": "Lotus",
+      "model": "Elise S1 Sport 190",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lotus Emira 2023 Large",
+      "brand": "Lotus",
+      "model": "Emira 2023 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Lotus Espirit V8",
+      "brand": "Lotus",
+      "model": "Espirit V8",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Lotus Esprit Turbo",
+      "brand": "Lotus",
+      "model": "Esprit Turbo",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Lotus Evija Large",
+      "brand": "Lotus",
+      "model": "Evija Large",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Lotus Exige Cup 430",
+      "brand": "Lotus",
+      "model": "Exige Cup 430",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Lotus Exige S",
+      "brand": "Lotus",
+      "model": "Exige S",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Lucid Air Sapphire 2024",
+      "brand": "Lucid",
+      "model": "Air Sapphire 2024",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Lynk & Co 02 HB",
+      "brand": "Lynk",
+      "model": "& Co 02 HB",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Lynk & Co 05+",
+      "brand": "Lynk",
+      "model": "& Co 05+",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "MG Cyberster",
+      "brand": "MG",
+      "model": "Cyberster",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "MG MG3 2015 Large",
+      "brand": "MG",
+      "model": "MG3 2015 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "MG MG7",
+      "brand": "MG",
+      "model": "MG7",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "MG Metro 6R4",
+      "brand": "MG",
+      "model": "Metro 6R4",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "MG XPower SVR 2005 Large",
+      "brand": "MG",
+      "model": "XPower SVR 2005 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "MINI Cooper S",
+      "brand": "MINI",
+      "model": "Cooper S",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "MINI Cooper S FE 1965 Large",
+      "brand": "MINI",
+      "model": "Cooper S FE 1965 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "MINI John Cooper Works 2009",
+      "brand": "MINI",
+      "model": "John Cooper Works 2009",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "MINI John Cooper Works Countryman All4",
+      "brand": "MINI",
+      "model": "John Cooper Works Countryman All4",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "MINI John Cooper Works GP 2012",
+      "brand": "MINI",
+      "model": "John Cooper Works GP 2012",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "MINI X-Raid All4 Racing Countryman",
+      "brand": "MINI",
+      "model": "X-Raid All4 Racing Countryman",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "MINI X-Raid John Cooper Works Buggy",
+      "brand": "MINI",
+      "model": "X-Raid John Cooper Works Buggy",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Maserati 8CTF",
+      "brand": "Maserati",
+      "model": "8CTF",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Maserati Gran Turismo S",
+      "brand": "Maserati",
+      "model": "Gran Turismo S",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Maserati Gran Turismo S FE Large",
+      "brand": "Maserati",
+      "model": "Gran Turismo S FE Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Maserati Levante S",
+      "brand": "Maserati",
+      "model": "Levante S",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Maserati MC12 Verisione Corsa",
+      "brand": "Maserati",
+      "model": "MC12 Verisione Corsa",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mazda 3 Mazdaspeed Traffic",
+      "brand": "Mazda",
+      "model": "3 Mazdaspeed Traffic",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mazda 323 GTR 1992 Large",
+      "brand": "Mazda",
+      "model": "323 GTR 1992 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mazda MX-5 2013",
+      "brand": "Mazda",
+      "model": "MX-5 2013",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mazda MX-5 2016",
+      "brand": "Mazda",
+      "model": "MX-5 2016",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mazda MX-5 Miata 1994",
+      "brand": "Mazda",
+      "model": "MX-5 Miata 1994",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mazda MX-5 Miata RF",
+      "brand": "Mazda",
+      "model": "MX-5 Miata RF",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mazda Mazdaspeed MX-5",
+      "brand": "Mazda",
+      "model": "Mazdaspeed MX-5",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mazda RX-7",
+      "brand": "Mazda",
+      "model": "RX-7",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Mazda RX-7 Spirit R Type-A",
+      "brand": "Mazda",
+      "model": "RX-7 Spirit R Type-A",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Mazda RX-8 R3",
+      "brand": "Mazda",
+      "model": "RX-8 R3",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Mazda Savanna RX-7",
+      "brand": "Mazda",
+      "model": "Savanna RX-7",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "McLaren 12C Coupe",
+      "brand": "McLaren",
+      "model": "12C Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 570S Coupe",
+      "brand": "McLaren",
+      "model": "570S Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 600LT Coupé",
+      "brand": "McLaren",
+      "model": "600LT Coupé",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 620R 2021 Large",
+      "brand": "McLaren",
+      "model": "620R 2021 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 650S Coupe",
+      "brand": "McLaren",
+      "model": "650S Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 650S Spider 2014 Large",
+      "brand": "McLaren",
+      "model": "650S Spider 2014 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 720S Coupe",
+      "brand": "McLaren",
+      "model": "720S Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 720S Spider",
+      "brand": "McLaren",
+      "model": "720S Spider",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren 765LT 2021 Large",
+      "brand": "McLaren",
+      "model": "765LT 2021 Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren Artura",
+      "brand": "McLaren",
+      "model": "Artura",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren F1",
+      "brand": "McLaren",
+      "model": "F1",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren F1 GT",
+      "brand": "McLaren",
+      "model": "F1 GT",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren GT Large",
+      "brand": "McLaren",
+      "model": "GT Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren P1",
+      "brand": "McLaren",
+      "model": "P1",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren Sabre",
+      "brand": "McLaren",
+      "model": "Sabre",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren Senna",
+      "brand": "McLaren",
+      "model": "Senna",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "McLaren Speedtail",
+      "brand": "McLaren",
+      "model": "Speedtail",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-AMG C 63 S Coupe",
+      "brand": "Mercedes-AMG",
+      "model": "C 63 S Coupe",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG E 63 S",
+      "brand": "Mercedes-AMG",
+      "model": "E 63 S",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG GT 4-Door Coupé",
+      "brand": "Mercedes-AMG",
+      "model": "GT 4-Door Coupé",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG GT Black Series Large",
+      "brand": "Mercedes-AMG",
+      "model": "GT Black Series Large",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG GT R",
+      "brand": "Mercedes-AMG",
+      "model": "GT R",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG GT S",
+      "brand": "Mercedes-AMG",
+      "model": "GT S",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-AMG GT3",
+      "brand": "Mercedes-AMG",
+      "model": "GT3",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mercedes-AMG One Large",
+      "brand": "Mercedes-AMG",
+      "model": "One Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Mercedes-AMG SL 63",
+      "brand": "Mercedes-AMG",
+      "model": "SL 63",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-Benz 190E 2.5-16 Evolution II",
+      "brand": "Mercedes-Benz",
+      "model": "190E 2.5-16 Evolution II",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mercedes-Benz 24 Tankpool24 Racing Truck",
+      "brand": "Mercedes-Benz",
+      "model": "24 Tankpool24 Racing Truck",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Mercedes-Benz 24 Tankpool24 Racing Truck FE Large",
+      "brand": "Mercedes-Benz",
+      "model": "24 Tankpool24 Racing Truck FE Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Mercedes-Benz 280 SL",
+      "brand": "Mercedes-Benz",
+      "model": "280 SL",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Mercedes-Benz 300 SL Coupe",
+      "brand": "Mercedes-Benz",
+      "model": "300 SL Coupe",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Mercedes-Benz 300 SLR",
+      "brand": "Mercedes-Benz",
+      "model": "300 SLR",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz 500 E",
+      "brand": "Mercedes-Benz",
+      "model": "500 E",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz A 45 AMG",
+      "brand": "Mercedes-Benz",
+      "model": "A 45 AMG",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mercedes-Benz AMG CLK GTR",
+      "brand": "Mercedes-Benz",
+      "model": "AMG CLK GTR",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-Benz AMG CLK GTR FE Large",
+      "brand": "Mercedes-Benz",
+      "model": "AMG CLK GTR FE Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-Benz AMG Hammer Coupe",
+      "brand": "Mercedes-Benz",
+      "model": "AMG Hammer Coupe",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz AMG Hammer Wagon",
+      "brand": "Mercedes-Benz",
+      "model": "AMG Hammer Wagon",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz C 63 AMG Black Series",
+      "brand": "Mercedes-Benz",
+      "model": "C 63 AMG Black Series",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz E 55 AMG Wagon",
+      "brand": "Mercedes-Benz",
+      "model": "E 55 AMG Wagon",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz E 63 AMG 2013",
+      "brand": "Mercedes-Benz",
+      "model": "E 63 AMG 2013",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-Benz G 63 AMG 6x6",
+      "brand": "Mercedes-Benz",
+      "model": "G 63 AMG 6x6",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Mercedes-Benz G 65 AMG",
+      "brand": "Mercedes-Benz",
+      "model": "G 65 AMG",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-Benz SL 65 AMG Black Series",
+      "brand": "Mercedes-Benz",
+      "model": "SL 65 AMG Black Series",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-Benz SLK 55 AMG 2012",
+      "brand": "Mercedes-Benz",
+      "model": "SLK 55 AMG 2012",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz SLS AMG",
+      "brand": "Mercedes-Benz",
+      "model": "SLS AMG",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mercedes-Benz SSK",
+      "brand": "Mercedes-Benz",
+      "model": "SSK",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Mercedes-Benz Unimog U5023",
+      "brand": "Mercedes-Benz",
+      "model": "Unimog U5023",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mercedes-Benz W154",
+      "brand": "Mercedes-Benz",
+      "model": "W154",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Mercedes-Benz X-Class",
+      "brand": "Mercedes-Benz",
+      "model": "X-Class",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mercedes-Benz X-Class Traffic",
+      "brand": "Mercedes-Benz",
+      "model": "X-Class Traffic",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mercury Cyclone Spoiler Large",
+      "brand": "Mercury",
+      "model": "Cyclone Spoiler Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Meyers Manx",
+      "brand": "Meyers",
+      "model": "Manx",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Meyers Manx 2.0 2023",
+      "brand": "Meyers",
+      "model": "Manx 2.0 2023",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Meyers Manx FE Large",
+      "brand": "Meyers",
+      "model": "Manx FE Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mini John Cooper Works GP 2021 Large",
+      "brand": "Mini",
+      "model": "John Cooper Works GP 2021 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi 1 Lancer Evo Time Attack",
+      "brand": "Mitsubishi",
+      "model": "1 Lancer Evo Time Attack",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Eclipse GSX",
+      "brand": "Mitsubishi",
+      "model": "Eclipse GSX",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi FTO GP Version R",
+      "brand": "Mitsubishi",
+      "model": "FTO GP Version R",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Mitsubishi GTO",
+      "brand": "Mitsubishi",
+      "model": "GTO",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Mitsubishi Galant VR-4",
+      "brand": "Mitsubishi",
+      "model": "Galant VR-4",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Galant VR-4 Traffic",
+      "brand": "Mitsubishi",
+      "model": "Galant VR-4 Traffic",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evo III GSR",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evo III GSR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evolution IX MR",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evolution IX MR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evolution VI GSR",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evolution VI GSR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evolution VIII MR",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evolution VIII MR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evolution X GSR",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evolution X GSR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Lancer Evolution X GSR WP Large",
+      "brand": "Mitsubishi",
+      "model": "Lancer Evolution X GSR WP Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Mitsubishi Montero Evolution",
+      "brand": "Mitsubishi",
+      "model": "Montero Evolution",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Mitsubishi Starion ESI-R",
+      "brand": "Mitsubishi",
+      "model": "Starion ESI-R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Morgan 3-Wheeler",
+      "brand": "Morgan",
+      "model": "3-Wheeler",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Morgan Aero GT",
+      "brand": "Morgan",
+      "model": "Aero GT",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Morris Mini-Traveller",
+      "brand": "Morris",
+      "model": "Mini-Traveller",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Morris Minor 1000",
+      "brand": "Morris",
+      "model": "Minor 1000",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Morris Minor 1000 FE Large",
+      "brand": "Morris",
+      "model": "Minor 1000 FE Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Morris Minor Series II Traveler",
+      "brand": "Morris",
+      "model": "Minor Series II Traveler",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Mosler MT900 GT3 Large",
+      "brand": "Mosler",
+      "model": "MT900 GT3 Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Mosler MT900S",
+      "brand": "Mosler",
+      "model": "MT900S",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "NIO EP9 2016 Large",
+      "brand": "NIO",
+      "model": "EP9 2016 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Napier Napier-Railton",
+      "brand": "Napier",
+      "model": "Napier-Railton",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Nissan 240SX SE",
+      "brand": "Nissan",
+      "model": "240SX SE",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan 370Z",
+      "brand": "Nissan",
+      "model": "370Z",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Nissan 370Z Nismo 2019 Large",
+      "brand": "Nissan",
+      "model": "370Z Nismo 2019 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Nissan Be-1",
+      "brand": "Nissan",
+      "model": "Be-1",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan Donut Media 350Z Hi Car Large",
+      "brand": "Nissan",
+      "model": "Donut Media 350Z Hi Car Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan Donut Media 350Z Low Car Large",
+      "brand": "Nissan",
+      "model": "Donut Media 350Z Low Car Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan Fairlady Z",
+      "brand": "Nissan",
+      "model": "Fairlady Z",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Nissan Fairlady Z 432",
+      "brand": "Nissan",
+      "model": "Fairlady Z 432",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Nissan Fairlady Z FE Large",
+      "brand": "Nissan",
+      "model": "Fairlady Z FE Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Nissan Fairlady Z Version S Twin Turbo",
+      "brand": "Nissan",
+      "model": "Fairlady Z Version S Twin Turbo",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan Figaro",
+      "brand": "Nissan",
+      "model": "Figaro",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan GT-R Black Edition R35",
+      "brand": "Nissan",
+      "model": "GT-R Black Edition R35",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan GT-R Nismo 2020 Large",
+      "brand": "Nissan",
+      "model": "GT-R Nismo 2020 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan GT-R R35",
+      "brand": "Nissan",
+      "model": "GT-R R35",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan NISMO GT-R LM",
+      "brand": "Nissan",
+      "model": "NISMO GT-R LM",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Pao",
+      "brand": "Nissan",
+      "model": "Pao",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan Pickup 23 Rally Raid Large",
+      "brand": "Nissan",
+      "model": "Pickup 23 Rally Raid Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Nissan Pulsar GTI-R",
+      "brand": "Nissan",
+      "model": "Pulsar GTI-R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan R390 GT1",
+      "brand": "Nissan",
+      "model": "R390 GT1",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Nissan S-Cargo",
+      "brand": "Nissan",
+      "model": "S-Cargo",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan Safari Large",
+      "brand": "Nissan",
+      "model": "Safari Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Sentra NISMO",
+      "brand": "Nissan",
+      "model": "Sentra NISMO",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan Silvia CLUB K's",
+      "brand": "Nissan",
+      "model": "Silvia CLUB K's",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan Silvia K's",
+      "brand": "Nissan",
+      "model": "Silvia K's",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan Silvia K's Aero",
+      "brand": "Nissan",
+      "model": "Silvia K's Aero",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Nissan Silvia Spec-R",
+      "brand": "Nissan",
+      "model": "Silvia Spec-R",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan Skyline 2000GT-R",
+      "brand": "Nissan",
+      "model": "Skyline 2000GT-R",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Nissan Skyline GT-R V-Spec 1993",
+      "brand": "Nissan",
+      "model": "Skyline GT-R V-Spec 1993",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Skyline GT-R V-Spec 1997",
+      "brand": "Nissan",
+      "model": "Skyline GT-R V-Spec 1997",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Skyline GT-R V-Spec II",
+      "brand": "Nissan",
+      "model": "Skyline GT-R V-Spec II",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Skyline GTS-R HR31",
+      "brand": "Nissan",
+      "model": "Skyline GTS-R HR31",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan Skyline HT 2000GT-R",
+      "brand": "Nissan",
+      "model": "Skyline HT 2000GT-R",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Nissan Stagea RS Four V",
+      "brand": "Nissan",
+      "model": "Stagea RS Four V",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Nissan TITAN Warrior Concept",
+      "brand": "Nissan",
+      "model": "TITAN Warrior Concept",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Nissan Tsuru 2010",
+      "brand": "Nissan",
+      "model": "Tsuru 2010",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Nissan Z 2023 Large",
+      "brand": "Nissan",
+      "model": "Z 2023 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Nissan Z Nismo",
+      "brand": "Nissan",
+      "model": "Z Nismo",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Noble M400 2006 Large",
+      "brand": "Noble",
+      "model": "M400 2006 Large",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Noble M600",
+      "brand": "Noble",
+      "model": "M600",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Null Car",
+      "brand": "Null",
+      "model": "Car",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Oldsmobile Toronado 1966 Large",
+      "brand": "Oldsmobile",
+      "model": "Toronado 1966 Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Opel Manta 400",
+      "brand": "Opel",
+      "model": "Manta 400",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Pagani Huayra BC Coupe",
+      "brand": "Pagani",
+      "model": "Huayra BC Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Huayra BC FE Large",
+      "brand": "Pagani",
+      "model": "Huayra BC FE Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Huayra Coupe",
+      "brand": "Pagani",
+      "model": "Huayra Coupe",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Huayra R Large",
+      "brand": "Pagani",
+      "model": "Huayra R Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Zonda Cinque Oreo Edition Large",
+      "brand": "Pagani",
+      "model": "Zonda Cinque Oreo Edition Large",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Zonda Cinque Roadster",
+      "brand": "Pagani",
+      "model": "Zonda Cinque Roadster",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Pagani Zonda R",
+      "brand": "Pagani",
+      "model": "Zonda R",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Peel P50 1962",
+      "brand": "Peel",
+      "model": "P50 1962",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Peel Trident",
+      "brand": "Peel",
+      "model": "Trident",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Penhall The Cholla",
+      "brand": "Penhall",
+      "model": "The Cholla",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Peugeot 205 Rallye",
+      "brand": "Peugeot",
+      "model": "205 Rallye",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Peugeot 205 Turbo 16",
+      "brand": "Peugeot",
+      "model": "205 Turbo 16",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Peugeot 207 Super 2000",
+      "brand": "Peugeot",
+      "model": "207 Super 2000",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Playground Box Truck",
+      "brand": "Playground",
+      "model": "Box Truck",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Playground Bus",
+      "brand": "Playground",
+      "model": "Bus",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Playground Carnival Float",
+      "brand": "Playground",
+      "model": "Carnival Float",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Playground Flatbed 2014",
+      "brand": "Playground",
+      "model": "Flatbed 2014",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Playground Flatbed 2020",
+      "brand": "Playground",
+      "model": "Flatbed 2020",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Playground Flatbed Hi Car",
+      "brand": "Playground",
+      "model": "Flatbed Hi Car",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Playground Flatbed Low Car",
+      "brand": "Playground",
+      "model": "Flatbed Low Car",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Plymouth Barracuda FormulaS 1968 Large",
+      "brand": "Plymouth",
+      "model": "Barracuda FormulaS 1968 Large",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Plymouth Belvedere 1964",
+      "brand": "Plymouth",
+      "model": "Belvedere 1964",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Plymouth Cuda 426 HEMI",
+      "brand": "Plymouth",
+      "model": "Cuda 426 HEMI",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Plymouth Fury",
+      "brand": "Plymouth",
+      "model": "Fury",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Polaris RZR Pro Factory Racing Limited Edition Large",
+      "brand": "Polaris",
+      "model": "RZR Pro Factory Racing Limited Edition Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Polaris RZR Pro Ultimate Large",
+      "brand": "Polaris",
+      "model": "RZR Pro Ultimate Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Polaris RZR XP 1000 EPS",
+      "brand": "Polaris",
+      "model": "RZR XP 1000 EPS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Pontiac Firebird 1968",
+      "brand": "Pontiac",
+      "model": "Firebird 1968",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac Firebird Trans Am 1977",
+      "brand": "Pontiac",
+      "model": "Firebird Trans Am 1977",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac Firebird Trans Am GTA FE Large",
+      "brand": "Pontiac",
+      "model": "Firebird Trans Am GTA FE Large",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac GTO 1965",
+      "brand": "Pontiac",
+      "model": "GTO 1965",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac GTO Judge",
+      "brand": "Pontiac",
+      "model": "GTO Judge",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac Trans Am GTA",
+      "brand": "Pontiac",
+      "model": "Trans Am GTA",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Pontiac Trans Am SD-455",
+      "brand": "Pontiac",
+      "model": "Trans Am SD-455",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Porsche 185 959 Prodrive Rally Raid",
+      "brand": "Porsche",
+      "model": "185 959 Prodrive Rally Raid",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 23 917-20",
+      "brand": "Porsche",
+      "model": "23 917-20",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Porsche 3 917 LH",
+      "brand": "Porsche",
+      "model": "3 917 LH",
+      "sound_profile": "chevy_smallblock_v8"
+    },
+    {
+      "full_name": "Porsche 356 A 1600 Super",
+      "brand": "Porsche",
+      "model": "356 A 1600 Super",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 356 C Cabriolet Emory Special",
+      "brand": "Porsche",
+      "model": "356 C Cabriolet Emory Special",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 46 356 SL Gmünd Coupe",
+      "brand": "Porsche",
+      "model": "46 356 SL Gmünd Coupe",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 550A Spyder",
+      "brand": "Porsche",
+      "model": "550A Spyder",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 65 Rothsport Racing 911 Desert Flyer Large",
+      "brand": "Porsche",
+      "model": "65 Rothsport Racing 911 Desert Flyer Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 718 Cayman GT4 RS 2022",
+      "brand": "Porsche",
+      "model": "718 Cayman GT4 RS 2022",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 718 Cayman GTS",
+      "brand": "Porsche",
+      "model": "718 Cayman GTS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 906 Carrera 6",
+      "brand": "Porsche",
+      "model": "906 Carrera 6",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Carrera 2 GW",
+      "brand": "Porsche",
+      "model": "911 Carrera 2 GW",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Carrera S",
+      "brand": "Porsche",
+      "model": "911 Carrera S",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Carrerra RS",
+      "brand": "Porsche",
+      "model": "911 Carrerra RS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT1 Strassenversion",
+      "brand": "Porsche",
+      "model": "911 GT1 Strassenversion",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT2 1995",
+      "brand": "Porsche",
+      "model": "911 GT2 1995",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT2 RS 2012",
+      "brand": "Porsche",
+      "model": "911 GT2 RS 2012",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT2 RS 2018",
+      "brand": "Porsche",
+      "model": "911 GT2 RS 2018",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 2004",
+      "brand": "Porsche",
+      "model": "911 GT3 2004",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 2021 Large",
+      "brand": "Porsche",
+      "model": "911 GT3 2021 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 R",
+      "brand": "Porsche",
+      "model": "911 GT3 R",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 R 2023",
+      "brand": "Porsche",
+      "model": "911 GT3 R 2023",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 RS 2016",
+      "brand": "Porsche",
+      "model": "911 GT3 RS 2016",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 RS 2019",
+      "brand": "Porsche",
+      "model": "911 GT3 RS 2019",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 RS 2019 FE Large",
+      "brand": "Porsche",
+      "model": "911 GT3 RS 2019 FE Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 RS 2023",
+      "brand": "Porsche",
+      "model": "911 GT3 RS 2023",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 GT3 RS 4.0",
+      "brand": "Porsche",
+      "model": "911 GT3 RS 4.0",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Rallye",
+      "brand": "Porsche",
+      "model": "911 Rallye",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Singer 1990",
+      "brand": "Porsche",
+      "model": "911 Singer 1990",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Speedster 2019 Large",
+      "brand": "Porsche",
+      "model": "911 Speedster 2019 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Sport Classic 2010 Large",
+      "brand": "Porsche",
+      "model": "911 Sport Classic 2010 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Turbo 3.3",
+      "brand": "Porsche",
+      "model": "911 Turbo 3.3",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Turbo S 2014",
+      "brand": "Porsche",
+      "model": "911 Turbo S 2014",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 911 Turbo S 2023",
+      "brand": "Porsche",
+      "model": "911 Turbo S 2023",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 914-6",
+      "brand": "Porsche",
+      "model": "914-6",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 918 Spyder",
+      "brand": "Porsche",
+      "model": "918 Spyder",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Porsche 92 911 RSR",
+      "brand": "Porsche",
+      "model": "92 911 RSR",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 944 Turbo",
+      "brand": "Porsche",
+      "model": "944 Turbo",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Porsche 959",
+      "brand": "Porsche",
+      "model": "959",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche 968 Turbo S",
+      "brand": "Porsche",
+      "model": "968 Turbo S",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Porsche Carrera GT",
+      "brand": "Porsche",
+      "model": "Carrera GT",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Porsche Cayenne Turbo 2018",
+      "brand": "Porsche",
+      "model": "Cayenne Turbo 2018",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Porsche Cayman GT4",
+      "brand": "Porsche",
+      "model": "Cayman GT4",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche Cayman GTS",
+      "brand": "Porsche",
+      "model": "Cayman GTS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Porsche Macan LPR Rally Raid Large",
+      "brand": "Porsche",
+      "model": "Macan LPR Rally Raid Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Porsche Macan Turbo 2019",
+      "brand": "Porsche",
+      "model": "Macan Turbo 2019",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Porsche Panamera Turbo 2017",
+      "brand": "Porsche",
+      "model": "Panamera Turbo 2017",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Porsche Taycan Cross Turismo",
+      "brand": "Porsche",
+      "model": "Taycan Cross Turismo",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Porsche Taycan Turbo S",
+      "brand": "Porsche",
+      "model": "Taycan Turbo S",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Porsche Taycan Turbo S WP Large",
+      "brand": "Porsche",
+      "model": "Taycan Turbo S WP Large",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "RAESR Tachyon Speed",
+      "brand": "RAESR",
+      "model": "Tachyon Speed",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "RAM 2500 Power Wagon",
+      "brand": "RAM",
+      "model": "2500 Power Wagon",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "RJ Anderson 37 Polaris RZR Pro 4 Truck Large",
+      "brand": "RJ",
+      "model": "Anderson 37 Polaris RZR Pro 4 Truck Large",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "RJ Anderson 37 Polaris RZR-Rockstar Energy Pro 2 Truck",
+      "brand": "RJ",
+      "model": "Anderson 37 Polaris RZR-Rockstar Energy Pro 2 Truck",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Radical RXC",
+      "brand": "Radical",
+      "model": "RXC",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "Reliant Supervan III",
+      "brand": "Reliant",
+      "model": "Supervan III",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Renault 4L Export Large",
+      "brand": "Renault",
+      "model": "4L Export Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Renault 5 Turbo",
+      "brand": "Renault",
+      "model": "5 Turbo",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Renault 8 Gordini Large",
+      "brand": "Renault",
+      "model": "8 Gordini Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Renault Clio R.S. 16 Concept",
+      "brand": "Renault",
+      "model": "Clio R.S. 16 Concept",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Renault Clio R.S. 200 EDC",
+      "brand": "Renault",
+      "model": "Clio R.S. 200 EDC",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Renault Clio RS",
+      "brand": "Renault",
+      "model": "Clio RS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Renault Clio Williams",
+      "brand": "Renault",
+      "model": "Clio Williams",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Renault MEGANE R.S.",
+      "brand": "Renault",
+      "model": "MEGANE R.S.",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Renault Megane R.S. 250",
+      "brand": "Renault",
+      "model": "Megane R.S. 250",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Renault Mégane R26.R",
+      "brand": "Renault",
+      "model": "Mégane R26.R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Rimac Concept Two",
+      "brand": "Rimac",
+      "model": "Concept Two",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Rimac Nevera 2021 Large",
+      "brand": "Rimac",
+      "model": "Nevera 2021 Large",
+      "sound_profile": "electric"
+    },
+    {
+      "full_name": "Rivian R1S 2022",
+      "brand": "Rivian",
+      "model": "R1S 2022",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Rivian R1T 2022",
+      "brand": "Rivian",
+      "model": "R1T 2022",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Rossion Q1",
+      "brand": "Rossion",
+      "model": "Q1",
+      "sound_profile": "straightpipe_v8"
+    },
+    {
+      "full_name": "SUBARU BRAT GL",
+      "brand": "SUBARU",
+      "model": "BRAT GL",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU BRZ 2013",
+      "brand": "SUBARU",
+      "model": "BRZ 2013",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Impreza 22B-STi Version",
+      "brand": "SUBARU",
+      "model": "Impreza 22B-STi Version",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Impreza WRX STI 2005",
+      "brand": "SUBARU",
+      "model": "Impreza WRX STI 2005",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Impreza WRX STI 2008",
+      "brand": "SUBARU",
+      "model": "Impreza WRX STI 2008",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Impreza WRX STI 2011",
+      "brand": "SUBARU",
+      "model": "Impreza WRX STI 2011",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Legacy B4 2.0 GT Traffic",
+      "brand": "SUBARU",
+      "model": "Legacy B4 2.0 GT Traffic",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU Legacy RS",
+      "brand": "SUBARU",
+      "model": "Legacy RS",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU SVX",
+      "brand": "SUBARU",
+      "model": "SVX",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "SUBARU WRX STI 2015",
+      "brand": "SUBARU",
+      "model": "WRX STI 2015",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Saleen S1",
+      "brand": "Saleen",
+      "model": "S1",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Saleen S7",
+      "brand": "Saleen",
+      "model": "S7",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Saleen S7 LM 2017",
+      "brand": "Saleen",
+      "model": "S7 LM 2017",
+      "sound_profile": "scania_v8_turbo"
+    },
+    {
+      "full_name": "Saleen Sportruck XR Large",
+      "brand": "Saleen",
+      "model": "Sportruck XR Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Schuppan 962CR Large",
+      "brand": "Schuppan",
+      "model": "962CR Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Shelby Cobra 427 S-C",
+      "brand": "Shelby",
+      "model": "Cobra 427 S-C",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Shelby Cobra Daytona Coupe",
+      "brand": "Shelby",
+      "model": "Cobra Daytona Coupe",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Shelby GT 500",
+      "brand": "Shelby",
+      "model": "GT 500",
+      "sound_profile": "muscle_v8_classic"
+    },
+    {
+      "full_name": "Sierra Cars 23 Yokohama Alpha Large",
+      "brand": "Sierra",
+      "model": "Cars 23 Yokohama Alpha Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Sierra Cars 700R Large",
+      "brand": "Sierra",
+      "model": "Cars 700R Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Sierra Cars RX3 Large",
+      "brand": "Sierra",
+      "model": "Cars RX3 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Spania GTA Spano",
+      "brand": "Spania",
+      "model": "GTA Spano",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "Subaru BRZ 2022",
+      "brand": "Subaru",
+      "model": "BRZ 2022",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Subaru Impreza WRX STi 2004",
+      "brand": "Subaru",
+      "model": "Impreza WRX STi 2004",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Subaru WRX 2022",
+      "brand": "Subaru",
+      "model": "WRX 2022",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Subaru WRX STI ARX Supercar Large",
+      "brand": "Subaru",
+      "model": "WRX STI ARX Supercar Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Subaru WRX STI S209 Large",
+      "brand": "Subaru",
+      "model": "WRX STI S209 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "TVR Cerbera Speed 12",
+      "brand": "TVR",
+      "model": "Cerbera Speed 12",
+      "sound_profile": "ferrari_v12"
+    },
+    {
+      "full_name": "TVR Griffith",
+      "brand": "TVR",
+      "model": "Griffith",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "TVR Sagaris",
+      "brand": "TVR",
+      "model": "Sagaris",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Toyota 1 T100 Baja Truck",
+      "brand": "Toyota",
+      "model": "1 T100 Baja Truck",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Toyota 2000GT",
+      "brand": "Toyota",
+      "model": "2000GT",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Toyota 4Runner TRD Pro 2019 Large",
+      "brand": "Toyota",
+      "model": "4Runner TRD Pro 2019 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Toyota 86",
+      "brand": "Toyota",
+      "model": "86",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Camry TRD",
+      "brand": "Toyota",
+      "model": "Camry TRD",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Toyota Celica GT 1974",
+      "brand": "Toyota",
+      "model": "Celica GT 1974",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Celica GT-Four RC ST185",
+      "brand": "Toyota",
+      "model": "Celica GT-Four RC ST185",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Toyota Celica GT-Four ST205",
+      "brand": "Toyota",
+      "model": "Celica GT-Four ST205",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Toyota Celica SS-1 2003 Large",
+      "brand": "Toyota",
+      "model": "Celica SS-1 2003 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Chaser GT Twin Turbo",
+      "brand": "Toyota",
+      "model": "Chaser GT Twin Turbo",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota FJ40",
+      "brand": "Toyota",
+      "model": "FJ40",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Toyota GR Supra Large",
+      "brand": "Toyota",
+      "model": "GR Supra Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota GR Yaris",
+      "brand": "Toyota",
+      "model": "GR Yaris",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota GR86 2022 Large",
+      "brand": "Toyota",
+      "model": "GR86 2022 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Hilux Artic Trucks AT37",
+      "brand": "Toyota",
+      "model": "Hilux Artic Trucks AT37",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Toyota Land Cruiser Arctic Trucks AT37",
+      "brand": "Toyota",
+      "model": "Land Cruiser Arctic Trucks AT37",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Toyota MR2 GT",
+      "brand": "Toyota",
+      "model": "MR2 GT",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Toyota MR2 SC",
+      "brand": "Toyota",
+      "model": "MR2 SC",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Sera",
+      "brand": "Toyota",
+      "model": "Sera",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Soarer 2.5 GT-T",
+      "brand": "Toyota",
+      "model": "Soarer 2.5 GT-T",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota Sports 800 Large",
+      "brand": "Toyota",
+      "model": "Sports 800 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Toyota Sprinter Trueno GT Apex",
+      "brand": "Toyota",
+      "model": "Sprinter Trueno GT Apex",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Toyota Supra 2.0 GT",
+      "brand": "Toyota",
+      "model": "Supra 2.0 GT",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota Supra RZ",
+      "brand": "Toyota",
+      "model": "Supra RZ",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota Supra RZ WP Large",
+      "brand": "Toyota",
+      "model": "Supra RZ WP Large",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Toyota Tacoma 2020 Large",
+      "brand": "Toyota",
+      "model": "Tacoma 2020 Large",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Toyota Tundra TRD Pro 2020 Large",
+      "brand": "Toyota",
+      "model": "Tundra TRD Pro 2020 Large",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Ultima 1020 Evolution Coupe",
+      "brand": "Ultima",
+      "model": "1020 Evolution Coupe",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Universal BTTF Time Machine 1",
+      "brand": "Universal",
+      "model": "BTTF Time Machine 1",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Universal BTTF Time Machine 2",
+      "brand": "Universal",
+      "model": "BTTF Time Machine 2",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Universal BTTF Time Machine 3",
+      "brand": "Universal",
+      "model": "BTTF Time Machine 3",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Universal Jeep Wrangler JP",
+      "brand": "Universal",
+      "model": "Jeep Wrangler JP",
+      "sound_profile": "toyota_i6"
+    },
+    {
+      "full_name": "Universal KITT",
+      "brand": "Universal",
+      "model": "KITT",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "VUHL 05RR",
+      "brand": "VUHL",
+      "model": "05RR",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "VW Beetle Taxi Traffic",
+      "brand": "VW",
+      "model": "Beetle Taxi Traffic",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "VW Bora VR6 Traffic",
+      "brand": "VW",
+      "model": "Bora VR6 Traffic",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "VW Golf R 2022",
+      "brand": "VW",
+      "model": "Golf R 2022",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "VW ID.4",
+      "brand": "VW",
+      "model": "ID.4",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "VW Santana",
+      "brand": "VW",
+      "model": "Santana",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Vauxhall Corsa VXR 2016",
+      "brand": "Vauxhall",
+      "model": "Corsa VXR 2016",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Vauxhall Lotus Carlton",
+      "brand": "Vauxhall",
+      "model": "Lotus Carlton",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "Vauxhall Monaro VXR",
+      "brand": "Vauxhall",
+      "model": "Monaro VXR",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Volkswagen 1107 Desert Dingo Racing Stock Bug",
+      "brand": "Volkswagen",
+      "model": "1107 Desert Dingo Racing Stock Bug",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen 34 Volkswagen Andretti Rallycross Beetle",
+      "brand": "Volkswagen",
+      "model": "34 Volkswagen Andretti Rallycross Beetle",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volkswagen Beetle 1963",
+      "brand": "Volkswagen",
+      "model": "Beetle 1963",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Beetle FE Large",
+      "brand": "Volkswagen",
+      "model": "Beetle FE Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Beetle Traffic",
+      "brand": "Volkswagen",
+      "model": "Beetle Traffic",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Class 5-1600 Baja Bug",
+      "brand": "Volkswagen",
+      "model": "Class 5-1600 Baja Bug",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Corrado VR6",
+      "brand": "Volkswagen",
+      "model": "Corrado VR6",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Volkswagen Double Cab Pick-Up",
+      "brand": "Volkswagen",
+      "model": "Double Cab Pick-Up",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen GTI VR6 Mk3",
+      "brand": "Volkswagen",
+      "model": "GTI VR6 Mk3",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Volkswagen GTI VR6 Mk3 Traffic",
+      "brand": "Volkswagen",
+      "model": "GTI VR6 Mk3 Traffic",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Volkswagen Golf GTI 83",
+      "brand": "Volkswagen",
+      "model": "Golf GTI 83",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Golf Gti 16v Mk2",
+      "brand": "Volkswagen",
+      "model": "Golf Gti 16v Mk2",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Golf R 2010",
+      "brand": "Volkswagen",
+      "model": "Golf R 2010",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volkswagen Golf R 2014",
+      "brand": "Volkswagen",
+      "model": "Golf R 2014",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volkswagen Golf R 2019 Large",
+      "brand": "Volkswagen",
+      "model": "Golf R 2019 Large",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volkswagen Golf R32",
+      "brand": "Volkswagen",
+      "model": "Golf R32",
+      "sound_profile": "mgb_v8"
+    },
+    {
+      "full_name": "Volkswagen Pickup LX 1982 Large",
+      "brand": "Volkswagen",
+      "model": "Pickup LX 1982 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen SP-2",
+      "brand": "Volkswagen",
+      "model": "SP-2",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Scirocco R",
+      "brand": "Volkswagen",
+      "model": "Scirocco R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volkswagen Scirocco S",
+      "brand": "Volkswagen",
+      "model": "Scirocco S",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Thing",
+      "brand": "Volkswagen",
+      "model": "Thing",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volkswagen Type 2 De Luxe",
+      "brand": "Volkswagen",
+      "model": "Type 2 De Luxe",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Volvo 242 Turbo Evolution",
+      "brand": "Volvo",
+      "model": "242 Turbo Evolution",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volvo 850 R",
+      "brand": "Volvo",
+      "model": "850 R",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volvo C30 Polestar",
+      "brand": "Volvo",
+      "model": "C30 Polestar",
+      "sound_profile": "defender_td5"
+    },
+    {
+      "full_name": "Volvo V60 Polestar",
+      "brand": "Volvo",
+      "model": "V60 Polestar",
+      "sound_profile": "cummins_diesel"
+    },
+    {
+      "full_name": "W Motors Lykan Hypersport",
+      "brand": "W",
+      "model": "Motors Lykan Hypersport",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Willys MB Jeep",
+      "brand": "Willys",
+      "model": "MB Jeep",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "Wuling Hongguang Mini EV Macaron",
+      "brand": "Wuling",
+      "model": "Hongguang Mini EV Macaron",
+      "sound_profile": "ls3_v8"
+    },
+    {
+      "full_name": "Wuling Sunshine S 2013 Large",
+      "brand": "Wuling",
+      "model": "Sunshine S 2013 Large",
+      "sound_profile": "vw_flat4"
+    },
+    {
+      "full_name": "XB1 Cadillac CT5-V",
+      "brand": "XB1",
+      "model": "Cadillac CT5-V",
+      "sound_profile": "muscle_v8_modern"
+    },
+    {
+      "full_name": "Zenvo ST1",
+      "brand": "Zenvo",
+      "model": "ST1",
+      "sound_profile": "chevy_bigblock_v8"
+    },
+    {
+      "full_name": "Zenvo TSR-S",
+      "brand": "Zenvo",
+      "model": "TSR-S",
+      "sound_profile": "ls3_v8"
+    }
+  ],
+  "stats": {
+    "total_cars": 915,
+    "total_profiles": 22,
+    "profile_usage": {
+      "muscle_v8_classic": 33,
+      "scania_v8_turbo": 44,
+      "vw_flat4": 158,
+      "defender_td5": 114,
+      "mgb_v8": 41,
+      "chevy_bigblock_v8": 55,
+      "ferrari_v12": 141,
+      "ls3_v8": 106,
+      "jaguar_v12": 31,
+      "chevy_smallblock_v8": 26,
+      "straightpipe_v8": 52,
+      "cummins_diesel": 30,
+      "toyota_i6": 18,
+      "muscle_v8_modern": 14,
+      "chevy_pickup_v8": 9,
+      "dodge_v8": 18,
+      "electric": 7,
+      "jeep_v8": 12,
+      "british_v8": 6
+    }
+  }
+}

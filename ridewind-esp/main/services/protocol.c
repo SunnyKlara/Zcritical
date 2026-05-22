@@ -259,7 +259,7 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
     if (strncmp(buf, "SPEED:", 6) == 0) {
         if (!parse_int(buf + 6, &val)) return false;
         if (val < 0) val = 0;
-        if (val > 340) val = 340;
+        if (val > 999) val = 999;
         out->type = CMD_SPEED;
         out->param.i16_val = (int16_t)val;
         return true;
@@ -287,6 +287,37 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
             out->param.u8_val = (uint8_t)val;
             return true;
         }
+    }
+
+    /* ── SPEED_MAX:xxx — set max speed display (1-999) ── */
+    if (strncmp(buf, "SPEED_MAX:", 10) == 0) {
+        if (!parse_int(buf + 10, &val)) return false;
+        if (val < 1 || val > 999) return false;
+        out->type = CMD_SPEED_MAX;
+        out->param.i16_val = (int16_t)val;
+        return true;
+    }
+
+    /* ── FAN_RANGE:min,max — set fan PWM range ── */
+    if (strncmp(buf, "FAN_RANGE:", 10) == 0) {
+        char *p2 = buf + 10;
+        int min_val = 0, max_val = 100;
+        char *comma = strchr(p2, ',');
+        if (comma) {
+            *comma = '\0';
+            parse_int(p2, &min_val);
+            parse_int(comma + 1, &max_val);
+            *comma = ',';  /* restore */
+        } else {
+            return false;
+        }
+        if (min_val < 0) min_val = 0;
+        if (max_val > 100) max_val = 100;
+        if (min_val > max_val) min_val = max_val;
+        out->type = CMD_FAN_RANGE;
+        out->param.led.r = (uint8_t)min_val;  /* reuse led struct for two values */
+        out->param.led.g = (uint8_t)max_val;
+        return true;
     }
 
     /* ── WIFI_SCAN ── */

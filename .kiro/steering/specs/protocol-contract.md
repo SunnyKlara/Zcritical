@@ -40,7 +40,7 @@ fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/comman
 | 命令 | 格式 | 参数 | 响应 |
 |------|------|------|------|
 | 风扇速度 | `FAN:xx\n` | 0-100 | `OK:FAN:xx\r\n` |
-| 速度显示 | `SPEED:xxx\n` | 0-340 | 无（高频） |
+| 速度显示 | `SPEED:xxx\n` | 0-999 | 无（高频） |
 | 预设 | `PRESET:xx\n` | 1-14 | `OK:PRESET:xx\r\n` |
 | LED 颜色 | `LED:s:r:g:b\n` | s=1-4, rgb=0-255 | `OK:LED\r\n` |
 | LED 渐变 | `LED_GRADIENT:s:r:g:b:speed\n` | speed=渐变速度 | `OK:LED_GRADIENT\r\n` |
@@ -53,6 +53,8 @@ fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/comman
 | 油门灯效 | `THROTTLE_FX:x\n` | 0-8 | `OK:THROTTLE_FX:x\r\n` |
 | 速度单位 | `UNIT:x\n` | 0=km/h, 1=mph | `OK:UNIT:x\r\n` |
 | LCD 开关 | `LCD:x\n` | 0/1 | `OK:LCD:x\r\n` |
+| 极速上限 | `SPEED_MAX:xxx\n` | 50-500 | `OK:SPEED_MAX:xxx\r\n` |
+| 风力范围 | `FAN_RANGE:min,max\n` | min=0-100, max=0-100 | `OK:FAN_RANGE:min,max\r\n` |
 
 ### 状态查询
 
