@@ -15,8 +15,9 @@ class DeviceConnectConfig {
   double get safeAreaTop => MediaQuery.of(context).padding.top;
   double get safeAreaBottom => MediaQuery.of(context).padding.bottom;
 
-  bool get isSmallScreen => screenHeight < 700 || screenWidth < 375;
+  bool get isSmallScreen => screenHeight < 700 || screenWidth < 380;
   bool get isLargeScreen => screenHeight > 900 || screenWidth > 428;
+  bool get isCompactWidth => screenWidth <= 390; // iPhone 13 mini (375), iPhone 13/14 (390)
   bool get isTablet => screenWidth > 600;
 
   // ── 顶部渐变遮罩 ──

@@ -65,13 +65,13 @@ class ResponsiveUtils {
   /// 基于设计稿宽度的缩放计算
   /// 
   /// [context] - BuildContext
-  /// [baseSize] - 基础尺寸（基于375px宽度的设计稿）
+  /// [baseSize] - 基础尺寸（基于412px宽度的设计稿 — Android 开发机）
   /// 返回：适配当前屏幕的尺寸
   /// 
   /// 示例：设计稿上按钮宽度为60px
   /// `ResponsiveUtils.scaledSize(context, 60)` 
-  /// 在iPhone 11 (390px) 上返回 62.4px
-  static double scaledSize(BuildContext context, double baseSize, {double baseWidth = 375.0}) {
+  /// 在iPhone 13 mini (375px) 上返回 54.6px
+  static double scaledSize(BuildContext context, double baseSize, {double baseWidth = 412.0}) {
     final screenWidth = MediaQuery.of(context).size.width;
     return baseSize * screenWidth / baseWidth;
   }
@@ -104,22 +104,22 @@ class ResponsiveUtils {
   
   /// 是否为小屏幕设备
   /// 
-  /// 定义：高度 < 700px 或 宽度 < 375px
-  /// 示例设备：iPhone SE (375×667)
+  /// 定义：高度 < 700px 或 宽度 < 380px
+  /// 示例设备：iPhone SE (375×667), iPhone 13 mini (375×812)
   static bool isSmallScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    return size.height < 700 || size.width < 375;
+    return size.height < 700 || size.width < 380;
   }
   
   /// 是否为中等屏幕设备
   /// 
-  /// 定义：700 <= 高度 <= 900 且 375 <= 宽度 <= 430
-  /// 示例设备：iPhone 11/12/13 (390×844)
+  /// 定义：700 <= 高度 <= 900 且 380 <= 宽度 <= 430
+  /// 示例设备：iPhone 13/14 (390×844), Android 标准 (412×915)
   static bool isMediumScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return size.height >= 700 && 
            size.height <= 900 && 
-           size.width >= 375 && 
+           size.width >= 380 && 
            size.width <= 430;
   }
   
