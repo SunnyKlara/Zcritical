@@ -210,50 +210,60 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
             ),
           ),
 
-          // ═══ 赛车轮播 ═══
-          SizedBox(
-            height: 180,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(
-                    color: Colors.white12, strokeWidth: 1.5))
-                : _buildCarCarousel(),
+          // ═══ 可滚动内容区域 ═══
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  // ═══ 赛车轮播 ═══
+                  SizedBox(
+                    height: 180,
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator(
+                            color: Colors.white12, strokeWidth: 1.5))
+                        : _buildCarCarousel(),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ═══ 参数面板 (2×2 进度条) ═══
+                  if (_cars.isNotEmpty) _buildStatsGrid(),
+
+                  const SizedBox(height: 20),
+
+                  // ═══ 引擎信息 (展示用，带进度条动画) ═══
+                  if (_cars.isNotEmpty) _buildEngineInfo(),
+
+                  const SizedBox(height: 24),
+
+                  // ═══ 分隔线 ═══
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    height: 1,
+                    color: Colors.white.withOpacity(0.04),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ═══ 速度范围 ═══
+                  _buildSpeedDisplay(),
+
+                  const SizedBox(height: 28),
+
+                  // ═══ 音量 ═══
+                  _buildVolumeControl(),
+
+                  const SizedBox(height: 24),
+
+                  // ═══ 启动按钮 ═══
+                  _buildActivateButton(),
+
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+                ],
+              ),
+            ),
           ),
-
-          const SizedBox(height: 28),
-
-          // ═══ 参数面板 (2×2 进度条) ═══
-          if (_cars.isNotEmpty) _buildStatsGrid(),
-
-          const SizedBox(height: 20),
-
-          // ═══ 引擎信息 (展示用，带进度条动画) ═══
-          if (_cars.isNotEmpty) _buildEngineInfo(),
-
-          const SizedBox(height: 24),
-
-          // ═══ 分隔线 ═══
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 40),
-            height: 1,
-            color: Colors.white.withOpacity(0.04),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ═══ 速度范围 ═══
-          _buildSpeedDisplay(),
-
-          const SizedBox(height: 28),
-
-          // ═══ 音量 ═══
-          _buildVolumeControl(),
-
-          const Spacer(),
-
-          // ═══ 启动按钮 ═══
-          _buildActivateButton(),
-
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
         ],
       ),
     );
