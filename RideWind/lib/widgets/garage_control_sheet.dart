@@ -139,7 +139,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     }
 
     setState(() {
-      _maxSpeed = suggestedMaxSpeed;
+      _maxSpeed = specs.topSpeedKmh ?? suggestedMaxSpeed;
       _volume = suggestedVolume;
     });
   }
@@ -223,6 +223,20 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           // ═══ 参数面板 (2×2 进度条) ═══
           if (_cars.isNotEmpty) _buildStatsGrid(),
+
+          const SizedBox(height: 20),
+
+          // ═══ 引擎信息 (展示用，带进度条动画) ═══
+          if (_cars.isNotEmpty) _buildEngineInfo(),
+
+          const SizedBox(height: 24),
+
+          // ═══ 分隔线 ═══
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            height: 1,
+            color: Colors.white.withOpacity(0.04),
+          ),
 
           const SizedBox(height: 20),
 
@@ -369,15 +383,15 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
         children: [
           Row(
             children: [
-              Expanded(child: _buildStatBar(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"}')),
+              Expanded(child: _buildStatBar(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"} hp')),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatBar(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"}')),
+              Expanded(child: _buildStatBar(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"} lb·ft')),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: _buildStatBar(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"}')),
+              Expanded(child: _buildStatBar(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"} km/h')),
               const SizedBox(width: 16),
               Expanded(child: _buildStatBar(
                 label: '0-100',
@@ -433,6 +447,75 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  //  引擎信息 — 展示用，带进度条动画
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildEngineInfo() {
+    final car = _cars[_selectedCarIndex];
+    final specs = car.specs;
+    if (specs == null) return const SizedBox.shrink();
+
+    // 引擎类型文字
+    final engineText = [
+      specs.displacement,
+      specs.engine,
+      specs.aspiration,
+    ].where((s) => s != null && s.isNotEmpty).join(' · ');
+
+    // 排量转数值（用于进度条）
+    double displacementValue = 0;
+    if (specs.displacement != null) {
+      final match = RegExp(r'([\d.]+)').firstMatch(specs.displacement!);
+      if (match != null) displacementValue = double.tryParse(match.group(1)!) ?? 0;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.settings, size: 12, color: Colors.white.withOpacity(0.25)),
+              const SizedBox(width: 6),
+              Text(
+                'ENGINE',
+                style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 2),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 引擎描述
+          Text(
+            engineText.isNotEmpty ? engineText : 'Unknown',
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          // 排量进度条
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final double progress = (displacementValue / 8.0).clamp(0.0, 1.0);
+              final double barWidth = constraints.maxWidth * progress;
+              return Container(
+                height: 4,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(2)),
+                alignment: Alignment.centerLeft,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  width: barWidth,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.6), borderRadius: BorderRadius.circular(2)),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   //  速度范围 — 大号数字居中显示
   // ═══════════════════════════════════════════════════════════════
 
@@ -441,7 +524,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       onHorizontalDragUpdate: (details) {
         final delta = details.primaryDelta ?? 0;
         setState(() {
-          _maxSpeed = (_maxSpeed + (delta * 0.5).round()).clamp(100, 500);
+          _maxSpeed = (_maxSpeed + (delta * 0.8).round()).clamp(0, 999);
         });
       },
       child: Column(
