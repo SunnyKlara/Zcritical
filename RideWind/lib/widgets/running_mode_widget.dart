@@ -798,7 +798,7 @@ class RunningModeWidgetState extends State<RunningModeWidget>
                 GarageControlSheet.show(
                   context,
                   onSettingsApplied: (settings) {
-                    debugPrint('🚗 车库设置已应用: maxSpeed=${settings.maxSpeed}, fan=${settings.fanSpeed}, vol=${settings.volume}');
+                    debugPrint('🚗 车库设置已应用: maxSpeed=${settings.maxSpeed}, vol=${settings.volume}');
                     // TODO: 将 settings.maxSpeed 传递给父组件更新 RunningModeWidget.maxSpeed
                   },
                 );
