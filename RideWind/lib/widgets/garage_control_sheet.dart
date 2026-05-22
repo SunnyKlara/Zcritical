@@ -204,7 +204,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           // ═══ 赛车轮播 ═══
           SizedBox(
-            height: 150,
+            height: 200,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(
                     color: Colors.white12, strokeWidth: 1.5))
