@@ -257,36 +257,17 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                   // ═══ 参数面板 (2×2 进度条) ═══
                   if (_cars.isNotEmpty) _buildStatsGrid(),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 36),
 
-                  // ═══ 分隔线 ═══
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
-                    height: 1,
-                    color: Colors.white.withOpacity(0.04),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // ═══ 引擎波形可视化 ═══
+                  // ═══ 引擎波形（充当分隔线，全宽拉长） ═══
                   if (_cars.isNotEmpty) _buildEngineWaveform(),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 36),
 
-                  // ═══ 速度范围 ═══
-                  _buildSpeedDisplay(),
+                  // ═══ 速度 / 音量 / 风力 — 三列并排 ═══
+                  _buildControlRow(),
 
-                  const SizedBox(height: 24),
-
-                  // ═══ 音量 Slider ═══
-                  _buildVolumeSlider(),
-
-                  const SizedBox(height: 20),
-
-                  // ═══ 风力 Slider ═══
-                  _buildWindSlider(),
-
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
 
                   // ═══ 启动按钮 ═══
                   _buildActivateButton(),
@@ -484,7 +465,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  引擎波形可视化 — 左侧播放按钮 + 引擎类型，右侧正弦波 CustomPaint
+  //  引擎波形 — 全宽正弦波，充当视觉分隔线
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildEngineWaveform() {
@@ -492,7 +473,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     final specs = car.specs;
     if (specs == null) return const SizedBox.shrink();
 
-    // 构建引擎类型文字
+    // 引擎类型文字
     final engineParts = <String>[];
     if (specs.displacement != null && specs.displacement!.isNotEmpty) {
       engineParts.add(specs.displacement!);
@@ -507,57 +488,55 @@ class _GarageControlSheetState extends State<GarageControlSheet>
         ? engineParts.join(' ')
         : 'Unknown Engine';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          if (_isPlaying) {
-            _stopWaveAnimation();
-          } else {
-            _startWaveAnimation();
-          }
-        },
-        child: Row(
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        if (_isPlaying) {
+          _stopWaveAnimation();
+        } else {
+          _startWaveAnimation();
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
           children: [
-            // 左侧：播放三角 + 引擎类型
-            Icon(
-              _isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white.withOpacity(0.6),
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 3,
-              child: Text(
-                engineLabel,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+            // 引擎类型 + 播放按钮（小字居中）
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: Colors.white.withOpacity(0.35),
+                  size: 14,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // 右侧：正弦波动画
-            Expanded(
-              flex: 5,
-              child: SizedBox(
-                height: 28,
-                child: AnimatedBuilder(
-                  animation: _waveController,
-                  builder: (context, _) {
-                    return CustomPaint(
-                      size: const Size(double.infinity, 28),
-                      painter: _SineWavePainter(
-                        phase: _wavePhase,
-                        isPlaying: _isPlaying,
-                      ),
-                    );
-                  },
+                const SizedBox(width: 6),
+                Text(
+                  engineLabel,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // 全宽正弦波
+            SizedBox(
+              height: 24,
+              width: double.infinity,
+              child: AnimatedBuilder(
+                animation: _waveController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: const Size(double.infinity, 24),
+                    painter: _SineWavePainter(
+                      phase: _wavePhase,
+                      isPlaying: _isPlaying,
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -567,181 +546,119 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  速度范围 — 大号数字 + Slider
+  //  控制面板 — 速度/音量/风力 三列并排
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildSpeedDisplay() {
+  Widget _buildControlRow() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '速度范围',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.2),
-              fontSize: 11,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$_maxSpeed',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: -2,
-                ),
+          // 速度
+          Expanded(child: _buildControlColumn(
+            label: '速度',
+            value: _maxSpeed,
+            unit: 'km/h',
+            fontSize: 32,
+            slider: SliderTheme(
+              data: _sliderTheme(context),
+              child: Slider(
+                value: _maxSpeed.toDouble(),
+                min: 0,
+                max: 999,
+                onChanged: (v) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _maxSpeed = v.round());
+                },
               ),
-              const SizedBox(width: 6),
-              Text(
-                'km/h',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.25),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SliderTheme(
-            data: _sliderTheme(context),
-            child: Slider(
-              value: _maxSpeed.toDouble(),
-              min: 0,
-              max: 999,
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                setState(() => _maxSpeed = v.round());
-              },
             ),
-          ),
+          )),
+          // 音量
+          Expanded(child: _buildControlColumn(
+            label: '音量',
+            value: _volume,
+            unit: '%',
+            fontSize: 32,
+            slider: SliderTheme(
+              data: _sliderTheme(context),
+              child: Slider(
+                value: _volume.toDouble(),
+                min: 0,
+                max: 100,
+                onChangeStart: (_) => _onVolumeAdjustStart(),
+                onChanged: (v) => _onVolumeChanged(v.round()),
+                onChangeEnd: (_) => _onVolumeAdjustEnd(),
+              ),
+            ),
+          )),
+          // 风力
+          Expanded(child: _buildControlColumn(
+            label: '风力',
+            value: _windPower,
+            unit: '%',
+            fontSize: 32,
+            slider: SliderTheme(
+              data: _sliderTheme(context),
+              child: Slider(
+                value: _windPower.toDouble(),
+                min: 0,
+                max: 100,
+                onChanged: (v) => _onWindChanged(v.round()),
+              ),
+            ),
+          )),
         ],
       ),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  //  音量 — 大数字 + Slider + 硬件联动
-  // ═══════════════════════════════════════════════════════════════
-
-  Widget _buildVolumeSlider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        children: [
-          Text(
-            '音量',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.2),
-              fontSize: 11,
-              letterSpacing: 2,
-            ),
+  Widget _buildControlColumn({
+    required String label,
+    required int value,
+    required String unit,
+    required double fontSize,
+    required Widget slider,
+  }) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.2),
+            fontSize: 10,
+            letterSpacing: 2,
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$_volume',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: -2,
-                ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '$value',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w200,
+                letterSpacing: -1,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '%',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.25),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SliderTheme(
-            data: _sliderTheme(context),
-            child: Slider(
-              value: _volume.toDouble(),
-              min: 0,
-              max: 100,
-              onChangeStart: (_) => _onVolumeAdjustStart(),
-              onChanged: (v) => _onVolumeChanged(v.round()),
-              onChangeEnd: (_) => _onVolumeAdjustEnd(),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  风力 — 大数字 + Slider + FAN 命令
-  // ═══════════════════════════════════════════════════════════════
-
-  Widget _buildWindSlider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        children: [
-          Text(
-            '风力',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.2),
-              fontSize: 11,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$_windPower',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: -2,
-                ),
+            const SizedBox(width: 2),
+            Text(
+              unit,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.2),
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '%',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.25),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SliderTheme(
-            data: _sliderTheme(context),
-            child: Slider(
-              value: _windPower.toDouble(),
-              min: 0,
-              max: 100,
-              onChanged: (v) => _onWindChanged(v.round()),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        slider,
+      ],
     );
   }
 
