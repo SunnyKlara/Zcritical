@@ -204,15 +204,12 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           // ═══ 赛车轮播 ═══
           SizedBox(
-            height: 200,
+            height: 220,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(
                     color: Colors.white12, strokeWidth: 1.5))
                 : _buildCarCarousel(),
           ),
-
-          // ═══ 车辆信息 ═══
-          if (_cars.isNotEmpty) _buildCarInfo(),
 
           const SizedBox(height: 28),
 
@@ -237,6 +234,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
   // ═══════════════════════════════════════════════════════════════
   //  赛车轮播 — 中间大+浮起，两边小+下沉+暗淡
+  //  卡片内含：图片（底部对齐）+ 文字信息（叠加在底部渐变上）
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildCarCarousel() {
@@ -283,6 +281,8 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }
 
   Widget _buildCarCard(CarModel car, bool isSelected) {
+    final specs = car.specs;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -297,63 +297,89 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
-        child: Image.asset(
-          car.assetPath,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Center(
-            child: Icon(
-              Icons.directions_car_outlined,
-              color: Colors.white.withOpacity(0.06),
-              size: 48,
+        child: Stack(
+          children: [
+            // 图片 — 底部对齐，所有车"停"在同一地平线
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 44),
+                child: Image.asset(
+                  car.assetPath,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomCenter,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Icon(
+                      Icons.directions_car_outlined,
+                      color: Colors.white.withOpacity(0.06),
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  // ═══════════════════════════════════════════════════════════════
-  //  车辆信息
-  // ═══════════════════════════════════════════════════════════════
-
-  Widget _buildCarInfo() {
-    final car = _cars[_selectedCarIndex];
-    final specs = car.specs;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Column(
-        children: [
-          Text(
-            car.brand.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.25),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            car.model,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
-          ),
-          if (specs?.horsepower != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${specs!.horsepower} HP  ·  ${specs.engine ?? ""}  ·  ${specs.drivetrain ?? ""}',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.3),
-                fontSize: 12,
+            // 底部渐变遮罩 + 文字信息
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(15),
+                  ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF0A0A0A).withOpacity(0.8),
+                      const Color(0xFF0A0A0A),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      car.brand.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.35),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      car.model,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (specs?.horsepower != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${specs!.horsepower} HP',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.3),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
