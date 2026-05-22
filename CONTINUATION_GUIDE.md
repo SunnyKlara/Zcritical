@@ -9,9 +9,9 @@
 
 功能全部跑通，进入打磨阶段。用户以产品经理身份提需求，AI 深入理解后设计实现。
 
-**Git**：main 单分支 + tag 发版。当前 tag: `v1.1.1`。
-WiFi 主通道分支 `feat/wifi-main-channel` 已合并回 main（2026-05-21）。
-v1.1.0 已发布到 GitHub Releases（APK 165.6MB）。
+**Git**：main 单分支 + feature 分支（大功能）+ tag 发版。当前 tag: `v1.2.0-baseline`。
+v1.2.0-baseline 是后续四大功能分支的干净起点（2026-05-22）。
+大功能分支规则已写入 `git-and-release.md`：feat/garage-v2、feat/colorize-v2、feat/audio-casting-v2、feat/ios-platform。
 Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/release）。
 详见 `.kiro/steering/git-and-release.md`。
 
@@ -77,7 +77,11 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 
 ## 下一步
 
-1. **P0 架构升级：WiFi 主通道** — 重大决策已确认（2026-05-21），见下方详情
+1. **P0 四大功能分支开发** — 从 v1.2.0-baseline 创建对应 feature 分支：
+   - `feat/garage-v2` — 车库大更新（联动风扇/灯光/音效/Logo）
+   - `feat/colorize-v2` — Colorize 灯光系统升级
+   - `feat/audio-casting-v2` — 音频投射升级（类蓝牙音箱）
+   - `feat/ios-platform` — iOS 开发体系建立
 2. **P1 体验打磨** — 用户实玩记录体验问题 → 分类 → 批量修复
 3. **P2 引擎音效调参** — RC Engine 方案待烧录验证最终效果
 4. **P3 DeviceConnectScreen 拆分**
