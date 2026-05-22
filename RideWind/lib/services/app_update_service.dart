@@ -83,13 +83,20 @@ class AppUpdateService {
     }
   }
 
-  /// 下载并安装APK
+  /// 下载并安装APK（仅 Android）
+  /// iOS 上不应调用此方法，应跳转 App Store
   Future<void> downloadAndInstall(
     AppVersionInfo info, {
     ValueChanged<double>? onProgress,
     VoidCallback? onComplete,
     ValueChanged<String>? onError,
   }) async {
+    // iOS 不支持 APK 下载安装
+    if (Platform.isIOS) {
+      onError?.call('iOS 请通过 App Store 更新');
+      return;
+    }
+
     if (_isDownloading) return;
     _isDownloading = true;
     _cancelToken = CancelToken();

@@ -53,8 +53,19 @@
 	<string>需要访问相册来选择Logo图片</string>
 	<!-- 蓝牙权限 -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>需要蓝牙来连接和控制设备</string>
+	<string>需要蓝牙来连接和控制RideWind设备</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>需要蓝牙来连接和控制设备</string>
+	<string>需要蓝牙来连接和控制RideWind设备</string>
+	<!-- WiFi/位置权限 — WiFi配网需要获取当前SSID -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>需要位置权限来获取当前WiFi网络名称，用于设备配网</string>
+	<!-- 本地网络权限 — WiFi通信 -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>需要访问本地网络来与RideWind设备通信</string>
+	<!-- 后台模式 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
 </dict>
 </plist>

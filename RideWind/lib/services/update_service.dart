@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ class UpdateInfo {
   final String downloadUrl;
   final String releaseNotes;
   final bool forceUpdate;
+  final String? iosAppStoreUrl; // iOS App Store 链接
 
   UpdateInfo({
     required this.latestVersion,
@@ -23,6 +25,7 @@ class UpdateInfo {
     required this.downloadUrl,
     required this.releaseNotes,
     required this.forceUpdate,
+    this.iosAppStoreUrl,
   });
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
@@ -33,6 +36,7 @@ class UpdateInfo {
       downloadUrl: json['download_url'] ?? '',
       releaseNotes: json['release_notes'] ?? '',
       forceUpdate: json['force_update'] ?? false,
+      iosAppStoreUrl: json['ios_app_store_url'],
     );
   }
 }
@@ -187,6 +191,19 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   }
 
   Future<void> _startDownload() async {
+    // iOS: 跳转 App Store
+    if (Platform.isIOS) {
+      final url = widget.updateInfo.iosAppStoreUrl;
+      if (url == null || url.isEmpty) {
+        setState(() => _error = 'App Store 链接未配置');
+        return;
+      }
+      // 使用 url_launcher 或直接关闭对话框提示用户去 App Store
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    // Android: 下载 APK 并安装
     if (widget.updateInfo.downloadUrl.isEmpty) {
       setState(() => _error = '下载地址未配置');
       return;
