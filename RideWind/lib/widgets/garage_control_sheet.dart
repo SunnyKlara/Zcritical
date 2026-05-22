@@ -30,7 +30,7 @@ class GarageControlSheet extends StatefulWidget {
       isDismissible: true,
       enableDrag: true,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
       builder: (context) => GarageControlSheet(
         onSettingsApplied: onSettingsApplied,
@@ -67,11 +67,18 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   bool _isPlaying = false;
   double _wavePhase = 0;
 
+  // 控制轮播
+  late PageController _controlPageController;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(
       viewportFraction: 0.72,
+      initialPage: 0,
+    );
+    _controlPageController = PageController(
+      viewportFraction: 0.65,
       initialPage: 0,
     );
 
@@ -91,6 +98,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   @override
   void dispose() {
     _pageController.dispose();
+    _controlPageController.dispose();
     _waveController.dispose();
     if (_isAdjustingVolume) _onVolumeAdjustEnd();
     super.dispose();
@@ -561,118 +569,102 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  控制面板 — 速度/音量/风力 三列并排
+  //  控制轮播 — 速度/音量/风力 中间大两边小，3项循环滚动
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildControlRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 速度
-          Expanded(child: _buildControlColumn(
-            label: '速度',
-            value: _maxSpeed,
-            unit: 'km/h',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _maxSpeed.toDouble(),
-                min: 0,
-                max: 999,
-                onChanged: (v) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _maxSpeed = v.round());
-                },
-              ),
-            ),
-          )),
-          // 音量
-          Expanded(child: _buildControlColumn(
-            label: '音量',
-            value: _volume,
-            unit: '%',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _volume.toDouble(),
-                min: 0,
-                max: 100,
-                onChangeStart: (_) => _onVolumeAdjustStart(),
-                onChanged: (v) => _onVolumeChanged(v.round()),
-                onChangeEnd: (_) => _onVolumeAdjustEnd(),
-              ),
-            ),
-          )),
-          // 风力
-          Expanded(child: _buildControlColumn(
-            label: '风力',
-            value: _windPower,
-            unit: '%',
-            fontSize: 32,
-            slider: SliderTheme(
-              data: _sliderTheme(context),
-              child: Slider(
-                value: _windPower.toDouble(),
-                min: 0,
-                max: 100,
-                onChanged: (v) => _onWindChanged(v.round()),
-              ),
-            ),
-          )),
-        ],
+    return SizedBox(
+      height: 120,
+      child: PageView.builder(
+        controller: _controlPageController,
+        itemCount: 300, // 大数模拟无限循环
+        onPageChanged: (_) => HapticFeedback.selectionClick(),
+        itemBuilder: (context, index) {
+          final int realIndex = index % 3;
+          return AnimatedBuilder(
+            animation: _controlPageController,
+            builder: (context, child) {
+              double page = 0;
+              if (_controlPageController.position.haveDimensions) {
+                page = _controlPageController.page ?? 0;
+              }
+              final double diff = (index - page);
+              final double absDiff = diff.abs().clamp(0.0, 2.0);
+              final double scale = 1.0 - absDiff * 0.2;
+              final double opacity = (1.0 - absDiff * 0.5).clamp(0.3, 1.0);
+
+              return Transform.scale(
+                scale: scale,
+                child: Opacity(
+                  opacity: opacity,
+                  child: _buildControlCard(realIndex),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildControlColumn({
-    required String label,
-    required int value,
-    required String unit,
-    required double fontSize,
-    required Widget slider,
-  }) {
+  Widget _buildControlCard(int index) {
+    late String label;
+    late int value;
+    late String unit;
+    late Widget slider;
+
+    switch (index) {
+      case 0:
+        label = '速度';
+        value = _maxSpeed;
+        unit = 'km/h';
+        slider = Slider(
+          value: _maxSpeed.toDouble(), min: 0, max: 999,
+          onChanged: (v) { HapticFeedback.selectionClick(); setState(() => _maxSpeed = v.round()); },
+        );
+        break;
+      case 1:
+        label = '音量';
+        value = _volume;
+        unit = '%';
+        slider = Slider(
+          value: _volume.toDouble(), min: 0, max: 100,
+          onChangeStart: (_) => _onVolumeAdjustStart(),
+          onChanged: (v) => _onVolumeChanged(v.round()),
+          onChangeEnd: (_) => _onVolumeAdjustEnd(),
+        );
+        break;
+      case 2:
+        label = '风力';
+        value = _windPower;
+        unit = '%';
+        slider = Slider(
+          value: _windPower.toDouble(), min: 0, max: 100,
+          onChanged: (v) => _onWindChanged(v.round()),
+        );
+        break;
+    }
+
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.2),
-            fontSize: 10,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 6),
+        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 10, letterSpacing: 3)),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w200,
-                letterSpacing: -1,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              unit,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.2),
-                fontSize: 10,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
+            Text('$value', style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w100, letterSpacing: -2)),
+            const SizedBox(width: 4),
+            Text(unit, style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 12)),
           ],
         ),
         const SizedBox(height: 8),
-        slider,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: SliderTheme(data: _sliderTheme(context), child: slider),
+        ),
       ],
     );
   }
