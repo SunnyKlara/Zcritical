@@ -204,7 +204,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           // ═══ 赛车轮播 ═══
           SizedBox(
-            height: 250,
+            height: 180,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(
                     color: Colors.white12, strokeWidth: 1.5))
@@ -277,14 +277,33 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     );
   }
 
-  /// 单个车辆项：上方文字 + 下方悬浮图片（无边框无卡片）
+  /// 单个车辆项：固定尺寸图片区域 + 下方文字
   Widget _buildCarItem(CarModel car, bool isSelected) {
     final specs = car.specs;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 文字信息 — 在图片上方
+        // 图片 — 固定 140x90 区域，所有车统一视觉大小
+        SizedBox(
+          width: 180,
+          height: 110,
+          child: Image.asset(
+            car.assetPath,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            errorBuilder: (_, __, ___) => Center(
+              child: Icon(
+                Icons.directions_car_outlined,
+                color: Colors.white.withOpacity(0.04),
+                size: 40,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // 文字信息 — 在图片下方，固定位置
         Text(
           car.brand.toUpperCase(),
           style: TextStyle(
@@ -315,26 +334,6 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
             ),
           ),
         ],
-        const SizedBox(height: 8),
-
-        // 图片 — fitWidth 让所有车宽度统一，高度自然适应
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Image.asset(
-              car.assetPath,
-              fit: BoxFit.fitWidth,
-              alignment: Alignment.center,
-              errorBuilder: (_, __, ___) => Center(
-                child: Icon(
-                  Icons.directions_car_outlined,
-                  color: Colors.white.withOpacity(0.04),
-                  size: 40,
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
