@@ -27,6 +27,7 @@ class _RunningModeConfig {
 
   bool get _isSmallScreen => _screenHeight < 700 || _screenWidth < 380;
   bool get _isLargeScreen => _screenHeight > 900 || _screenWidth > 428;
+  bool get _isCompactWidth => _screenWidth <= 390;
 
   /// 下半部分容器高度（从分界线到屏幕底部）
   double get containerHeight => _screenHeight * 0.55;
@@ -108,14 +109,16 @@ class _RunningModeConfig {
   double get unitLabelRight =>
       ResponsiveUtils.width(context, _isSmallScreen ? 5 : 8);
 
-  /// 非选中数字字体大小 - 根据项目高度动态计算
+  /// 非选中数字字体大小 - 根据屏幕宽度动态计算
   double get speedFontSize {
+    if (_isCompactWidth) return 26.0;
     final baseSize = wheelItemExtent * 0.5;
     return baseSize.clamp(32.0, 50.0);
   }
 
-  /// 🔑 选中数字的字体大小（更大更突出）
+  /// 🔑 选中数字的字体大小（更大更突出）— 按屏幕宽度缩放
   double get selectedSpeedFontSize {
+    if (_isCompactWidth) return 55.0;
     final baseSize = wheelItemExtent * 1.1;
     return baseSize.clamp(65.0, 100.0);
   }
@@ -1229,7 +1232,7 @@ class RunningModeWidgetState extends State<RunningModeWidget>
                           color: isCurrent ? Colors.white : const Color(0xFFC94A4A).withAlpha((opacity * 0.7 * 255).round()),
                           fontSize: isCurrent ? config.selectedSpeedFontSize : config.speedFontSize,
                           fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w800,
-                          letterSpacing: isCurrent ? 4 : 2,
+                          letterSpacing: isCurrent ? (config._isCompactWidth ? 2 : 4) : (config._isCompactWidth ? 1 : 2),
                           height: 1.0,
                           shadows: isCurrent ? [
                             // 🔑 纯黑色阴影，无白色高光，干净的金属感
