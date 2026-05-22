@@ -62,7 +62,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   void initState() {
     super.initState();
     _pageController = PageController(
-      viewportFraction: 0.52,
+      viewportFraction: 0.72,
       initialPage: 0,
     );
     _loadCarData();
