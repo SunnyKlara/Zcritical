@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/car_model.dart';
+import '../services/engine_sound_service.dart';
 import 'logo_management_screen.dart';
 
 /// 🚗 车辆详情页 — 可缩放大图 + 竖列参数进度条 + Hero 动画 + 设为 Logo
@@ -21,6 +22,9 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   /// 控制进度条入场动画：页面进入后延迟触发
   bool _animateIn = false;
 
+  /// 引擎声音 Profile
+  EngineSoundProfile? _soundProfile;
+
   CarModel get car => widget.car;
 
   @override
@@ -30,6 +34,18 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _animateIn = true);
     });
+    // 加载引擎声音映射
+    _loadSoundProfile();
+  }
+
+  Future<void> _loadSoundProfile() async {
+    final service = EngineSoundService.instance;
+    await service.load();
+    if (mounted) {
+      setState(() {
+        _soundProfile = service.getProfileForCar(car.fullName);
+      });
+    }
   }
 
   /// 跳转到 Logo 管理页面，传入当前车辆图片
@@ -173,63 +189,7 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                       const SizedBox(height: 24),
 
                       // 音效状态
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF141414),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.05),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.music_note,
-                                color: Colors.white.withOpacity(0.3),
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Engine Sound',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Not assigned',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.3),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right,
-                              color: Colors.white.withOpacity(0.2),
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildEngineSoundCard(),
                       const SizedBox(height: 24),
 
                       // 设为 Logo 按钮（WiFi 上传）
@@ -507,6 +467,94 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
           },
         ),
       ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  引擎声音卡片 — 显示匹配的声音 Profile
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildEngineSoundCard() {
+    final hasSound = _soundProfile != null;
+    final profileName = _soundProfile?.displayName ?? 'Loading...';
+    final engineType = _soundProfile?.engineType ?? '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasSound
+              ? Colors.white.withOpacity(0.08)
+              : Colors.white.withOpacity(0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: hasSound
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              hasSound ? Icons.volume_up_rounded : Icons.music_note,
+              color: hasSound
+                  ? Colors.white.withOpacity(0.6)
+                  : Colors.white.withOpacity(0.3),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Engine Sound',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  profileName,
+                  style: TextStyle(
+                    color: hasSound
+                        ? Colors.white.withOpacity(0.5)
+                        : Colors.white.withOpacity(0.3),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (engineType.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                engineType,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

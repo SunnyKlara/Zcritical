@@ -110,6 +110,7 @@ flutter:
     - assets/bmp/
     - assets/car_thumbnails/car_index.json
     - assets/car_thumbnails/car_specs.json
+    - assets/car_thumbnails/engine_sound_map.json
     - assets/car_thumbnails/
 
   # An image asset can refer to one or more resolution-specific "variants", see
