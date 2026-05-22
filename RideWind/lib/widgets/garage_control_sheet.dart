@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +11,9 @@ import '../providers/bluetooth_provider.dart';
 /// 长按紧急停止按钮后弹出。
 /// 纯黑极简设计，沉浸式选车体验。
 /// 上方：赛车轮播（中间大+浮起，两边小+下沉）
-/// 下方：速度范围数字 + 音量点阵指示器
+/// 下方：引擎波形 + 速度/音量/风力 Slider
 ///
-/// 音量联动：触摸音量区域时硬件切到音量界面，松手后自动切回速度界面。
+/// 音量联动：触摸音量 Slider 时硬件切到音量界面，松手后自动切回速度界面。
 class GarageControlSheet extends StatefulWidget {
   final void Function(GarageSettings settings)? onSettingsApplied;
 
@@ -41,7 +42,8 @@ class GarageControlSheet extends StatefulWidget {
   State<GarageControlSheet> createState() => _GarageControlSheetState();
 }
 
-class _GarageControlSheetState extends State<GarageControlSheet> {
+class _GarageControlSheetState extends State<GarageControlSheet>
+    with TickerProviderStateMixin {
   // ═══════════════════════════════════════════════════════════════
   //  状态
   // ═══════════════════════════════════════════════════════════════
@@ -55,9 +57,17 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   // 参数
   int _maxSpeed = 340;
   int _volume = 70;
+  int _windPower = 0;
 
   // 音量调节中
   bool _isAdjustingVolume = false;
+
+  // 波形动画
+  late AnimationController _waveController;
+  bool _isPlaying = false;
+  final int _barCount = 10;
+  List<double> _barHeights = [];
+  final Random _random = Random();
 
   @override
   void initState() {
@@ -66,14 +76,54 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       viewportFraction: 0.72,
       initialPage: 0,
     );
+
+    // 波形动画控制器
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    )..addListener(_updateBars);
+
+    _barHeights = List.filled(_barCount, 0.15);
+
     _loadCarData();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _waveController.removeListener(_updateBars);
+    _waveController.dispose();
     if (_isAdjustingVolume) _onVolumeAdjustEnd();
     super.dispose();
+  }
+
+  void _updateBars() {
+    if (!_isPlaying) return;
+    setState(() {
+      _barHeights = List.generate(_barCount, (_) {
+        return 0.15 + _random.nextDouble() * 0.85;
+      });
+    });
+    // 循环触发
+    if (_isPlaying) {
+      Future.delayed(const Duration(milliseconds: 120), () {
+        if (mounted && _isPlaying) {
+          _waveController.forward(from: 0);
+        }
+      });
+    }
+  }
+
+  void _startWaveAnimation() {
+    setState(() => _isPlaying = true);
+    _waveController.forward(from: 0);
+  }
+
+  void _stopWaveAnimation() {
+    setState(() {
+      _isPlaying = false;
+      _barHeights = List.filled(_barCount, 0.15);
+    });
   }
 
   Future<void> _loadCarData() async {
@@ -114,19 +164,6 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     if (specs == null) return;
     final hp = specs.horsepower ?? 200;
 
-    int suggestedMaxSpeed;
-    if (hp < 150) {
-      suggestedMaxSpeed = 180;
-    } else if (hp < 300) {
-      suggestedMaxSpeed = 250;
-    } else if (hp < 500) {
-      suggestedMaxSpeed = 320;
-    } else if (hp < 700) {
-      suggestedMaxSpeed = 360;
-    } else {
-      suggestedMaxSpeed = 420;
-    }
-
     int suggestedVolume;
     if (hp < 150) {
       suggestedVolume = 45;
@@ -139,7 +176,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     }
 
     setState(() {
-      _maxSpeed = specs.topSpeedKmh ?? suggestedMaxSpeed;
+      _maxSpeed = specs.topSpeedKmh ?? 340;
       _volume = suggestedVolume;
     });
   }
@@ -169,6 +206,12 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     });
   }
 
+  void _onWindChanged(int value) {
+    setState(() => _windPower = value);
+    final bt = Provider.of<BluetoothProvider>(context, listen: false);
+    if (bt.isConnected) bt.sendCommand('FAN:$value');
+  }
+
   void _applySettings() {
     HapticFeedback.mediumImpact();
     final bt = Provider.of<BluetoothProvider>(context, listen: false);
@@ -182,6 +225,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       selectedCar: car,
       maxSpeed: _maxSpeed,
       volume: _volume,
+      windPower: _windPower,
     ));
     Navigator.of(context).pop();
   }
@@ -230,11 +274,6 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
                   // ═══ 参数面板 (2×2 进度条) ═══
                   if (_cars.isNotEmpty) _buildStatsGrid(),
 
-                  const SizedBox(height: 20),
-
-                  // ═══ 引擎信息 (展示用，带进度条动画) ═══
-                  if (_cars.isNotEmpty) _buildEngineInfo(),
-
                   const SizedBox(height: 24),
 
                   // ═══ 分隔线 ═══
@@ -246,15 +285,25 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
                   const SizedBox(height: 20),
 
-                  // ═══ 速度范围 ═══
-                  _buildSpeedDisplay(),
+                  // ═══ 引擎波形可视化 ═══
+                  if (_cars.isNotEmpty) _buildEngineWaveform(),
 
                   const SizedBox(height: 28),
 
-                  // ═══ 音量 ═══
-                  _buildVolumeControl(),
+                  // ═══ 速度范围 ═══
+                  _buildSpeedDisplay(),
 
                   const SizedBox(height: 24),
+
+                  // ═══ 音量 Slider ═══
+                  _buildVolumeSlider(),
+
+                  const SizedBox(height: 20),
+
+                  // ═══ 风力 Slider ═══
+                  _buildWindSlider(),
+
+                  const SizedBox(height: 28),
 
                   // ═══ 启动按钮 ═══
                   _buildActivateButton(),
@@ -271,7 +320,6 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
   // ═══════════════════════════════════════════════════════════════
   //  赛车轮播 — 文字在上，图片悬浮无边框
-  //  去掉卡片容器，图片直接浮在纯黑背景上，大小差异不再明显
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildCarCarousel() {
@@ -317,13 +365,11 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   /// 单个车辆项：上方文字 + 下方图片（精准缩放，尽可能大）
   Widget _buildCarItem(CarModel car, bool isSelected) {
     final specs = car.specs;
-    // 从 scale map 获取精准缩放系数
     final double imageScale = _scaleMap[car.filename] ?? 1.0;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 文字信息 — 在图片上方
         Text(
           car.brand.toUpperCase(),
           style: TextStyle(
@@ -355,8 +401,6 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
           ),
         ],
         const SizedBox(height: 6),
-
-        // 图片 — 精准缩放，每辆车视觉大小统一
         Expanded(
           child: Transform.scale(
             scale: imageScale,
@@ -457,86 +501,111 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  引擎信息 — 展示用，带进度条动画
+  //  引擎波形可视化 — 左侧引擎类型 + 右侧 equalizer 波形条
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildEngineInfo() {
+  Widget _buildEngineWaveform() {
     final car = _cars[_selectedCarIndex];
     final specs = car.specs;
     if (specs == null) return const SizedBox.shrink();
 
-    // 引擎类型文字
-    final engineText = [
-      specs.displacement,
-      specs.engine,
-      specs.aspiration,
-    ].where((s) => s != null && s.isNotEmpty).join(' · ');
-
-    // 排量转数值（用于进度条）
-    double displacementValue = 0;
-    if (specs.displacement != null) {
-      final match = RegExp(r'([\d.]+)').firstMatch(specs.displacement!);
-      if (match != null) displacementValue = double.tryParse(match.group(1)!) ?? 0;
+    // 构建引擎类型文字
+    final engineParts = <String>[];
+    if (specs.displacement != null && specs.displacement!.isNotEmpty) {
+      engineParts.add(specs.displacement!);
     }
+    if (specs.engine != null && specs.engine!.isNotEmpty) {
+      engineParts.add(specs.engine!);
+    }
+    if (specs.aspiration != null && specs.aspiration!.isNotEmpty) {
+      engineParts.add(specs.aspiration!);
+    }
+    final engineLabel = engineParts.isNotEmpty
+        ? engineParts.join(' ')
+        : 'Unknown Engine';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.settings, size: 12, color: Colors.white.withOpacity(0.25)),
-              const SizedBox(width: 6),
-              Text(
-                'ENGINE',
-                style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 2),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (_isPlaying) {
+            _stopWaveAnimation();
+          } else {
+            _startWaveAnimation();
+          }
+        },
+        child: Row(
+          children: [
+            // 左侧：引擎类型文字
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ENGINE',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.25),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    engineLabel,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // 引擎描述
-          Text(
-            engineText.isNotEmpty ? engineText : 'Unknown',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          // 排量进度条
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final double progress = (displacementValue / 8.0).clamp(0.0, 1.0);
-              final double barWidth = constraints.maxWidth * progress;
-              return Container(
-                height: 4,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(2)),
-                alignment: Alignment.centerLeft,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  width: barWidth,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.6), borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 16),
+            // 右侧：波形条
+            Expanded(
+              flex: 5,
+              child: SizedBox(
+                height: 32,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: List.generate(_barCount, (i) {
+                    final double height = _barHeights[i] * 32;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 100),
+                      curve: Curves.easeOut,
+                      width: 3,
+                      height: height.clamp(4.0, 32.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(
+                          _isPlaying ? 0.8 : 0.2,
+                        ),
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    );
+                  }),
                 ),
-              );
-            },
-          ),
-        ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  速度范围 — 大号数字居中显示
+  //  速度范围 — 大号数字 + Slider
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildSpeedDisplay() {
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        final delta = details.primaryDelta ?? 0;
-        setState(() {
-          _maxSpeed = (_maxSpeed + (delta * 0.8).round()).clamp(0, 999);
-        });
-      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
           Text(
@@ -573,12 +642,17 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            '← 左右滑动调整 →',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.1),
-              fontSize: 10,
+          const SizedBox(height: 12),
+          SliderTheme(
+            data: _sliderTheme(context),
+            child: Slider(
+              value: _maxSpeed.toDouble(),
+              min: 0,
+              max: 999,
+              onChanged: (v) {
+                HapticFeedback.selectionClick();
+                setState(() => _maxSpeed = v.round());
+              },
             ),
           ),
         ],
@@ -587,86 +661,95 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  音量 — 点阵指示器 + 触摸联动硬件
+  //  音量 — 标准 Slider + 硬件联动
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildVolumeControl() {
-    final int dots = 10;
-    final int filledDots = (_volume / 10).round().clamp(0, 10);
-
-    return GestureDetector(
-      onHorizontalDragStart: (_) => _onVolumeAdjustStart(),
-      onHorizontalDragUpdate: (details) {
-        final delta = details.primaryDelta ?? 0;
-        final newVol = (_volume + (delta * 0.3).round()).clamp(0, 100);
-        _onVolumeChanged(newVol);
-      },
-      onHorizontalDragEnd: (_) => _onVolumeAdjustEnd(),
-      onTapDown: (_) => _onVolumeAdjustStart(),
-      onTapUp: (_) => _onVolumeAdjustEnd(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '音量',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.2),
-                    fontSize: 11,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Text(
-                  '$_volume%',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 点阵
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(dots, (i) {
-                final isFilled = i < filledDots;
-                return Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isFilled
-                        ? Colors.white.withOpacity(0.8)
-                        : Colors.white.withOpacity(0.08),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 6),
-            if (_isAdjustingVolume)
+  Widget _buildVolumeSlider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                '硬件同步中',
+                'VOLUME',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withOpacity(0.25),
                   fontSize: 9,
-                ),
-              )
-            else
-              Text(
-                '← 左右滑动调节 →',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.08),
-                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 2,
                 ),
               ),
-          ],
-        ),
+              Text(
+                '$_volume%',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: _sliderTheme(context),
+            child: Slider(
+              value: _volume.toDouble(),
+              min: 0,
+              max: 100,
+              onChangeStart: (_) => _onVolumeAdjustStart(),
+              onChanged: (v) => _onVolumeChanged(v.round()),
+              onChangeEnd: (_) => _onVolumeAdjustEnd(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  风力 — Slider + FAN 命令
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildWindSlider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'WIND',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.25),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 2,
+                ),
+              ),
+              Text(
+                '$_windPower%',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: _sliderTheme(context),
+            child: Slider(
+              value: _windPower.toDouble(),
+              min: 0,
+              max: 100,
+              onChanged: (v) => _onWindChanged(v.round()),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -704,6 +787,22 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  Slider 统一主题 — 纯白轨道 + 白色圆形 thumb
+  // ═══════════════════════════════════════════════════════════════
+
+  SliderThemeData _sliderTheme(BuildContext context) {
+    return SliderThemeData(
+      trackHeight: 2,
+      activeTrackColor: Colors.white.withOpacity(0.8),
+      inactiveTrackColor: Colors.white.withOpacity(0.1),
+      thumbColor: Colors.white,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+      overlayColor: Colors.white.withOpacity(0.05),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+    );
+  }
 }
 
 /// 车库设置结果
@@ -711,10 +810,12 @@ class GarageSettings {
   final CarModel? selectedCar;
   final int maxSpeed;
   final int volume;
+  final int windPower;
 
   const GarageSettings({
     this.selectedCar,
     required this.maxSpeed,
     required this.volume,
+    this.windPower = 0,
   });
 }
