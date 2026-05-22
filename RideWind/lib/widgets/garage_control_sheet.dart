@@ -50,6 +50,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   bool _isLoading = true;
   int _selectedCarIndex = 0;
   late PageController _pageController;
+  Map<String, double> _scaleMap = {};
 
   // 参数
   int _maxSpeed = 340;
@@ -77,6 +78,13 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
   Future<void> _loadCarData() async {
     try {
+      // 加载 scale map
+      final scaleStr = await rootBundle.loadString(
+        'assets/car_thumbnails/car_scale_map.json',
+      );
+      final Map<String, dynamic> scaleJson = json.decode(scaleStr);
+      _scaleMap = scaleJson.map((k, v) => MapEntry(k, (v as num).toDouble()));
+
       final jsonStr = await rootBundle.loadString(
         'assets/car_thumbnails/car_specs.json',
       );
@@ -277,33 +285,16 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
     );
   }
 
-  /// 单个车辆项：固定尺寸图片区域 + 下方文字
+  /// 单个车辆项：上方文字 + 下方图片（精准缩放，尽可能大）
   Widget _buildCarItem(CarModel car, bool isSelected) {
     final specs = car.specs;
+    // 从 scale map 获取精准缩放系数
+    final double imageScale = _scaleMap[car.filename] ?? 1.0;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 图片 — 固定 140x90 区域，所有车统一视觉大小
-        SizedBox(
-          width: 180,
-          height: 110,
-          child: Image.asset(
-            car.assetPath,
-            fit: BoxFit.contain,
-            alignment: Alignment.center,
-            errorBuilder: (_, __, ___) => Center(
-              child: Icon(
-                Icons.directions_car_outlined,
-                color: Colors.white.withOpacity(0.04),
-                size: 40,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // 文字信息 — 在图片下方，固定位置
+        // 文字信息 — 在图片上方
         Text(
           car.brand.toUpperCase(),
           style: TextStyle(
@@ -334,6 +325,26 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
             ),
           ),
         ],
+        const SizedBox(height: 6),
+
+        // 图片 — 精准缩放，每辆车视觉大小统一
+        Expanded(
+          child: Transform.scale(
+            scale: imageScale,
+            child: Image.asset(
+              car.assetPath,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              errorBuilder: (_, __, ___) => Center(
+                child: Icon(
+                  Icons.directions_car_outlined,
+                  color: Colors.white.withOpacity(0.04),
+                  size: 40,
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
