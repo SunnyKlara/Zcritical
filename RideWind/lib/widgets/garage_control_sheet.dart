@@ -449,23 +449,29 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
           ],
         ),
         const SizedBox(height: 5),
-        // 进度条
-        Container(
-          height: 3,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(1.5),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progress,
-            child: Container(
+        // 进度条 — AnimatedContainer 实现平滑宽度增长/收缩
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double barWidth = constraints.maxWidth * progress;
+            return Container(
+              height: 3,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(1.5),
               ),
-            ),
-          ),
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                width: barWidth,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
