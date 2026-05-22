@@ -277,17 +277,15 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
                   const SizedBox(height: 16),
 
-                  const SizedBox(height: 20),
-
                   // ═══ 引擎波形（充当分隔线） ═══
                   if (_cars.isNotEmpty) _buildEngineWaveform(),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // ═══ 控制轮播 — 速度/音量/风力 中间大两边小循环滚动 ═══
                   _buildControlCarousel(),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // ═══ 启动按钮 ═══
                   _buildActivateButton(),
@@ -413,7 +411,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
   Widget _buildControlCarousel() {
     return SizedBox(
-      height: 155,
+      height: 140,
       child: PageView.builder(
         controller: _controlPageController,
         // 用大数模拟无限循环（3项）
@@ -507,7 +505,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           // 大数字
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -518,7 +516,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                 '$value',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 44,
+                  fontSize: 38,
                   fontWeight: FontWeight.w100,
                   letterSpacing: -2,
                 ),
@@ -528,13 +526,13 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                 unit,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.2),
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w400,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // Slider
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
