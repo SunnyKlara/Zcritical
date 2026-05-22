@@ -128,11 +128,18 @@ class _GarageControlSheetState extends State<GarageControlSheet>
         c.specs != null && c.specs!.horsepower != null
       ).toList();
 
-      carsWithSpecs.sort((a, b) =>
+      // 过滤非赛车车辆（拖车、卡车、越野车、工程车等）
+      const excludeKeywords = ['Flatbed', 'Truck', 'Van', 'Bus', 'Semi', 'Unimog', 'Tankpool'];
+      final racingCars = carsWithSpecs.where((c) {
+        final name = c.fullName;
+        return !excludeKeywords.any((kw) => name.contains(kw));
+      }).toList();
+
+      racingCars.sort((a, b) =>
         (b.specs!.horsepower ?? 0).compareTo(a.specs!.horsepower ?? 0));
 
       setState(() {
-        _cars = carsWithSpecs.take(50).toList();
+        _cars = racingCars.take(50).toList();
         _isLoading = false;
         if (_cars.isNotEmpty) _applyCarProfile(_cars[0]);
       });
@@ -146,21 +153,18 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     final specs = car.specs;
     if (specs == null) return;
     final hp = specs.horsepower ?? 200;
+    final torque = specs.torqueLbft ?? 200;
 
-    int suggestedVolume;
-    if (hp < 150) {
-      suggestedVolume = 45;
-    } else if (hp < 300) {
-      suggestedVolume = 60;
-    } else if (hp < 600) {
-      suggestedVolume = 75;
-    } else {
-      suggestedVolume = 85;
-    }
+    // 速度 = 极速值
+    // 音量 = 马力线性映射到 20-100（100hp→20%, 2000hp→100%）
+    // 风力 = 扭矩线性映射到 15-100（100lb·ft→15%, 1200lb·ft→100%）
+    final int suggestedVolume = ((hp - 100) / 1900.0 * 80 + 20).round().clamp(20, 100);
+    final int suggestedWind = ((torque - 100) / 1100.0 * 85 + 15).round().clamp(15, 100);
 
     setState(() {
       _maxSpeed = specs.topSpeedKmh ?? 340;
       _volume = suggestedVolume;
+      _windPower = suggestedWind;
     });
   }
 
