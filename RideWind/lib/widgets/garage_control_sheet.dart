@@ -146,21 +146,36 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     final specs = car.specs;
     if (specs == null) return;
     final hp = specs.horsepower ?? 200;
+    final torque = specs.torqueLbft ?? 200;
 
+    // 音量 ↔ 马力：马力越大，推荐音量越高
     int suggestedVolume;
     if (hp < 150) {
-      suggestedVolume = 45;
+      suggestedVolume = 40;
     } else if (hp < 300) {
-      suggestedVolume = 60;
+      suggestedVolume = 55;
     } else if (hp < 600) {
-      suggestedVolume = 75;
+      suggestedVolume = 72;
     } else {
       suggestedVolume = 85;
+    }
+
+    // 风力 ↔ 扭矩：扭矩越大，推荐风力越强
+    int suggestedWind;
+    if (torque < 200) {
+      suggestedWind = 25;
+    } else if (torque < 400) {
+      suggestedWind = 45;
+    } else if (torque < 700) {
+      suggestedWind = 65;
+    } else {
+      suggestedWind = 85;
     }
 
     setState(() {
       _maxSpeed = specs.topSpeedKmh ?? 340;
       _volume = suggestedVolume;
+      _windPower = suggestedWind;
     });
   }
 
@@ -387,7 +402,8 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  参数面板 — 2×2 网格 + 动画进度条
+  //  参数面板 — 三列联动进度条（与下方控制 Slider 对应）
+  //  速度 ↔ TOP SPEED | 音量 ↔ HP（马力） | 风力 ↔ TORQUE（扭矩）
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildStatsGrid() {
@@ -395,67 +411,96 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     final specs = car.specs;
     if (specs == null) return const SizedBox.shrink();
 
+    // 速度进度：当前 _maxSpeed 相对于车辆极速的比例
+    final int topSpeed = specs.topSpeedKmh ?? 300;
+    final double speedProgress = (_maxSpeed / topSpeed.toDouble()).clamp(0.0, 1.5);
+
+    // 音量进度：当前 _volume 映射到马力比例
+    final int hp = specs.horsepower ?? 200;
+    final double volumeProgress = (_volume / 100.0).clamp(0.0, 1.0);
+
+    // 风力进度：当前 _windPower 映射到扭矩比例
+    final int torque = specs.torqueLbft ?? 200;
+    final double windProgress = (_windPower / 100.0).clamp(0.0, 1.0);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(child: _buildStatBar(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"} hp')),
-              const SizedBox(width: 16),
-              Expanded(child: _buildStatBar(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"} lb·ft')),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: _buildStatBar(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"} km/h')),
-              const SizedBox(width: 16),
-              Expanded(child: _buildStatBar(
-                label: '0-100',
-                value: specs.acceleration0100 != null ? (14.0 - specs.acceleration0100!).clamp(0, 14).toInt() : 0,
-                maxValue: 12,
-                displayText: specs.acceleration0100 != null ? '${specs.acceleration0100}s' : '—',
-              )),
-            ],
-          ),
+          Expanded(child: _buildLinkedStatBar(
+            label: 'TOP SPEED',
+            displayText: '$topSpeed km/h',
+            progress: speedProgress,
+          )),
+          const SizedBox(width: 16),
+          Expanded(child: _buildLinkedStatBar(
+            label: 'HP',
+            displayText: '$hp hp',
+            progress: volumeProgress,
+          )),
+          const SizedBox(width: 16),
+          Expanded(child: _buildLinkedStatBar(
+            label: 'TORQUE',
+            displayText: '$torque lb·ft',
+            progress: windProgress,
+          )),
         ],
       ),
     );
   }
 
-  Widget _buildStatBar({
+  Widget _buildLinkedStatBar({
     required String label,
-    required int value,
-    required int maxValue,
     required String displayText,
+    required double progress,
   }) {
-    final double progress = (value / maxValue).clamp(0.0, 1.0);
+    // 超过 1.0 时用不同颜色提示"超出车辆参考值"
+    final bool isOver = progress > 1.0;
+    final double clampedProgress = progress.clamp(0.0, 1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 1.5)),
-            Text(displayText, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600)),
-          ],
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.3),
+            fontSize: 8,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          displayText,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         LayoutBuilder(
           builder: (context, constraints) {
-            final double barWidth = constraints.maxWidth * progress;
+            final double barWidth = constraints.maxWidth * clampedProgress;
             return Container(
-              height: 5,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(2.5)),
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(2),
+              ),
               alignment: Alignment.centerLeft,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 600),
+                duration: const Duration(milliseconds: 400),
                 curve: Curves.easeOutCubic,
                 width: barWidth,
-                height: 5,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(2.5)),
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isOver
+                      ? Colors.white.withOpacity(0.95)
+                      : Colors.white.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             );
           },
