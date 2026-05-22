@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/app_update_service.dart';
 
@@ -29,6 +30,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   String? _error;
 
   void _startDownload() {
+    // iOS: 提示用户去 App Store 更新
+    if (Platform.isIOS) {
+      // TODO(ios): 上架后添加 url_launcher 跳转 App Store
+      Navigator.of(context).pop();
+      return;
+    }
+
     setState(() {
       _downloading = true;
       _error = null;

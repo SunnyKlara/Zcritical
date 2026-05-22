@@ -47,19 +47,31 @@ class AudioStreamService {
 
   /// Scan WiFi networks using Android's native WiFi API.
   /// Returns list of {ssid: String, rssi: int, secure: bool}
+  /// On iOS, returns empty list (platform channel not available).
   static Future<List<Map<String, dynamic>>> scanWifi() async {
-    final result = await _channel.invokeMethod<List>('scanWifi');
-    if (result == null) return [];
-    return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    try {
+      final result = await _channel.invokeMethod<List>('scanWifi');
+      if (result == null) return [];
+      return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      // MissingPluginException on iOS — graceful fallback
+      return [];
+    }
   }
 
   /// Get the currently connected WiFi network info.
   /// Returns {ssid: String, frequency: int (MHz)} or null if not connected.
   /// frequency > 3000 means 5GHz band (ESP32 only supports 2.4GHz).
+  /// On iOS, returns null (platform channel not available).
   static Future<Map<String, dynamic>?> getConnectedWifi() async {
-    final result = await _channel.invokeMethod<Map>('getConnectedWifi');
-    if (result == null) return null;
-    return Map<String, dynamic>.from(result);
+    try {
+      final result = await _channel.invokeMethod<Map>('getConnectedWifi');
+      if (result == null) return null;
+      return Map<String, dynamic>.from(result);
+    } catch (e) {
+      // MissingPluginException on iOS — graceful fallback
+      return null;
+    }
   }
 
   // ╔══════════════════════════════════════════════════════════════╗
