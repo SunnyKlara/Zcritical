@@ -317,13 +317,13 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
         ],
         const SizedBox(height: 8),
 
-        // 图片 — contain 保持完整车身，不裁剪
+        // 图片 — fitWidth 让所有车宽度统一，高度自然适应
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Image.asset(
               car.assetPath,
-              fit: BoxFit.contain,
+              fit: BoxFit.fitWidth,
               alignment: Alignment.center,
               errorBuilder: (_, __, ___) => Center(
                 child: Icon(
