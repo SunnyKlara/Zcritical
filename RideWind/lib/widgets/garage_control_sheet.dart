@@ -628,7 +628,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  音量 — 标准 Slider + 硬件联动
+  //  音量 — 大数字 + Slider + 硬件联动
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildVolumeSlider() {
@@ -636,29 +636,41 @@ class _GarageControlSheetState extends State<GarageControlSheet>
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
+          Text(
+            '音量',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.2),
+              fontSize: 11,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                'VOLUME',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.25),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 2,
+                '$_volume',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w200,
+                  letterSpacing: -2,
                 ),
               ),
+              const SizedBox(width: 4),
               Text(
-                '$_volume%',
+                '%',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.25),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           SliderTheme(
             data: _sliderTheme(context),
             child: Slider(
@@ -676,7 +688,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  风力 — Slider + FAN 命令
+  //  风力 — 大数字 + Slider + FAN 命令
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildWindSlider() {
@@ -684,29 +696,41 @@ class _GarageControlSheetState extends State<GarageControlSheet>
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
+          Text(
+            '风力',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.2),
+              fontSize: 11,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                'WIND',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.25),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 2,
+                '$_windPower',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w200,
+                  letterSpacing: -2,
                 ),
               ),
+              const SizedBox(width: 4),
               Text(
-                '$_windPower%',
+                '%',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.25),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           SliderTheme(
             data: _sliderTheme(context),
             child: Slider(
