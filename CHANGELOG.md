@@ -4,6 +4,32 @@
 
 ---
 
+## [v1.2.0] - 2026-05-23
+
+车库控制面板 v2 + 动态极速系统 + 车模识别集成。
+
+### APP 新功能
+- 车库控制面板：风力 RangeSlider 双滑块（设定怠速/极速风力区间）
+- ACTIVATE 等待固件 OK 确认 + loading 动画
+- 车模识别入口（YOLOv5 + MobileNetV3，Android only，模型待训练）
+- 极速范围扩展到 0-999（用户可自定义任意极速）
+
+### 固件新功能
+- `SPEED_MAX:1-999` 命令 — 动态设置 LCD 极速上限
+- `FAN_RANGE:min,max` 命令 — 风力区间映射（速度联动）
+- NVS 持久化 — SPEED_MAX/FAN_RANGE/VOL 断电不丢失
+- 音量控制引擎音（`audio_player_set_master_volume` 同步）
+
+### Bug 修复
+- 修复普通模式误触发引擎音播放
+- 修复音量调节对油门引擎音无效
+- 修复 APP SPEED 命令强制映射到 0-340（现在直接发显示值）
+- 修复油门模式下 APP 滑动干扰硬件（现在忽略）
+- 禁用 APP 端 EngineAudioManager（音频全部由硬件处理）
+- 修复 YoloDetector.java TFLite GPU API 兼容问题
+
+---
+
 ## [v1.0.0] - 2026-05-21
 
 首个正式版本。ESP32-S3 固件从 STM32 F4 完全重写，Flutter APP 全功能适配。
