@@ -47,6 +47,8 @@ typedef enum {
     CMD_AUDIO_DELETE,   /* AUDIO_DELETE or AUDIO_DELETE:layer */
     CMD_GET_AUDIO,      /* GET:AUDIO — query custom audio status */
     CMD_OTA_VERSION,    /* OTA_VERSION — query firmware version */
+    CMD_SPEED_MAX,      /* SPEED_MAX:xxx — set max speed display value */
+    CMD_FAN_RANGE,      /* FAN_RANGE:min,max — set fan PWM range */
 } cmd_type_t;
 
 typedef struct {

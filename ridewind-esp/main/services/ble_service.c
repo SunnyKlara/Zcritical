@@ -21,6 +21,8 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/timers.h"
+#include "esp_timer.h"
 
 #include <string.h>
 
@@ -40,6 +42,11 @@ static uint16_t s_conn_id     = 0;
 static bool     s_connected   = false;
 static uint16_t s_char_handle = 0;
 static uint16_t s_svc_handle  = 0;
+
+/* ── Idle timeout — disconnect stale connections ── */
+#define BLE_IDLE_TIMEOUT_SEC  30   /* Disconnect after 30s of no data */
+static int64_t s_last_rx_time = 0; /* Last time data was received (esp_timer_get_time) */
+static TimerHandle_t s_idle_timer = NULL;
 
 /* ── MTU fragment reassembly buffer ── */
 #define RX_BUF_SIZE  512
@@ -239,6 +246,27 @@ static void process_rx_data(const uint8_t *data, uint16_t len)
 }
 
 /* ═══════════════════════════════════════════════════════════════
+ *  Idle timeout callback — kick stale BLE connections
+ * ═══════════════════════════════════════════════════════════════ */
+static void idle_timer_callback(TimerHandle_t xTimer)
+{
+    (void)xTimer;
+    if (!s_connected) return;
+
+    int64_t now = esp_timer_get_time();
+    int64_t elapsed_us = now - s_last_rx_time;
+    int64_t timeout_us = (int64_t)BLE_IDLE_TIMEOUT_SEC * 1000000LL;
+
+    if (elapsed_us >= timeout_us) {
+        ESP_LOGW(TAG, "BLE idle timeout (%ds no data) — disconnecting client",
+                 BLE_IDLE_TIMEOUT_SEC);
+        /* Close the connection from server side */
+        esp_ble_gatts_close(s_gatts_if, s_conn_id);
+        /* The DISCONNECT_EVT will fire and restart advertising */
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
  *  GAP event handler
  * ═══════════════════════════════════════════════════════════════ */
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
@@ -310,6 +338,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         s_conn_id   = param->connect.conn_id;
         s_connected = true;
         s_rx_len    = 0;  /* Reset reassembly buffer */
+        s_last_rx_time = esp_timer_get_time(); /* Reset idle timer on connect */
         ESP_LOGI(TAG, "Client connected, conn_id=%d (free heap: %u, largest block: %u)",
                  s_conn_id,
                  (unsigned)esp_get_free_heap_size(),
@@ -328,6 +357,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
     case ESP_GATTS_WRITE_EVT:
         if (param->write.handle == s_char_handle && param->write.len > 0) {
+            s_last_rx_time = esp_timer_get_time(); /* Reset idle timeout on data */
             process_rx_data(param->write.value, param->write.len);
         }
         /* Send write response manually (RSP_BY_APP mode) */
@@ -374,7 +404,14 @@ void ble_service_init(void)
     ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
     ESP_ERROR_CHECK(esp_ble_gatts_app_register(GATTS_APP_ID));
 
-    ESP_LOGI(TAG, "BLE GATTS initialized");
+    /* Create idle timeout timer — checks every 10s if connection is stale */
+    s_idle_timer = xTimerCreate("ble_idle", pdMS_TO_TICKS(10000), pdTRUE,
+                                NULL, idle_timer_callback);
+    if (s_idle_timer) {
+        xTimerStart(s_idle_timer, 0);
+    }
+
+    ESP_LOGI(TAG, "BLE GATTS initialized (idle timeout: %ds)", BLE_IDLE_TIMEOUT_SEC);
 }
 
 void ble_service_start(void)

@@ -28,6 +28,9 @@ typedef struct {
     int16_t  fan_speed;             /* 0-100 (Num) */
     int16_t  current_speed_kmh;     /* 0-340 */
     uint8_t  speed_unit;            /* 0=km/h, 1=mph */
+    uint16_t speed_max_display;     /* 极速上限 display value (default 340 km/h) */
+    uint8_t  fan_range_min;         /* 风力下限 0-100 (default 0) */
+    uint8_t  fan_range_max;         /* 风力上限 0-100 (default 100) */
 
     /* ── Humidifier / Throttle ── */
     uint8_t  wuhuaqi_state;         /* 0=off, 1=on, 2=throttle */
@@ -107,6 +110,9 @@ extern SemaphoreHandle_t g_app_state_mutex;
 
 /* Init with factory defaults */
 void app_state_init(void);
+
+/* Save user config (speed_max, fan_range, volume) to NVS flash */
+void app_state_save_config(void);
 
 /* Thread-safe lock/unlock */
 #define APP_STATE_LOCK()   xSemaphoreTake(g_app_state_mutex, portMAX_DELAY)

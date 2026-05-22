@@ -62,10 +62,14 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   // 参数
   int _maxSpeed = 340;
   int _volume = 70;
-  int _windPower = 0;
+  int _windMin = 0;    // 风力下限
+  int _windMax = 100;  // 风力上限
 
   // 音量调节中
   bool _isAdjustingVolume = false;
+
+  // ACTIVATE 应用中
+  bool _isApplying = false;
 
   // 波形动画
   late AnimationController _waveController;
@@ -180,7 +184,8 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     setState(() {
       _maxSpeed = specs.topSpeedKmh ?? 340;
       _volume = suggestedVolume;
-      _windPower = suggestedWind;
+      _windMin = suggestedWind;
+      _windMax = 100;
     });
   }
 
@@ -209,26 +214,64 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     });
   }
 
-  void _onWindChanged(int value) {
-    setState(() => _windPower = value);
-    final bt = Provider.of<BluetoothProvider>(context, listen: false);
-    if (bt.isConnected) bt.sendCommand('FAN:$value');
+  void _onWindRangeChanged(RangeValues values) {
+    setState(() {
+      _windMin = values.start.round();
+      _windMax = values.end.round();
+    });
+    // 风力只在 ACTIVATE 时发送，拖动仅更新 UI 预览
   }
 
-  void _applySettings() {
+  Future<void> _applySettings() async {
+    if (_isApplying) return; // 防止重复点击
+
     HapticFeedback.mediumImpact();
+    setState(() => _isApplying = true);
+
     final bt = Provider.of<BluetoothProvider>(context, listen: false);
     if (bt.isConnected) {
-      bt.setVolume(_volume);
+      // 发送并等待固件确认，每条等 OK 回复
+      final ok1 = await bt.sendCommandWithRetry(
+        'SPEED_MAX:$_maxSpeed',
+        expectedPrefix: 'OK:SPEED_MAX',
+        timeout: const Duration(seconds: 2),
+      );
+      final ok2 = await bt.sendCommandWithRetry(
+        'FAN_RANGE:$_windMin,$_windMax',
+        expectedPrefix: 'OK:FAN_RANGE',
+        timeout: const Duration(seconds: 2),
+      );
+      final ok3 = await bt.sendCommandWithRetry(
+        'VOL:$_volume',
+        expectedPrefix: 'OK:VOL',
+        timeout: const Duration(seconds: 2),
+      );
       bt.sendCommand('UI:1');
+
+      // 检查是否全部成功
+      if (ok1 == null || ok2 == null || ok3 == null) {
+        if (mounted) {
+          setState(() => _isApplying = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('部分设置未确认，请重试'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
     }
+
+    if (!mounted) return;
 
     final car = _cars.isNotEmpty ? _cars[_selectedCarIndex] : null;
     widget.onSettingsApplied?.call(GarageSettings(
       selectedCar: car,
       maxSpeed: _maxSpeed,
       volume: _volume,
-      windPower: _windPower,
+      windMin: _windMin,
+      windMax: _windMax,
     ));
     Navigator.of(context).pop();
   }
@@ -607,16 +650,53 @@ class _GarageControlSheetState extends State<GarageControlSheet>
             onChangeEnd: (_) => _onVolumeAdjustEnd(),
           ),
           const SizedBox(height: 20),
-          _buildControlSlider(
-            label: '风力',
-            value: _windPower.toDouble(),
-            displayText: '$_windPower%',
-            min: 0,
-            max: 100,
-            onChanged: (v) => _onWindChanged(v.round()),
-          ),
+          // 风力区间 RangeSlider
+          _buildWindRangeSlider(),
         ],
       ),
+    );
+  }
+
+  /// 风力区间双滑块
+  Widget _buildWindRangeSlider() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '风力区间',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+                letterSpacing: 1,
+              ),
+            ),
+            Text(
+              '$_windMin% — $_windMax%',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: _sliderTheme(context).copyWith(
+            rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 6),
+          ),
+          child: RangeSlider(
+            values: RangeValues(_windMin.toDouble(), _windMax.toDouble()),
+            min: 0,
+            max: 100,
+            divisions: 20,
+            onChanged: _onWindRangeChanged,
+          ),
+        ),
+      ],
     );
   }
 
@@ -680,27 +760,54 @@ class _GarageControlSheetState extends State<GarageControlSheet>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: GestureDetector(
-        onTap: _applySettings,
-        child: Container(
+        onTap: _isApplying ? null : _applySettings,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           height: 50,
           decoration: BoxDecoration(
-            color: Colors.transparent,
+            color: _isApplying ? Colors.white.withOpacity(0.05) : Colors.transparent,
             borderRadius: BorderRadius.circular(25),
             border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+              color: _isApplying
+                  ? Colors.greenAccent.withOpacity(0.4)
+                  : Colors.white.withOpacity(0.2),
               width: 1,
             ),
           ),
           alignment: Alignment.center,
-          child: Text(
-            'ACTIVATE',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 4,
-            ),
-          ),
+          child: _isApplying
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.greenAccent.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'APPLYING...',
+                      style: TextStyle(
+                        color: Colors.greenAccent.withOpacity(0.7),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  'ACTIVATE',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 4,
+                  ),
+                ),
         ),
       ),
     );
@@ -728,13 +835,15 @@ class GarageSettings {
   final CarModel? selectedCar;
   final int maxSpeed;
   final int volume;
-  final int windPower;
+  final int windMin;
+  final int windMax;
 
   const GarageSettings({
     this.selectedCar,
     required this.maxSpeed,
     required this.volume,
-    this.windPower = 0,
+    this.windMin = 0,
+    this.windMax = 100,
   });
 }
 
