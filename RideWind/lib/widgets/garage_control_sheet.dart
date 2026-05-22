@@ -30,7 +30,7 @@ class GarageControlSheet extends StatefulWidget {
       isDismissible: true,
       enableDrag: true,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       builder: (context) => GarageControlSheet(
         onSettingsApplied: onSettingsApplied,
