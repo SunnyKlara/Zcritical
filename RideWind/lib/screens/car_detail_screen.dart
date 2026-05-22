@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/car_model.dart';
 import 'logo_management_screen.dart';
 
-/// 🚗 车辆详情页 — 可缩放大图 + 丰富信息 + Hero 动画 + 设为 Logo
+/// 🚗 车辆详情页 — 可缩放大图 + 竖列参数进度条 + Hero 动画 + 设为 Logo
 class CarDetailScreen extends StatefulWidget {
   final CarModel car;
 
@@ -18,7 +18,19 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   double _uploadProgress = 0.0;
   String? _uploadStatus;
 
+  /// 控制进度条入场动画：页面进入后延迟触发
+  bool _animateIn = false;
+
   CarModel get car => widget.car;
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟触发动画，让进度条从 0 增长到目标值
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _animateIn = true);
+    });
+  }
 
   /// 跳转到 Logo 管理页面，传入当前车辆图片
   Future<void> _setAsLogo() async {
@@ -138,32 +150,19 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                           height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
 
-                      // 性能数据网格（有数据时显示）
+                      // 竖列参数进度条区域
                       if (specs != null && specs.horsepower != null) ...[
-                        _buildSpecsGrid(specs),
+                        _buildStatsColumn(specs),
                         const SizedBox(height: 20),
                       ],
 
-                      // 标签行
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (specs?.engine != null)
-                            _buildChip('${specs!.displacement ?? ''} ${specs.engine!}'.trim(), Icons.settings),
-                          if (specs?.aspiration != null)
-                            _buildChip(specs!.aspiration!, Icons.air),
-                          if (specs?.drivetrain != null)
-                            _buildChip(specs!.drivetrain!, Icons.swap_horiz),
-                          if (specs?.gears != null)
-                            _buildChip(specs!.gears!, Icons.speed),
-                          if (specs?.layout != null)
-                            _buildChip(specs!.layout!, Icons.architecture),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
+                      // 引擎信息行
+                      if (specs != null) ...[
+                        _buildEngineInfoRow(specs),
+                        const SizedBox(height: 24),
+                      ],
 
                       // 分隔线
                       Container(
@@ -367,82 +366,188 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     );
   }
 
-  /// 性能数据网格 — 2x2 布局展示核心参数
-  Widget _buildSpecsGrid(CarSpecs specs) {
+  // ═══════════════════════════════════════════════════════════════
+  //  竖列参数进度条 — 每行：标签(左) + 进度条(中) + 数值(右)
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildStatsColumn(CarSpecs specs) {
+    // 解析档位数为整数
+    int gearsValue = 0;
+    if (specs.gears != null) {
+      final match = RegExp(r'(\d+)').firstMatch(specs.gears!);
+      if (match != null) gearsValue = int.tryParse(match.group(1)!) ?? 0;
+    }
+
+    // 0-100 加速：越小越好，反转进度条（14s为最慢基准）
+    final accelValue = specs.acceleration0100 != null
+        ? (14.0 - specs.acceleration0100!).clamp(0.0, 14.0)
+        : 0.0;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(child: _buildSpecItem(
-                '${specs.horsepower ?? "—"}',
-                'HP',
-                Icons.bolt,
-              )),
-              Container(width: 1, height: 44, color: Colors.white.withOpacity(0.05)),
-              Expanded(child: _buildSpecItem(
-                '${specs.torqueLbft ?? "—"}',
-                'LB·FT',
-                Icons.rotate_right,
-              )),
-            ],
+          _buildStatBar(
+            label: 'HORSEPOWER',
+            value: (specs.horsepower ?? 0).toDouble(),
+            maxValue: 2000,
+            displayText: '${specs.horsepower ?? "—"} hp',
           ),
-          Container(height: 1, color: Colors.white.withOpacity(0.05)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _buildSpecItem(
-                specs.weightKg != null ? '${specs.weightKg}' : '—',
-                'KG',
-                Icons.fitness_center,
-              )),
-              Container(width: 1, height: 44, color: Colors.white.withOpacity(0.05)),
-              Expanded(child: _buildSpecItem(
-                specs.drivetrain ?? '—',
-                'DRIVE',
-                Icons.swap_horiz,
-              )),
-            ],
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: 'TORQUE',
+            value: (specs.torqueLbft ?? 0).toDouble(),
+            maxValue: 1500,
+            displayText: '${specs.torqueLbft ?? "—"} lb·ft',
+          ),
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: 'TOP SPEED',
+            value: (specs.topSpeedKmh ?? 0).toDouble(),
+            maxValue: 450,
+            displayText: '${specs.topSpeedKmh ?? "—"} km/h',
+          ),
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: '0-100 KM/H',
+            value: accelValue,
+            maxValue: 14,
+            displayText: specs.acceleration0100 != null
+                ? '${specs.acceleration0100!.toStringAsFixed(1)} s'
+                : '— s',
+          ),
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: 'DISPLACEMENT',
+            value: _parseDisplacement(specs.displacement),
+            maxValue: 8.0,
+            displayText: specs.displacement ?? '—',
+          ),
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: 'WEIGHT',
+            value: (specs.weightKg ?? 0).toDouble(),
+            maxValue: 3000,
+            displayText: specs.weightKg != null ? '${specs.weightKg} kg' : '—',
+          ),
+          const SizedBox(height: 14),
+          _buildStatBar(
+            label: 'GEARS',
+            value: gearsValue.toDouble(),
+            maxValue: 10,
+            displayText: specs.gears ?? '—',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSpecItem(String value, String label, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: Colors.white.withOpacity(0.3)),
-              const SizedBox(width: 6),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+  /// 单行参数进度条：标签(左) + 进度条(中) + 数值(右)
+  /// 设计风格与 GarageControlSheet._buildStatBar 一致
+  Widget _buildStatBar({
+    required String label,
+    required double value,
+    required double maxValue,
+    required String displayText,
+  }) {
+    final double progress = _animateIn ? (value / maxValue).clamp(0.0, 1.0) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1.5,
+              ),
+            ),
+            Text(
+              displayText,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double barWidth = constraints.maxWidth * progress;
+            return Container(
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                width: barWidth,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
-            ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  引擎信息行 — 排量 + 引擎类型 + 进气方式
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildEngineInfoRow(CarSpecs specs) {
+    final parts = <String>[
+      if (specs.displacement != null && specs.displacement!.isNotEmpty) specs.displacement!,
+      if (specs.engine != null && specs.engine!.isNotEmpty) specs.engine!,
+      if (specs.aspiration != null && specs.aspiration!.isNotEmpty) specs.aspiration!,
+    ];
+
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.settings,
+            size: 14,
+            color: Colors.white.withOpacity(0.3),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.3),
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ],
@@ -450,30 +555,12 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     );
   }
 
-  Widget _buildChip(String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.white.withOpacity(0.4)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
+  /// 解析排量字符串为数值（升）
+  double _parseDisplacement(String? displacement) {
+    if (displacement == null) return 0;
+    final match = RegExp(r'([\d.]+)').firstMatch(displacement);
+    if (match != null) return double.tryParse(match.group(1)!) ?? 0;
+    return 0;
   }
 
   /// 品牌→国旗映射
