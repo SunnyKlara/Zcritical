@@ -66,12 +66,37 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
       );
       final data = json.decode(jsonStr) as Map<String, dynamic>;
       final stories = data['stories'] as Map<String, dynamic>?;
-      if (stories != null && mounted) {
-        // 尝试用 full_name 匹配
-        final story = stories[car.fullName] ?? stories['${car.brand} ${car.model}'];
-        if (story != null) {
-          setState(() => _carStory = story as Map<String, dynamic>);
+      if (stories == null || !mounted) return;
+
+      // 精确匹配
+      var story = stories[car.fullName];
+
+      // 模糊匹配：full_name 包含 story key，或 story key 包含 full_name
+      if (story == null) {
+        final carName = car.fullName.toLowerCase();
+        for (final entry in stories.entries) {
+          final key = entry.key.toLowerCase();
+          if (carName.contains(key) || key.contains(carName)) {
+            story = entry.value;
+            break;
+          }
         }
+      }
+
+      // 品牌+型号匹配
+      if (story == null) {
+        final brandModel = '${car.brand} ${car.model}'.toLowerCase();
+        for (final entry in stories.entries) {
+          final key = entry.key.toLowerCase();
+          if (brandModel.contains(key) || key.contains(brandModel)) {
+            story = entry.value;
+            break;
+          }
+        }
+      }
+
+      if (story != null && mounted) {
+        setState(() => _carStory = story as Map<String, dynamic>);
       }
     } catch (_) {
       // 静默失败
