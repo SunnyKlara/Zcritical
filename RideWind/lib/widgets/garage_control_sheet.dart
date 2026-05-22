@@ -132,6 +132,13 @@ class _GarageControlSheetState extends State<GarageControlSheet>
       const excludeKeywords = ['Flatbed', 'Truck', 'Van', 'Bus', 'Semi', 'Unimog', 'Tankpool'];
       final racingCars = carsWithSpecs.where((c) {
         final name = c.fullName;
+        final specs = c.specs!;
+        // 必须四个关键参数都有数据
+        if (specs.horsepower == null || specs.torqueLbft == null ||
+            specs.topSpeedKmh == null || specs.acceleration0100 == null) {
+          return false;
+        }
+        // 排除非赛车
         return !excludeKeywords.any((kw) => name.contains(kw));
       }).toList();
 
