@@ -68,12 +68,16 @@ static void draw_speed_screen(void)
     uint8_t unit = g_app_state.speed_unit;
     int16_t display_spd;
 
+    /* Dynamic scale: use speed_max_display instead of hardcoded 3.4 */
+    float scale = g_app_state.speed_max_display / 100.0f;
     if (unit == 0) {
-        display_spd = (int16_t)(spd_kmh * 3.4f + 0.5f);
-        if (display_spd > 340) display_spd = 340;
+        display_spd = (int16_t)(spd_kmh * scale + 0.5f);
+        if (display_spd > (int16_t)g_app_state.speed_max_display)
+            display_spd = (int16_t)g_app_state.speed_max_display;
     } else {
-        display_spd = (int16_t)(spd_kmh * 3.4f * 0.621371f + 0.5f);
-        if (display_spd > 211) display_spd = 211;
+        display_spd = (int16_t)(spd_kmh * scale * 0.621371f + 0.5f);
+        int16_t mph_max = (int16_t)(g_app_state.speed_max_display * 0.621371f + 0.5f);
+        if (display_spd > mph_max) display_spd = mph_max;
     }
 
     uint8_t wuhuaqi = g_app_state.wuhuaqi_state;
@@ -202,9 +206,10 @@ static void throttle_process(void)
             if (fan > 100) fan = 100;
             g_app_state.fan_speed = fan;
             drv_pwm_set_duty(fan);
-            /* Start engine sound on first acceleration (speed 0→1) */
-            if (g_app_state.current_speed_kmh == 1 && !audio_player_is_playing()) {
+            /* Start engine sound on first acceleration (speed 0→1), only if volume > 0 */
+            if (g_app_state.current_speed_kmh == 1 && !audio_player_is_playing() && g_app_state.volume > 0) {
                 audio_player_start_engine();
+                audio_player_set_master_volume(g_app_state.volume);
             }
             audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
         }
@@ -335,8 +340,14 @@ void ui_speed_update(void)
             g_app_state.current_speed_kmh += evt.delta;
             if (g_app_state.current_speed_kmh < 0) g_app_state.current_speed_kmh = 0;
             if (g_app_state.current_speed_kmh > 100) g_app_state.current_speed_kmh = 100;
-            g_app_state.fan_speed = (uint8_t)g_app_state.current_speed_kmh;
-            drv_pwm_set_duty(g_app_state.fan_speed);
+            /* Fan uses range mapping: min + (max - min) * speed / 100 */
+            {
+                uint8_t spd = (uint8_t)g_app_state.current_speed_kmh;
+                uint8_t fan = g_app_state.fan_range_min +
+                    (uint8_t)((uint16_t)(g_app_state.fan_range_max - g_app_state.fan_range_min) * spd / 100);
+                g_app_state.fan_speed = fan;
+                drv_pwm_set_duty(fan);
+            }
 
             /* Normal mode: no engine sound — WiFi audio plays uninterrupted.
              * Engine sound is only used in throttle mode. */
@@ -364,9 +375,11 @@ void ui_speed_update(void)
             /* Do NOT force speed to 10 or start engine sound here.
              * Speed stays at 0 (silent) until user presses to accelerate.
              * Engine sound will start in throttle_process() when speed > 0. */
-            if (g_app_state.current_speed_kmh > 0) {
+            /* Start engine sound only if volume > 0 and speed > 0 */
+            if (g_app_state.current_speed_kmh > 0 && g_app_state.volume > 0) {
                 if (!audio_player_is_playing()) {
                     audio_player_start_engine();
+                    audio_player_set_master_volume(g_app_state.volume);
                 }
                 audio_player_set_target_rpm((uint8_t)g_app_state.current_speed_kmh);
             }

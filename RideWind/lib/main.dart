@@ -6,7 +6,7 @@ import 'screens/splash_screen.dart';
 import 'screens/no_device_screen.dart';
 import 'providers/bluetooth_provider.dart';
 import 'core/service_locator.dart';
-import 'services/engine_audio_manager.dart';
+// import 'services/engine_audio_manager.dart';  // 已禁用
 import 'services/first_launch_manager.dart';
 import 'widgets/app_update_dialog.dart';
 
@@ -35,12 +35,12 @@ void main() async {
       ),
     );
     
-    // 🚗 初始化引擎音效管理器（添加错误处理，防止Release模式崩溃）
-    try {
-      await EngineAudioManager().initialize();
-    } catch (e) {
-      debugPrint('⚠️ 引擎音效初始化失败（非致命）: $e');
-    }
+    // 🚗 引擎音效管理器 — 已禁用（音频由硬件端处理）
+    // try {
+    //   await EngineAudioManager().initialize();
+    // } catch (e) {
+    //   debugPrint('⚠️ 引擎音效初始化失败（非致命）: $e');
+    // }
     
     // 🔧 初始化依赖注入
     setupServiceLocator();

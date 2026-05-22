@@ -1,0 +1,148 @@
+name: Multi-Platform Build
+
+on:
+  push:
+    branches: [main]
+    paths: ['RideWind/**']
+    tags: ['app-v*']
+  pull_request:
+    branches: [main]
+    paths: ['RideWind/**']
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: 'Build Android APK'
+        type: boolean
+        default: true
+      build_ios:
+        description: 'Build iOS IPA'
+        type: boolean
+        default: true
+
+env:
+  FLUTTER_VERSION: '3.x'
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  #  代码质量检查（所有平台共享）
+  # ═══════════════════════════════════════════════════════════════
+  analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: RideWind
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+        working-directory: RideWind
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Android APK 构建
+  # ═══════════════════════════════════════════════════════════════
+  build-android:
+    name: Build Android APK
+    needs: analyze
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_android }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: RideWind
+      - name: Build APK
+        run: flutter build apk --release
+        working-directory: RideWind
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: RideWind/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════
+  #  iOS IPA 构建
+  # ═══════════════════════════════════════════════════════════════
+  build-ios:
+    name: Build iOS
+    needs: analyze
+    runs-on: macos-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_ios }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: RideWind
+      - name: Install CocoaPods
+        run: |
+          cd RideWind/ios
+          pod install --repo-update
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+        working-directory: RideWind
+      # 签名构建（需要配置 secrets）
+      # - name: Build IPA (signed)
+      #   run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+      #   working-directory: RideWind
+      #   env:
+      #     APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #     APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #     APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+      # - name: Upload IPA artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ios-ipa
+      #     path: RideWind/build/ios/ipa/*.ipa
+      #     retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Release 自动分发（tag 触发）
+  # ═══════════════════════════════════════════════════════════════
+  release:
+    name: Create Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/app-v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./artifacts/
+      # - name: Download iOS IPA
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: ios-ipa
+      #     path: ./artifacts/
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/app-v}" >> $GITHUB_OUTPUT
+      - name: Rename APK
+        run: mv ./artifacts/app-release.apk ./artifacts/ridewind-v${{ steps.version.outputs.VERSION }}.apk
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "APP v${{ steps.version.outputs.VERSION }}"
+          files: |
+            ./artifacts/ridewind-v${{ steps.version.outputs.VERSION }}.apk
+          generate_release_notes: true

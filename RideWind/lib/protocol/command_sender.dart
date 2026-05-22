@@ -32,7 +32,7 @@ class CommandSender {
   /// GET:FAN\n
   Future<bool> getFanSpeed() => _send('GET:FAN');
 
-  /// SPEED:value\n (0-340)
+  /// SPEED:value\n (0-999, display value matching speed_max_display)
   Future<bool> setRunningSpeed(int speed) => _send('SPEED:$speed');
 
   /// UNIT:x\n (0=km/h, 1=mph)

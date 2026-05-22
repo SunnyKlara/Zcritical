@@ -6,7 +6,7 @@ import '../models/device_model.dart';
 import '../models/logo_slot_status.dart';
 import '../models/speed_report.dart';
 import '../services/ble_service.dart';
-import '../services/engine_audio_manager.dart';
+// import '../services/engine_audio_manager.dart';  // 已禁用
 import '../protocol/command_sender.dart';
 import '../protocol/response_router.dart';
 
@@ -91,6 +91,7 @@ class BluetoothProvider with ChangeNotifier {
   bool get isConnected => _bleService.isConnected;
   Stream<bool> get connectionStream => _bleService.connectionStream;
   int? get effectiveMtu => _bleService.isConnected ? _bleService.effectiveMtu : null;
+  String? get lastConnectionError => _bleService.lastConnectionError;
   int? get currentSpeed => _currentSpeed;
   bool get wuhuaqiStatus => _wuhuaqiStatus;
   bool get streamlightStatus => _streamlightStatus;
@@ -308,7 +309,7 @@ class BluetoothProvider with ChangeNotifier {
 
       device.isConnected = true;
       _connectedDevice = device;
-      EngineAudioManager().bindBluetoothProvider(this);
+      // EngineAudioManager().bindBluetoothProvider(this);  // 已禁用 — 音频由硬件端处理
       notifyListeners();
       return true;
     } catch (e) {
@@ -328,6 +329,11 @@ class BluetoothProvider with ChangeNotifier {
         debugPrint('断开连接失败: $e');
       }
     }
+  }
+
+  /// 重置 BLE 底层重连状态（用于 App 从后台恢复时清除卡住的重连计时器）
+  void resetBleReconnectState() {
+    _bleService.resetReconnectState();
   }
 
   Future<void> checkBluetoothState() async {
