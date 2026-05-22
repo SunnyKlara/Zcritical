@@ -294,7 +294,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
           // ═══ 控制轮播 — 速度/音量/风力 中间大两边小 ═══
           _buildControlRow(),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 48),
 
           // ═══ 启动按钮 ═══
           _buildActivateButton(),
