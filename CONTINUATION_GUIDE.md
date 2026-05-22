@@ -47,6 +47,7 @@ Commit 规范：`类型: 中文描述`（feat/fix/refactor/docs/chore/perf/test/
 - **车库 Logo WiFi 上传验证通过** — Python 脚本测试成功：115KB / 3.0s / 29 ACKs / LOGO_OK:0。CRC=0 跳过应用层校验（WiFi TCP 已保证完整性）。ESP32 日志确认 `Logo slot 0 written OK`。APP 端待实测。
 - **APP 自动更新完成** — 检测弹窗通过 + APK 下载链接改为阿里云轻量服务器（`http://47.107.143.4/releases/`，200Mbps 带宽，国内直连）。服务器 nginx 已配置，APK 已上传验证（HTTP 200）。
 - **死代码清理完成** — 删除 4 文件 ~600 行：`image_preprocessing_service.dart` + `image_compression_service.dart` + `transmission_benchmark.dart` + `test/image_preprocessing_test.dart`。`logo_transmission_manager.dart`(1373行) 不再被 Logo 页面使用，仅被测试文件引用，后续可删。
+- **iOS 上架准备完成** — Info.plist 权限补全（Location/LocalNetwork/后台BLE）、音频投射 iOS 隐藏、WiFi 配网 iOS 手动输入 SSID、更新服务 iOS App Store 跳转、Deployment Target 14.0。第二轮修复：`app_update_service.dart` 防 APK 崩溃、`app_update_dialog.dart` 平台检查、`audio_stream_service.dart` try/catch 防 MissingPluginException。多平台规则写入 `.kiro/steering/platform-rules.md`。详见 `RideWind/docs/IOS_RELEASE_CHECKLIST.md`。
 
 ## 最近修复（2026-05-21）
 

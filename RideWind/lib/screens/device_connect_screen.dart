@@ -5,6 +5,7 @@
 /// 通过 BluetoothProvider 与 ESP32 通信。
 
 import 'dart:async'; // 用于 StreamSubscription
+import 'dart:io'; // 用于 Platform 检测
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 用于震动反馈
 import 'package:provider/provider.dart'; // Provider 状态管理
@@ -818,7 +819,8 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
             });
           },
         ),
-        // 音频投射选项
+        // 音频投射选项 — 仅 Android（iOS 不支持系统音频捕获）
+        if (Platform.isAndroid)
         PopupMenuItem(
           child: const Row(
             children: [
@@ -1624,8 +1626,10 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
   int? _frequency;
   bool _loading = true;
   bool _connecting = false;
+  bool _manualSsidInput = false; // iOS: 手动输入 SSID
   String? _statusMessage;
   final _passwordController = TextEditingController();
+  final _ssidController = TextEditingController(); // iOS: SSID 输入框
   bool _showPassword = false;
   StreamSubscription? _ipSub;
   StreamSubscription? _errSub;
@@ -1663,11 +1667,22 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
     _ipSub?.cancel();
     _errSub?.cancel();
     _passwordController.dispose();
+    _ssidController.dispose();
     super.dispose();
   }
 
   Future<void> _loadCurrentWifi() async {
     try {
+      // iOS 上 getConnectedWifi 使用 Android 平台通道，会抛出 MissingPluginException
+      // 此时允许用户手动输入 SSID
+      if (Platform.isIOS) {
+        setState(() {
+          _ssid = null;
+          _loading = false;
+          _manualSsidInput = true;
+        });
+        return;
+      }
       final info = await AudioStreamService.getConnectedWifi();
       if (!mounted) return;
       if (info != null) {
@@ -1687,13 +1702,21 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _statusMessage = '⚠️ 无法获取 WiFi 信息: $e';
+        // iOS 或其他平台通道不可用时，允许手动输入
+        _manualSsidInput = true;
       });
     }
   }
 
   void _doConnect() {
-    if (_ssid == null || _ssid!.isEmpty) return;
+    // iOS 手动输入模式：从 _ssidController 获取 SSID
+    if (_manualSsidInput) {
+      _ssid = _ssidController.text.trim();
+    }
+    if (_ssid == null || _ssid!.isEmpty) {
+      setState(() => _statusMessage = '⚠️ 请输入 WiFi 名称');
+      return;
+    }
     final password = _passwordController.text;
     if (password.isEmpty) {
       setState(() => _statusMessage = '⚠️ 请输入密码');
@@ -1771,8 +1794,65 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
                       const SizedBox(height: 16),
                     ],
 
-                    // SSID display (read-only)
-                    if (_ssid != null && _ssid!.isNotEmpty) ...[
+                    // SSID display (read-only) 或手动输入 (iOS)
+                    if (_manualSsidInput) ...[
+                      Text(
+                        '请输入 WiFi 名称（仅支持 2.4GHz）',
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _ssidController,
+                        enabled: !_connecting,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'WiFi 名称 (SSID)',
+                          labelStyle: TextStyle(color: Colors.white54),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white24),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.blue),
+                          ),
+                          disabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white12),
+                          ),
+                          prefixIcon: Icon(Icons.wifi, color: Colors.blue, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Password input for manual mode
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: !_showPassword,
+                        enabled: !_connecting,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'WiFi 密码',
+                          labelStyle: const TextStyle(color: Colors.white54),
+                          enabledBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white24),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.blue),
+                          ),
+                          disabledBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white12),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showPassword ? Icons.visibility : Icons.visibility_off,
+                              color: Colors.white54,
+                            ),
+                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        onSubmitted: (_) {
+                          if (!_connecting) _doConnect();
+                        },
+                      ),
+                    ] else if (_ssid != null && _ssid!.isNotEmpty) ...[
                       Text(
                         '将设备连接到',
                         style: TextStyle(color: Colors.white60, fontSize: 13),
@@ -1923,7 +2003,7 @@ class _WifiProvisioningDialogState extends State<_WifiProvisioningDialog> {
             ),
           ),
         ),
-        if (_ssid != null && _ssid!.isNotEmpty && !_connecting && !(_statusMessage?.startsWith('✅') ?? false))
+        if ((_manualSsidInput || (_ssid != null && _ssid!.isNotEmpty)) && !_connecting && !(_statusMessage?.startsWith('✅') ?? false))
           ElevatedButton(
             onPressed: _is5GHz ? null : _doConnect,
             style: ElevatedButton.styleFrom(

@@ -53,6 +53,7 @@ inclusion: auto
 | 引擎音效架构 | `.kiro/steering/knowledge/engine-sound-design.md` |
 | 参考项目为何不能照搬 | `.kiro/steering/knowledge/why-reference-failed.md` |
 | Git 工作流规范 | `.kiro/steering/guides/git-workflow.md` |
+| 跨平台协作（Win+Mac） | `.kiro/steering/guides/cross-platform-workflow.md` |
 | 构建/测试命令 | `.kiro/steering/guides/build-and-test.md` |
 | AI 行为规范（含协作模式） | `.kiro/steering/guides/ai-behavior.md` |
 | 发布流程 | `.kiro/steering/guides/release-workflow.md` |

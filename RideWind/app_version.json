@@ -3,6 +3,7 @@
   "latest_build": 2,
   "min_version": "1.0.0",
   "download_url": "http://47.107.143.4/releases/ridewind-v1.1.0.apk",
+  "ios_app_store_url": "",
   "release_notes": "WiFi 主通道升级\n- WiFi 配网（自动识别 SSID + 5GHz 检测）\n- WiFi OTA 固件升级（3MB/77s，比 BLE 快 4 倍）\n- WiFi Logo 上传（115KB/3s 秒传）\n- 车库页面 → Logo 联动",
   "force_update": false,
   "version": "1.1.0",
