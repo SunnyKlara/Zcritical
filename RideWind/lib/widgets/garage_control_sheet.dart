@@ -413,7 +413,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
 
   Widget _buildControlCarousel() {
     return SizedBox(
-      height: 170,
+      height: 155,
       child: PageView.builder(
         controller: _controlPageController,
         // 用大数模拟无限循环（3项）
@@ -507,7 +507,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           // 大数字
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -518,7 +518,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                 '$value',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 52,
+                  fontSize: 44,
                   fontWeight: FontWeight.w100,
                   letterSpacing: -2,
                 ),
@@ -528,13 +528,13 @@ class _GarageControlSheetState extends State<GarageControlSheet>
                 unit,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.2),
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w400,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           // Slider
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -543,7 +543,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
               child: _buildSliderForIndex(controlIndex),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           // 对应车辆参数 + 进度条
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
