@@ -65,9 +65,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   // 波形动画
   late AnimationController _waveController;
   bool _isPlaying = false;
-  final int _barCount = 10;
-  List<double> _barHeights = [];
-  final Random _random = Random();
+  double _wavePhase = 0;
 
   @override
   void initState() {
@@ -77,13 +75,15 @@ class _GarageControlSheetState extends State<GarageControlSheet>
       initialPage: 0,
     );
 
-    // 波形动画控制器
+    // 正弦波相位动画控制器 — 持续循环
     _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150),
-    )..addListener(_updateBars);
-
-    _barHeights = List.filled(_barCount, 0.15);
+      duration: const Duration(seconds: 2),
+    )..addListener(() {
+      setState(() {
+        _wavePhase = _waveController.value * 2 * pi;
+      });
+    });
 
     _loadCarData();
   }
@@ -91,38 +91,21 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   @override
   void dispose() {
     _pageController.dispose();
-    _waveController.removeListener(_updateBars);
     _waveController.dispose();
     if (_isAdjustingVolume) _onVolumeAdjustEnd();
     super.dispose();
   }
 
-  void _updateBars() {
-    if (!_isPlaying) return;
-    setState(() {
-      _barHeights = List.generate(_barCount, (_) {
-        return 0.15 + _random.nextDouble() * 0.85;
-      });
-    });
-    // 循环触发
-    if (_isPlaying) {
-      Future.delayed(const Duration(milliseconds: 120), () {
-        if (mounted && _isPlaying) {
-          _waveController.forward(from: 0);
-        }
-      });
-    }
-  }
-
   void _startWaveAnimation() {
     setState(() => _isPlaying = true);
-    _waveController.forward(from: 0);
+    _waveController.repeat();
   }
 
   void _stopWaveAnimation() {
+    _waveController.stop();
     setState(() {
       _isPlaying = false;
-      _barHeights = List.filled(_barCount, 0.15);
+      _wavePhase = 0;
     });
   }
 
@@ -501,7 +484,7 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  引擎波形可视化 — 左侧引擎类型 + 右侧 equalizer 波形条
+  //  引擎波形可视化 — 左侧播放按钮 + 引擎类型，右侧正弦波 CustomPaint
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildEngineWaveform() {
@@ -537,59 +520,43 @@ class _GarageControlSheetState extends State<GarageControlSheet>
         },
         child: Row(
           children: [
-            // 左侧：引擎类型文字
+            // 左侧：播放三角 + 引擎类型
+            Icon(
+              _isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white.withOpacity(0.6),
+              size: 20,
+            ),
+            const SizedBox(width: 10),
             Expanded(
-              flex: 4,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ENGINE',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.25),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    engineLabel,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              flex: 3,
+              child: Text(
+                engineLabel,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 16),
-            // 右侧：波形条
+            const SizedBox(width: 12),
+            // 右侧：正弦波动画
             Expanded(
               flex: 5,
               child: SizedBox(
-                height: 32,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: List.generate(_barCount, (i) {
-                    final double height = _barHeights[i] * 32;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 100),
-                      curve: Curves.easeOut,
-                      width: 3,
-                      height: height.clamp(4.0, 32.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(
-                          _isPlaying ? 0.8 : 0.2,
-                        ),
-                        borderRadius: BorderRadius.circular(1.5),
+                height: 28,
+                child: AnimatedBuilder(
+                  animation: _waveController,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: const Size(double.infinity, 28),
+                      painter: _SineWavePainter(
+                        phase: _wavePhase,
+                        isPlaying: _isPlaying,
                       ),
                     );
-                  }),
+                  },
                 ),
               ),
             ),
@@ -818,4 +785,63 @@ class GarageSettings {
     required this.volume,
     this.windPower = 0,
   });
+}
+
+/// 正弦波绘制器 — 连绵起伏的荡漾效果
+class _SineWavePainter extends CustomPainter {
+  final double phase;
+  final bool isPlaying;
+
+  _SineWavePainter({required this.phase, required this.isPlaying});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(isPlaying ? 0.7 : 0.15)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    final double midY = size.height / 2;
+    final double amplitude = isPlaying ? size.height * 0.35 : 0;
+    final double frequency = 2.5; // 波浪数量
+
+    path.moveTo(0, midY);
+
+    for (double x = 0; x <= size.width; x += 1) {
+      final double normalizedX = x / size.width;
+      final double y = midY +
+          amplitude * sin(normalizedX * frequency * 2 * pi + phase);
+      path.lineTo(x, y);
+    }
+
+    canvas.drawPath(path, paint);
+
+    // 播放时加一条更淡的副波（叠加丰富感）
+    if (isPlaying) {
+      final paint2 = Paint()
+        ..color = Colors.white.withOpacity(0.25)
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+
+      final path2 = Path();
+      path2.moveTo(0, midY);
+
+      for (double x = 0; x <= size.width; x += 1) {
+        final double normalizedX = x / size.width;
+        final double y = midY +
+            amplitude * 0.5 * sin(normalizedX * frequency * 3.2 * pi + phase * 1.7);
+        path2.lineTo(x, y);
+      }
+
+      canvas.drawPath(path2, paint2);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SineWavePainter oldDelegate) {
+    return oldDelegate.phase != phase || oldDelegate.isPlaying != isPlaying;
+  }
 }
