@@ -232,7 +232,7 @@ class NoDeviceScreen extends StatelessWidget {
               ),
             ),
 
-            // 设置入口（替代"用户头像"心智模型，使用 Icons.tune）
+            // 设置入口（保留点击区域，不渲染图标，使用背景图上的头像）
             Positioned(
               top: backButtonTop,
               right: userButtonRight,
@@ -248,12 +248,7 @@ class NoDeviceScreen extends StatelessWidget {
                 child: Container(
                   width: buttonSize,
                   height: buttonSize,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.tune,
-                    color: Colors.white.withAlpha((255 * 0.85).round()),
-                    size: ResponsiveUtils.isSmallScreen(context) ? 24 : 26,
-                  ),
+                  color: Colors.transparent,
                 ),
               ),
             ),

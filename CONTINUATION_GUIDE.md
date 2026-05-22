@@ -36,6 +36,7 @@ Mac 端环境已就绪，即将执行首次 iOS 克隆+编译+真机运行。
 | ✅ 已完成 | 多平台抽象体系建立（PlatformCapabilities + ChannelRegistry + CI/CD） | 2026-05-22 |
 | ✅ 已完成 | 跨平台协作规范落地（Mac=纯构建机，`cross-platform-workflow.md` 最终版） | 2026-05-22 |
 | ⏳ 进行中 | Mac 首次 iOS 克隆+编译+真机运行 | 2026-05-22 |
+| ⏳ 待处理 | 背景图左上角 "RideWind T1" 文字需替换为 "T1"（等后续换图时一并处理） | 2026-05-23 |
 | 🔲 暂搁 | car_brand_recognition 插件 GPU Delegate 编译失败（已从 pubspec 禁用，待 TFLite 版本修复） | 2026-05-23 |
 
 ## 下一步
@@ -54,6 +55,7 @@ Mac 端环境已就绪，即将执行首次 iOS 克隆+编译+真机运行。
 ESP32-S3 固件：✅ idf.py build 通过（2026-05-21，v1.1.1，bin 3.04MB，余量 3%）
 Flutter APP：  ✅ flutter analyze 通过（2026-05-23，无 error，仅 pre-existing warnings）
 协议测试：    ✅ flutter test test/protocol/ — 51/51 通过
+App 图标：    ✅ flutter_launcher_icons 生成完成（2026-05-23，新 Z 字 logo，全平台）
 ```
 
 ## 本次新增：BLE 连接稳定性 + 雾化器指示器修复 (2026-05-23)
@@ -204,7 +206,7 @@ Flutter APP：  ✅ flutter analyze 通过（2026-05-23，无 error，仅 pre-ex
 - 硬件端 SPEED_RANGE 命令（让 LCD 数字范围同步）
 - 硬件端引擎声联动：ESP32 LittleFS 烧录 + SOUND 协议命令 + audio_engine 改造
 - 车辆故事集：第一批 20 辆已写入 car_stories.json + UI 已接入 CarDetailScreen，剩余 895 辆后续补充（低优先级）
-- **P0 引擎声独立录音获取**：YouTube 路线已跑通，yt-dlp+ffmpeg 已安装，批量脚本 `fetch_engine_sounds_yt.py` 正在后台运行（~700辆，预计1-2小时），输出到 `assets/sound/engine_individual/`，有断点续传。完成后需接入 CarDetailScreen 替换通用 profile 预览。
+- **P0 引擎声独立录音获取**：✅ 已完成。715/729 辆车有独立 YouTube 引擎声（299MB WAV），17辆特殊车用通用 profile 兜底。CarDetailScreen 播放逻辑已改好（优先独立→fallback通用）。WAV 文件未入 git（太大），发布时需 LFS 或单独处理。
 - 弹窗下半部分：自定义速度范围 + 硬件联调设计
 
 ## 本次新增：多平台开发体系（2026-05-22）
