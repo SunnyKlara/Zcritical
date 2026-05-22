@@ -88,7 +88,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
   // ========== 🏃 Running Mode 专用状态 ==========
   int _currentSpeed = 0;
-  final int _maxSpeed = 340;
+  int _maxSpeed = 340; // 🚗 可由车库联动动态更新（车辆极速值）
   DateTime _lastCommandTime = DateTime.now();
 
   // ========== 🎨 Colorize Mode 专用状态 ==========
@@ -1488,7 +1488,11 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
 
           if (shouldSend) {
             _lastCommandTime = now;
-            await btProvider.setRunningSpeed(speed);
+            // 🚗 反向映射：显示值 → 硬件步数 (0-340)
+            final int hardwareStep = _maxSpeed == 340
+                ? speed
+                : (speed * 340 / _maxSpeed).round().clamp(0, 340);
+            await btProvider.setRunningSpeed(hardwareStep);
           }
         },
         onUnitChanged: (isMetric) async {
@@ -1520,6 +1524,13 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
           await btProvider.setFanSpeed(0);
         },
         onSpeedControlVisibilityChanged: null, // 🔑 不需要这个回调了
+        onGarageSettingsApplied: (settings) {
+          // 🚗 车库联动：更新速度范围为车辆极速值
+          debugPrint('🚗 DeviceConnectScreen 收到车库设置: maxSpeed=${settings.maxSpeed}');
+          setState(() {
+            _maxSpeed = settings.maxSpeed;
+          });
+        },
           );
         },
       );
