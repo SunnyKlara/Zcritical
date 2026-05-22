@@ -184,8 +184,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen> {
         // 💾 恢复用户偏好设置（会重建 _colorPageController）
         debugPrint('🚀 [3c] 准备调用 _restoreUserPreferences');
         _restoreUserPreferences();
-        // 🔄 检查 App 更新（异步，不阻塞）
-        UpdateService.showUpdateDialogIfNeeded(context);
+        // 🔄 App 更新检查已移到 main.dart（避免重复弹窗）
         debugPrint('🚀 [3/5] PostFrameCallback 执行完成');
     });
 
