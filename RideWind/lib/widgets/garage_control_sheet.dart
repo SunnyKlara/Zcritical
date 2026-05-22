@@ -221,6 +221,11 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
 
           const SizedBox(height: 28),
 
+          // ═══ 参数面板 (2×2 进度条) ═══
+          if (_cars.isNotEmpty) _buildStatsGrid(),
+
+          const SizedBox(height: 20),
+
           // ═══ 速度范围 ═══
           _buildSpeedDisplay(),
 
@@ -341,6 +346,123 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
                   color: Colors.white.withOpacity(0.04),
                   size: 40,
                 ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  参数面板 — 2×2 网格 + 动画进度条
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildStatsGrid() {
+    final car = _cars[_selectedCarIndex];
+    final specs = car.specs;
+    if (specs == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // 第一行: 马力 + 扭矩
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(
+                label: 'HP',
+                value: specs.horsepower ?? 0,
+                maxValue: 2000,
+                displayText: '${specs.horsepower ?? "—"}',
+              )),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(
+                label: 'TORQUE',
+                value: specs.torqueLbft ?? 0,
+                maxValue: 1200,
+                displayText: '${specs.torqueLbft ?? "—"} lb·ft',
+              )),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 第二行: 极速 + 百公里加速
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(
+                label: 'TOP SPEED',
+                value: specs.topSpeedKmh ?? 0,
+                maxValue: 450,
+                displayText: '${specs.topSpeedKmh ?? "—"} km/h',
+              )),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(
+                label: '0-100',
+                // 加速时间越短越好，所以进度条反转
+                value: specs.acceleration0100 != null
+                    ? (14.0 - specs.acceleration0100!).clamp(0, 14).toInt()
+                    : 0,
+                maxValue: 12,
+                displayText: specs.acceleration0100 != null
+                    ? '${specs.acceleration0100}s'
+                    : '—',
+              )),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 单个参数条：标签 + 数值 + 动画进度条
+  Widget _buildStatBar({
+    required String label,
+    required int value,
+    required int maxValue,
+    required String displayText,
+  }) {
+    final double progress = (value / maxValue).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.3),
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1.5,
+              ),
+            ),
+            Text(
+              displayText,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        // 进度条
+        Container(
+          height: 3,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(1.5),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: progress,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(1.5),
               ),
             ),
           ),
