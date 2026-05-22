@@ -138,6 +138,11 @@ class _GarageControlSheetState extends State<GarageControlSheet>
             specs.topSpeedKmh == null || specs.acceleration0100 == null) {
           return false;
         }
+        // 必须有引擎信息
+        if ((specs.engine == null || specs.engine!.isEmpty) &&
+            (specs.displacement == null || specs.displacement!.isEmpty)) {
+          return false;
+        }
         // 排除非赛车
         return !excludeKeywords.any((kw) => name.contains(kw));
       }).toList();
