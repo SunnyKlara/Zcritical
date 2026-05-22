@@ -355,7 +355,7 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  参数面板 — 4行竖列 Stat Meter 设计
+  //  参数面板 — 2×2 网格 + 动画进度条
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildStatsGrid() {
@@ -367,25 +367,32 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          _buildStatRow(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"}'),
-          const SizedBox(height: 12),
-          _buildStatRow(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"}'),
-          const SizedBox(height: 12),
-          _buildStatRow(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"}'),
-          const SizedBox(height: 12),
-          _buildStatRow(
-            label: '0-100',
-            value: specs.acceleration0100 != null ? (14.0 - specs.acceleration0100!).clamp(0, 14).toInt() : 0,
-            maxValue: 12,
-            displayText: specs.acceleration0100 != null ? '${specs.acceleration0100}s' : '—',
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(label: 'HP', value: specs.horsepower ?? 0, maxValue: 2000, displayText: '${specs.horsepower ?? "—"}')),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(label: 'TORQUE', value: specs.torqueLbft ?? 0, maxValue: 1200, displayText: '${specs.torqueLbft ?? "—"}')),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildStatBar(label: 'TOP SPEED', value: specs.topSpeedKmh ?? 0, maxValue: 450, displayText: '${specs.topSpeedKmh ?? "—"}')),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatBar(
+                label: '0-100',
+                value: specs.acceleration0100 != null ? (14.0 - specs.acceleration0100!).clamp(0, 14).toInt() : 0,
+                maxValue: 12,
+                displayText: specs.acceleration0100 != null ? '${specs.acceleration0100}s' : '—',
+              )),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// 单行参数：标签(左) + 进度条(中间填充) + 数值(右)
-  Widget _buildStatRow({
+  Widget _buildStatBar({
     required String label,
     required int value,
     required int maxValue,
@@ -393,35 +400,33 @@ class _GarageControlSheetState extends State<GarageControlSheet> {
   }) {
     final double progress = (value / maxValue).clamp(0.0, 1.0);
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 72,
-          child: Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 1)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 9, fontWeight: FontWeight.w500, letterSpacing: 1.5)),
+            Text(displayText, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
         ),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final double barWidth = constraints.maxWidth * progress;
-              return Container(
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double barWidth = constraints.maxWidth * progress;
+            return Container(
+              height: 5,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(2.5)),
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                width: barWidth,
                 height: 5,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(2.5)),
-                alignment: Alignment.centerLeft,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  width: barWidth,
-                  height: 5,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.45), borderRadius: BorderRadius.circular(2.5)),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 50,
-          child: Text(displayText, textAlign: TextAlign.right, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(2.5)),
+              ),
+            );
+          },
         ),
       ],
     );
