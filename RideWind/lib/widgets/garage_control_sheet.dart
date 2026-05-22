@@ -673,15 +673,24 @@ class _GarageControlSheetState extends State<GarageControlSheet>
             },
           ),
           const SizedBox(height: 2),
-          // 大数字
+          // 大数字 — 参考 RunningMode 风格
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text('${value.round()}', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w100, letterSpacing: -1)),
+              Text(
+                '${value.round()}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  height: 1.0,
+                ),
+              ),
               const SizedBox(width: 3),
-              Text(unit, style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 10)),
+              Text(unit, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
             ],
           ),
         ],
