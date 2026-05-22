@@ -72,18 +72,11 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   bool _isPlaying = false;
   double _wavePhase = 0;
 
-  // 控制轮播
-  late PageController _controlPageController;
-
   @override
   void initState() {
     super.initState();
     _pageController = PageController(
       viewportFraction: 0.72,
-      initialPage: 0,
-    );
-    _controlPageController = PageController(
-      viewportFraction: 0.55,
       initialPage: 0,
     );
 
@@ -103,7 +96,6 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   @override
   void dispose() {
     _pageController.dispose();
-    _controlPageController.dispose();
     _waveController.dispose();
     if (_isAdjustingVolume) _onVolumeAdjustEnd();
     super.dispose();
@@ -583,133 +575,100 @@ class _GarageControlSheetState extends State<GarageControlSheet>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  控制轮播 — 速度/音量/风力 中间大两边小，3项循环滚动
-  //  Slider 用 TweenAnimationBuilder 实现切换车辆时的伸缩动画
+  //  控制面板 — 速度/音量/风力 竖列排列，参考 _buildStatBar 风格
+  //  每项：标签(左)+数字(右) 一行，下面全宽 Slider（带动画）
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildControlRow() {
-    return SizedBox(
-      height: 120,
-      child: PageView.builder(
-        controller: _controlPageController,
-        itemCount: 300,
-        onPageChanged: (_) => HapticFeedback.selectionClick(),
-        itemBuilder: (context, index) {
-          final int realIndex = index % 3;
-          return AnimatedBuilder(
-            animation: _controlPageController,
-            builder: (context, child) {
-              double page = 0;
-              if (_controlPageController.hasClients &&
-                  _controlPageController.position.haveDimensions) {
-                page = _controlPageController.page ?? 0;
-              }
-              final double diff = (index - page);
-              final double absDiff = diff.abs().clamp(0.0, 2.0);
-              final double scale = 1.0 - absDiff * 0.25;
-              final double opacity = (1.0 - absDiff * 0.5).clamp(0.2, 1.0);
-
-              return Transform.scale(
-                scale: scale,
-                child: Opacity(
-                  opacity: opacity,
-                  child: _buildControlCard(realIndex),
-                ),
-              );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          _buildControlSlider(
+            label: '速度',
+            value: _maxSpeed.toDouble(),
+            displayText: '$_maxSpeed km/h',
+            min: 0,
+            max: 999,
+            onChanged: (v) {
+              HapticFeedback.selectionClick();
+              setState(() => _maxSpeed = v.round());
             },
-          );
-        },
+          ),
+          const SizedBox(height: 20),
+          _buildControlSlider(
+            label: '音量',
+            value: _volume.toDouble(),
+            displayText: '$_volume%',
+            min: 0,
+            max: 100,
+            onChangeStart: (_) => _onVolumeAdjustStart(),
+            onChanged: (v) => _onVolumeChanged(v.round()),
+            onChangeEnd: (_) => _onVolumeAdjustEnd(),
+          ),
+          const SizedBox(height: 20),
+          _buildControlSlider(
+            label: '风力',
+            value: _windPower.toDouble(),
+            displayText: '$_windPower%',
+            min: 0,
+            max: 100,
+            onChanged: (v) => _onWindChanged(v.round()),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildControlCard(int index) {
-    late String label;
-    late double value;
-    late double min;
-    late double max;
-    late String unit;
-    late ValueChanged<double> onChanged;
-    late VoidCallback? onStart;
-    late VoidCallback? onEnd;
-
-    switch (index) {
-      case 0:
-        label = '速度';
-        value = _maxSpeed.toDouble();
-        min = 0; max = 999;
-        unit = 'km/h';
-        onChanged = (v) { HapticFeedback.selectionClick(); setState(() => _maxSpeed = v.round()); };
-        onStart = null; onEnd = null;
-        break;
-      case 1:
-        label = '音量';
-        value = _volume.toDouble();
-        min = 0; max = 100;
-        unit = '%';
-        onChanged = (v) => _onVolumeChanged(v.round());
-        onStart = _onVolumeAdjustStart; onEnd = _onVolumeAdjustEnd;
-        break;
-      case 2:
-        label = '风力';
-        value = _windPower.toDouble();
-        min = 0; max = 100;
-        unit = '%';
-        onChanged = (v) => _onWindChanged(v.round());
-        onStart = null; onEnd = null;
-        break;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 标签
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 9, letterSpacing: 2)),
-          const SizedBox(height: 6),
-          // Slider with animation
-          TweenAnimationBuilder<double>(
-            tween: Tween(end: value),
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOutCubic,
-            builder: (context, animatedValue, _) {
-              return SliderTheme(
-                data: _sliderTheme(context),
-                child: Slider(
-                  value: animatedValue.clamp(min, max),
-                  min: min,
-                  max: max,
-                  onChangeStart: onStart != null ? (_) => onStart!() : null,
-                  onChanged: onChanged,
-                  onChangeEnd: onEnd != null ? (_) => onEnd!() : null,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 2),
-          // 大数字 — 参考 RunningMode 风格
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '${value.round()}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  height: 1.0,
-                ),
+  Widget _buildControlSlider({
+    required String label,
+    required double value,
+    required String displayText,
+    required double min,
+    required double max,
+    required ValueChanged<double> onChanged,
+    ValueChanged<double>? onChangeStart,
+    ValueChanged<double>? onChangeEnd,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(
+              color: Colors.white.withOpacity(0.35),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.5,
+            )),
+            Text(displayText, style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            )),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: value),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedValue, _) {
+            return SliderTheme(
+              data: _sliderTheme(context),
+              child: Slider(
+                value: animatedValue.clamp(min, max),
+                min: min,
+                max: max,
+                onChangeStart: onChangeStart,
+                onChanged: onChanged,
+                onChangeEnd: onChangeEnd,
               ),
-              const SizedBox(width: 3),
-              Text(unit, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
-            ],
-          ),
-        ],
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 
