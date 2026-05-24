@@ -13,7 +13,7 @@
  * ═══════════════════════════════════════════════════════════════ */
 
 /* ── Version & Compatibility ── */
-#define PROTOCOL_VERSION        3       /* Increment on breaking protocol changes */
+#define PROTOCOL_VERSION        1       /* Increment on breaking protocol changes */
 #define HW_MODEL                "T1"    /* Hardware model identifier */
 #define MIN_APP_VERSION         "1.2.0" /* Minimum compatible APP version */
 
@@ -108,9 +108,6 @@
 
 /* Message queue */
 #define CMD_QUEUE_DEPTH             32
-
-/* Protocol version (increment on breaking changes) */
-#define PROTOCOL_VERSION            1
 
 /* Speed */
 #define SPEED_MAX_KMH               340

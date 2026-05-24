@@ -7,6 +7,7 @@ import '../models/logo_slot_status.dart';
 import '../models/speed_report.dart';
 import '../services/ble_service.dart';
 import '../services/firmware_compatibility.dart';
+import '../services/device_capabilities.dart';
 // import '../services/engine_audio_manager.dart';  // 已禁用
 import '../protocol/command_sender.dart';
 import '../protocol/response_router.dart';
@@ -80,6 +81,7 @@ class BluetoothProvider with ChangeNotifier {
   // 固件兼容性
   FirmwareInfo? _firmwareInfo;
   CompatibilityResult? _compatibilityResult;
+  DeviceCapabilities _capabilities = DeviceCapabilities.disconnected;
 
   // ── 转发流（从 ResponseRouter 转发到 UI 层）──
   // 这些流保持与旧版完全相同的公开接口
@@ -108,6 +110,7 @@ class BluetoothProvider with ChangeNotifier {
   bool get isWifiProvisioning => _isWifiProvisioning;
   FirmwareInfo? get firmwareInfo => _firmwareInfo;
   CompatibilityResult? get compatibilityResult => _compatibilityResult;
+  DeviceCapabilities get capabilities => _capabilities;
 
   // ── 事件流（直接暴露 ResponseRouter 的流）──
   Stream<int> get knobDeltaStream => _router.knobDeltaStream;
@@ -331,6 +334,9 @@ class BluetoothProvider with ChangeNotifier {
         await _bleService.disconnect();
         _connectedDevice!.isConnected = false;
         _connectedDevice = null;
+        _capabilities = DeviceCapabilities.disconnected;
+        _firmwareInfo = null;
+        _compatibilityResult = null;
         notifyListeners();
       } catch (e) {
         debugPrint('断开连接失败: $e');
@@ -679,17 +685,21 @@ class BluetoothProvider with ChangeNotifier {
       if (response != null) {
         _firmwareInfo = FirmwareInfo.parse(response);
         _compatibilityResult = FirmwareCompatibility.check(_firmwareInfo);
+        _capabilities = DeviceCapabilities.fromFirmwareInfo(_firmwareInfo);
         debugPrint('🔗 固件版本协商: $_firmwareInfo → ${_compatibilityResult!.status.name}');
+        debugPrint('🔗 设备能力: $_capabilities');
       } else {
         // 旧固件不支持 GET:VERSION
         _firmwareInfo = null;
         _compatibilityResult = FirmwareCompatibility.check(null);
+        _capabilities = DeviceCapabilities.forProtocol(null);
         debugPrint('🔗 固件不支持版本协商（旧固件），按兼容模式运行');
       }
     } catch (e) {
       debugPrint('⚠️ 版本协商异常: $e');
       _firmwareInfo = null;
       _compatibilityResult = FirmwareCompatibility.check(null);
+      _capabilities = DeviceCapabilities.forProtocol(null);
     }
   }
 

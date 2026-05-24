@@ -2,5 +2,8 @@
   "version": "1.1.1",
   "size": 3037152,
   "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.1.1/zcritical-fw-v1.1.1.bin",
-  "changelog": "固件 v1.1.1 维护更新\n- 新增产测自检功能（开机时长按编码器进入）\n- 隐藏跑步机菜单，恢复音量调节菜单\n- 修复音量软件增益未生效的问题\n- 默认 LED 颜色设为白色，默认静音\n- 修复存储默认值不同步的问题"
+  "changelog": "固件 v1.1.1 维护更新\n- 新增产测自检功能（开机时长按编码器进入）\n- 隐藏跑步机菜单，恢复音量调节菜单\n- 修复音量软件增益未生效的问题\n- 默认 LED 颜色设为白色，默认静音\n- 修复存储默认值不同步的问题",
+  "protocol_version": 1,
+  "hw_model": "T1",
+  "min_app_version": "1.0.0"
 }

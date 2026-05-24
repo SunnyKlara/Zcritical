@@ -79,6 +79,12 @@
 - 编译状态：✅ `.\build.ps1` 通过（2026-05-24，0 error，bin 3.04MB，余量 3%）
 - 修复脚本：`ridewind-esp/tools/fix_v8.py`
 
+**APP 修复：重连自动切 UI 问题**：
+- `colorize_controller.dart`: `reapplyCurrentSelection` 加 `skipUISwitch` 参数
+- 重连时传 `skipUISwitch: true`，跳过 `setHardwareUI(2)` 调用
+- 只重发颜色数据（PRESET/LED），不切换硬件界面
+- 编译状态：✅ `dart analyze` 通过（0 error，4 pre-existing warning）
+
 ## Kiro 管理体系优化 (2026-05-24)
 
 - `architecture-boundary-guard.kiro.hook`: `preToolUse` → `postToolUse`（v2）。解决每次写入都触发检查导致大文件写入极慢的问题。防护逻辑不变，只是从阻塞式改为事后检查。
@@ -202,6 +208,33 @@ FW → APP:  VERSION:1.1.1:3:T1\r\n
 - 旧固件向后兼容（超时=兼容模式）
 
 **编译状态**：Flutter ✅ 0 error | ESP32 ⚠️ 待 `idf.py build` 验证（本机无 ESP-IDF 环境）| 协议测试 51/51 ✅
+
+## 本次新增：Phase 1 兼容性加固 — DeviceCapabilities (2026-05-24)
+
+**改动文件**：
+- `ridewind-esp/main/config/board_config.h` — 修复 PROTOCOL_VERSION 重复定义（删除第114行的重复，保留顶部=1）
+- `RideWind/lib/services/device_capabilities.dart` — **新建**，能力矩阵类（17 个功能开关，按 proto 版本映射）
+- `RideWind/lib/providers/bluetooth_provider.dart` — 集成 capabilities（连接后生成，断开时重置，暴露 getter）
+- `firmware.json` — 新增 `protocol_version`、`hw_model`、`min_app_version` 字段
+- `.kiro/steering/specs/compatibility-matrix.md` — **新建**，兼容性矩阵文档
+- `.kiro/reference/strategy/release-infrastructure-roadmap.md` — **新建**，发布基础设施演进路线图
+
+**核心设计**：
+- `DeviceCapabilities.forProtocol(proto)` — 按协议版本返回功能开关集合
+- proto=null（旧固件）→ 基础功能可用（风扇/LED/雾化器）
+- proto=1 → 全部当前功能
+- proto=2+ → 预留车库/Colorize v2 等
+- UI 层通过 `provider.capabilities.hasXxx` 判断是否显示功能入口
+
+**PROTOCOL_VERSION bug 修复**：
+- 原来 board_config.h 有两处定义（第17行=3，第114行=1），C 预处理器取最后一个=1
+- 删除重复，统一为顶部唯一定义=1（当前实际协议版本）
+
+**编译状态**：Flutter ✅ 0 error（getDiagnostics 验证）| ESP32 ⚠️ 待 `idf.py build` 验证
+
+**下一步**：
+- UI 层按 capabilities 动态显示/隐藏功能入口（settings_screen / device_connect_screen）
+- 实机验证 GET:VERSION 响应格式正确（proto=1）
 
 ## 下一步
 

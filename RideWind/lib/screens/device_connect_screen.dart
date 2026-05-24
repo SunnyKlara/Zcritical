@@ -298,7 +298,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
       Navigator.of(context).pop();
     } else {
       await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const NoDeviceScreen()),
+        MaterialPageRoute(builder: (_) => const NoDeviceScreen(skipAutoConnect: true)),
       );
     }
   }
