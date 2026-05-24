@@ -15,7 +15,7 @@
 | # | 目标 | 状态 | 下一步 |
 |---|------|------|--------|
 | 1 | OTA 能用 | ✅ WiFi OTA 已实现，效果好。速度优化在 `feat/ota-speed-boost` 分支 | 速度优化待合并（非阻塞） |
-| 2 | CI/CD 能跑 | ✅ Android 全自动 | iOS 签名已修复（manual signing），待验证 |
+| 2 | CI/CD 能跑 | ✅ Android 全自动 | iOS 已改用 App Store Connect API 自动签名（无需 .p12/.mobileprovision），待 tag 触发验证 |
 | 3 | 关键路径有测试 | 🟡 协议 51/51，BLE 连接无测试 | BLE 状态机单元测试 |
 | 4 | 代码可维护 | 🟡 34 文件超 400 行 | 死代码清除 + 每次改功能时顺手拆文件 |
 
@@ -110,20 +110,14 @@
 
 **修复优先级**：
 1. ~~清理垃圾（删死代码+无用依赖+修损坏测试+CI 跑全量测试）~~
-2. iOS 全自动化 — **iOS CI 签名阻塞：缺 Provisioning Profile**
-   - ✅ 创建 `ios/Podfile`（platform :ios, '13.0'）
-   - ✅ 创建 `ios/ExportOptions.plist`（app-store-connect 分发）
-   - ✅ CI iOS job：`pod install` + `flutter build ios --no-codesign` 通过
-   - ✅ CI iOS job 升级：自动签名 + 构建 IPA + 上传 TestFlight（待 Secrets）
-   - ✅ CI release job 依赖 build-ios（iOS 失败阻塞发版）
-   - ✅ CI 测试全量化（删除 13 个编码损坏测试文件 + 1 个过时 widget_test）
-   - ✅ CI 非 tag 构建 Android 用 debug 模式（不需要 keystore）
-   - ✅ GitHub Secrets 已配置：APPLE_CERTIFICATE + PASSWORD + API_KEY_ID + ISSUER_ID + API_KEY
-   - ✅ project.pbxproj 添加 DEVELOPMENT_TEAM = 9YSTN2JSTJ
-   - ❌ **阻塞**：CI 签名需要 Provisioning Profile（`APPLE_PROVISIONING_PROFILE` Secret 未配）
-   - 需要在 Apple Developer Portal 创建 iOS App Development profile for `com.example.ridewind`
-   - 下载 .mobileprovision → base64 → 添加到 GitHub Secrets
-   - 测试 tag：v1.2.3-rc1 和 v1.2.3-rc2 已用（下次用 rc3）
+2. iOS 全自动化 — **需要换方案：改用 App Store Connect API 自动签名**
+   - ✅ CI iOS `--no-codesign` 构建通过
+   - ✅ GitHub Secrets 已配：API_KEY_ID + ISSUER_ID + API_KEY + CERTIFICATE + PASSWORD + PROVISIONING_PROFILE
+   - ❌ 手动证书+profile 方案失败 5 次（rc1-rc5），原因：证书和 profile 不匹配、缺私钥、缺 Team ID 等
+   - **决策：放弃手动证书管理，改用 App Store Connect API 自动签名（行业标准做法）**
+   - 下次对话：改 CI workflow 用 `xcodebuild -allowProvisioningUpdates -authenticationKeyPath` 方式
+   - 这个方案只需要 API Key（已配好），不需要 .p12 和 .mobileprovision
+   - 可删除 APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / APPLE_PROVISIONING_PROFILE 三个 Secret
 3. 每次发版只改一件事（从 v1.2.3 开始）
 
 **所有文件已提交并 push 到 main。**
