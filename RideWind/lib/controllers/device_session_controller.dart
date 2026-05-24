@@ -218,14 +218,10 @@ class DeviceSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  static const int _maxSilentReconnectWaitSeconds = 30;
-  static const int _maxManualReconnectAttempts = 3;
-
   void _handleConnected() {
     _disconnectDebounceTimer?.cancel();
     _disconnectDebounceTimer = null;
     _lastConnectionEvent = ConnectionEvent.connected;
-    _reconnectAttemptCount = 0;
 
     // Save this device for auto-reconnect on next app launch
     _prefs.saveLastConnectedDevice(device.id, device.name);

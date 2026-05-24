@@ -22,7 +22,6 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
 import '../services/preference_service.dart';
-import '../core/service_locator.dart';
 
 enum BleState {
   idle,          // No device known, waiting for user action
