@@ -50,6 +50,7 @@ typedef enum {
     CMD_SPEED_MAX,      /* SPEED_MAX:xxx — set max speed display value */
     CMD_FAN_RANGE,      /* FAN_RANGE:min,max — set fan PWM range */
     CMD_GET_VERSION,    /* GET:VERSION — query firmware/protocol version */
+    CMD_HELLO,          /* HELLO:app_ver:proto_ver:platform — handshake */
 } cmd_type_t;
 
 typedef struct {

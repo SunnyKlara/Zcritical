@@ -672,24 +672,55 @@ class BluetoothProvider with ChangeNotifier {
     }
   }
 
-  /// 版本协商：发送 GET:VERSION，解析响应，检查兼容性
+  /// 版本协商：发送 HELLO 握手，解析响应，获取 capabilities bitmap
   Future<void> _negotiateFirmwareVersion() async {
     try {
-      final response = await _cmd.sendWithRetry(
+      // Phase 1: 尝试新的 HELLO 握手（返回 capabilities bitmap）
+      final helloResponse = await _cmd.sendWithRetry(
+        'HELLO:1.2.1:1:android',
+        expectedPrefix: 'HELLO:',
+        timeout: const Duration(seconds: 2),
+        maxRetries: 1,
+      );
+
+      if (helloResponse != null) {
+        // 新固件支持 HELLO — 解析 HELLO:fw_ver:proto_ver:hw_model:caps_hex
+        final parts = helloResponse.trim().split(':');
+        if (parts.length >= 5) {
+          final fwVer = parts[1];
+          final protoVer = int.tryParse(parts[2]) ?? 0;
+          final hwModel = parts[3];
+          final capsHex = parts[4];
+
+          _firmwareInfo = FirmwareInfo(
+            version: fwVer,
+            protocolVersion: protoVer,
+            hwModel: hwModel,
+          );
+          _compatibilityResult = FirmwareCompatibility.check(_firmwareInfo);
+          _capabilities = DeviceCapabilities.fromHexBitmap(capsHex);
+          debugPrint('🤝 HELLO 握手成功: $_firmwareInfo');
+          debugPrint('🔗 设备能力: $_capabilities');
+          return;
+        }
+      }
+
+      // Phase 2: Fallback — 尝试旧的 GET:VERSION
+      final versionResponse = await _cmd.sendWithRetry(
         'GET:VERSION',
         expectedPrefix: 'VERSION:',
         timeout: const Duration(seconds: 2),
         maxRetries: 1,
       );
 
-      if (response != null) {
-        _firmwareInfo = FirmwareInfo.parse(response);
+      if (versionResponse != null) {
+        _firmwareInfo = FirmwareInfo.parse(versionResponse);
         _compatibilityResult = FirmwareCompatibility.check(_firmwareInfo);
         _capabilities = DeviceCapabilities.fromFirmwareInfo(_firmwareInfo);
-        debugPrint('🔗 固件版本协商: $_firmwareInfo → ${_compatibilityResult!.status.name}');
-        debugPrint('🔗 设备能力: $_capabilities');
+        debugPrint('🔗 GET:VERSION 协商: $_firmwareInfo → ${_compatibilityResult!.status.name}');
+        debugPrint('🔗 设备能力（按协议版本推断）: $_capabilities');
       } else {
-        // 旧固件不支持 GET:VERSION
+        // 旧固件不支持任何版本查询
         _firmwareInfo = null;
         _compatibilityResult = FirmwareCompatibility.check(null);
         _capabilities = DeviceCapabilities.forProtocol(null);

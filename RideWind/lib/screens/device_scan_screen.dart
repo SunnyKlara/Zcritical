@@ -5,7 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/sound_wave_scanner.dart';
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
-import 'main_pager_screen.dart';
+import 'device_list_screen.dart';
 import 'device_management_screen.dart';
 
 class DeviceScanScreen extends StatefulWidget {
@@ -520,13 +520,12 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                           _foundDevice!.id,
                           _foundDevice!.name,
                         );
-                        // 替换 ScanScreen 为 MainPagerScreen
-                        // 栈变为: [NoDevice, MainPager]
-                        // 回退: MainPager → NoDevice
+                        // 替换 ScanScreen 为 DeviceListScreen（新栈底）
+                        // DeviceListScreen 会检测到已连接设备并自动 push 控制页面
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (_) =>
-                                MainPagerScreen(device: _foundDevice!),
+                                const DeviceListScreen(),
                           ),
                         );
                       },

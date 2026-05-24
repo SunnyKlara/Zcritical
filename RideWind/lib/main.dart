@@ -1,17 +1,19 @@
-import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/splash_screen.dart';
 import 'screens/no_device_screen.dart';
+import 'screens/device_list_screen.dart';
 import 'providers/bluetooth_provider.dart';
 import 'core/service_locator.dart';
 import 'services/first_launch_manager.dart';
 
 /// Sentry DSN — 注册 https://sentry.io 后替换为你的项目 DSN
 /// 免费版每月 5000 事件，足够小规模用户使用
-const String _sentryDsn = 'https://YOUR_DSN_HERE@o0.ingest.sentry.io/0';
+const String _sentryDsn = 'https://1e3ffad26e1049487f7453f026da401e@o4511444403355648.ingest.us.sentry.io/4511444408270848';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,15 +52,36 @@ void main() async {
       final firstLaunchManager = FirstLaunchManager();
       final isFirstLaunch = await firstLaunchManager.isFirstLaunch();
 
-      runApp(ZcriticalApp(isFirstLaunch: isFirstLaunch));
+      // 检查是否有已保存的设备（决定启动路由）
+      bool hasSavedDevices = false;
+      if (!isFirstLaunch) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final jsonStr = prefs.getString('saved_devices_list');
+          if (jsonStr != null && jsonStr.isNotEmpty) {
+            final list = jsonDecode(jsonStr) as List;
+            hasSavedDevices = list.isNotEmpty;
+          }
+        } catch (_) {}
+      }
+
+      runApp(ZcriticalApp(
+        isFirstLaunch: isFirstLaunch,
+        hasSavedDevices: hasSavedDevices,
+      ));
     },
   );
 }
 
 class ZcriticalApp extends StatefulWidget {
   final bool isFirstLaunch;
+  final bool hasSavedDevices;
 
-  const ZcriticalApp({super.key, required this.isFirstLaunch});
+  const ZcriticalApp({
+    super.key,
+    required this.isFirstLaunch,
+    required this.hasSavedDevices,
+  });
 
   @override
   State<ZcriticalApp> createState() => _ZcriticalAppState();
@@ -88,7 +111,11 @@ class _ZcriticalAppState extends State<ZcriticalApp> {
           ),
           useMaterial3: true,
         ),
-        home: widget.isFirstLaunch ? const SplashScreen() : const NoDeviceScreen(),
+        home: widget.isFirstLaunch
+            ? const SplashScreen()
+            : widget.hasSavedDevices
+                ? const DeviceListScreen()
+                : const NoDeviceScreen(),
       ),
     );
   }

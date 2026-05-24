@@ -54,9 +54,10 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
     if (_bleMgr.state == BleState.connected && _bleMgr.device != null) {
       DeviceManagementScreen.recordDevice(
           _bleMgr.device!.id, _bleMgr.device!.name);
+      // 连接成功 → 替换为设备列表首页（新栈底）
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => MainPagerScreen(device: _bleMgr.device!),
+          builder: (_) => const DeviceListScreen(),
         ),
       );
       return;

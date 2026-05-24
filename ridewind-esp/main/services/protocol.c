@@ -415,6 +415,12 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         return true;
     }
 
+    /* ── HELLO:app_ver:proto_ver:platform — handshake ── */
+    if (strncmp(buf, "HELLO:", 6) == 0) {
+        out->type = CMD_HELLO;
+        return true;
+    }
+
     return false;  /* unrecognized command */
 }
 

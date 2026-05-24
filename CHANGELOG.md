@@ -4,6 +4,33 @@
 
 ---
 
+## [v1.2.2] - 2026-05-24
+
+设备列表首页 + 专业级软硬件版本协商系统。
+
+### APP 新功能
+- 设备列表首页：启动后直接显示已保存设备列表，点击连接进入控制页面
+- 导航栈重构：设备列表为栈底，控制页面在上面，返回键回到列表
+- HELLO 双向握手：连接时获取固件 capabilities bitmap，精确知道设备支持哪些功能
+- ERR:UNKNOWN_CMD 检测：固件不支持的命令有明确回复，不再静默失败
+
+### APP 修复
+- 彻底关闭 APP 端引擎音效（所有音频由硬件端处理）
+- 移除自动重连逻辑（用户手动点击连接，避免竞态问题）
+- 修复控制页面返回导航（pop 回设备列表，不再 pushReplacement）
+
+### 固件新功能
+- HELLO 握手命令：回复固件版本 + 协议版本 + 硬件型号 + capabilities bitmap
+- ERR:UNKNOWN_CMD 回复：未知命令不再静默丢弃，回复错误码供 APP 降级
+- 18 位 capability bitmap 定义（speed/led/atomizer/ota/wifi/audio 等）
+
+### 架构改进
+- DeviceCapabilities 重写为 bitmap 驱动（与固件 board_config.h 同步）
+- 三级 fallback：HELLO → GET:VERSION → 基础模式
+- 设备管理功能合并到首页（DeviceManagementScreen 废弃独立入口）
+
+---
+
 ## [v1.2.0] - 2026-05-23
 
 车库控制面板 v2 + 动态极速系统 + 车模识别集成。

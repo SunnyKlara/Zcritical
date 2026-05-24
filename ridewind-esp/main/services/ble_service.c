@@ -231,6 +231,11 @@ static void process_rx_data(const uint8_t *data, uint16_t len)
                     }
                 } else {
                     ESP_LOGW(TAG, "Parse fail: %s", s_rx_buf);
+                    /* Reply ERR:UNKNOWN_CMD so APP knows this command is not supported */
+                    char err_resp[80];
+                    /* Truncate command name to fit buffer (max ~58 chars of command) */
+                    snprintf(err_resp, sizeof(err_resp), "ERR:UNKNOWN_CMD:%.58s\r\n", s_rx_buf);
+                    ble_service_notify_str(err_resp);
                 }
                 s_rx_len = 0;
             }

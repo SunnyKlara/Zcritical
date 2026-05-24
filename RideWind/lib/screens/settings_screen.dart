@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/preference_service.dart';
-import 'device_management_screen.dart';
 
 /// 设置 / 更多入口页（替代"个人中心"心智模型）
 ///
@@ -161,28 +160,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // 品牌 + 版本号
             SliverToBoxAdapter(child: _buildBrandHeader()),
-
-            // 关于分组（P0 仅这一组 + 重置）
-            SliverToBoxAdapter(
-              child: _SectionHeader(title: '设备'),
-            ),
-            SliverToBoxAdapter(
-              child: _SettingsGroup(
-                children: [
-                  _SettingsRow(
-                    icon: Icons.devices_outlined,
-                    title: '设备管理',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const DeviceManagementScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 

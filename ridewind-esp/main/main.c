@@ -864,6 +864,21 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         break;
     }
 
+    case CMD_HELLO: {
+        /* Bidirectional handshake — reply with full device info + capabilities bitmap
+         * Format: HELLO:fw_ver:proto_ver:hw_model:caps_hex
+         * caps_hex is a hex-encoded 32-bit bitmap of supported features
+         */
+        const esp_app_desc_t *desc = esp_app_get_description();
+        snprintf(resp, sizeof(resp), "HELLO:%s:%d:%s:%08X\r\n",
+                 desc->version,
+                 PROTOCOL_VERSION,
+                 HW_MODEL,
+                 (unsigned)DEVICE_CAPABILITIES);
+        ble_service_notify_str(resp);
+        break;
+    }
+
     // ═══ SECTION: WiFi 音频命令 (WIFI/WIFI_SCAN) ═══
 
     /* ── WIFI:ssid:password ── */
