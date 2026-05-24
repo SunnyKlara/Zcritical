@@ -211,59 +211,15 @@ class DeviceSessionController extends ChangeNotifier {
   }
 
   void _handleDisconnected() {
-    if (_navigatedOnDisconnect) return;
-    if (_disconnectedByBackground) return;
-
-    // NEVER show a popup for transient disconnects.
-    // BLE service handles auto-reconnect internally (up to 5 attempts).
-    // We only mark as disconnected after exhausting all options silently.
-    _disconnectDebounceTimer?.cancel();
-    _reconnectAttemptCount = 0;
+    // Connection lifecycle is now managed by BleConnectionManager.
+    // DeviceSessionController does NOT show popups or manage reconnection.
+    // It only updates its internal state for UI rendering purposes.
     _lastConnectionEvent = ConnectionEvent.disconnected;
-    notifyListeners(); // UI can show a subtle indicator if desired
-
-    _startSilentReconnectWatch();
+    notifyListeners();
   }
 
-  int _reconnectAttemptCount = 0;
   static const int _maxSilentReconnectWaitSeconds = 30;
   static const int _maxManualReconnectAttempts = 3;
-
-  void _startSilentReconnectWatch() {
-    _disconnectDebounceTimer?.cancel();
-    _disconnectDebounceTimer = Timer(
-      const Duration(seconds: _maxSilentReconnectWaitSeconds),
-      () async {
-        if (_navigatedOnDisconnect) return;
-        if (_bt.isConnected) {
-          _lastConnectionEvent = ConnectionEvent.connected;
-          notifyListeners();
-          return;
-        }
-
-        // Try manual reconnect attempts
-        _reconnectAttemptCount++;
-        if (_reconnectAttemptCount <= _maxManualReconnectAttempts) {
-          final success = await _bt.connectToDevice(device);
-          if (success) {
-            _lastConnectionEvent = ConnectionEvent.connected;
-            notifyListeners();
-            return;
-          }
-          // Try again after another wait
-          _startSilentReconnectWatch();
-          return;
-        }
-
-        // All attempts exhausted — NOW show disconnect dialog
-        saveSettings();
-        _navigatedOnDisconnect = true;
-        _lastConnectionEvent = ConnectionEvent.disconnected;
-        notifyListeners();
-        _disconnectConfirmed.add(null);
-      },
-    );
-  }
 
   void _handleConnected() {
     _disconnectDebounceTimer?.cancel();

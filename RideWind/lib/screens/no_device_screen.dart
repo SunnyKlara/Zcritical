@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
-import 'package:provider/provider.dart';
 import 'device_scan_screen.dart';
 import 'main_pager_screen.dart';
 import 'device_list_screen.dart';
@@ -10,9 +8,8 @@ import 'device_management_screen.dart';
 import 'settings_screen.dart';
 import '../models/device_model.dart';
 import '../utils/responsive_utils.dart';
-import '../providers/bluetooth_provider.dart';
-import '../services/preference_service.dart';
 import '../widgets/app_update_dialog.dart';
+import '../services/ble_connection_manager.dart';
 import '../core/service_locator.dart';
 
 /// 未连接设备页面（空状态）+ 自动重连上次设备
@@ -24,15 +21,22 @@ class NoDeviceScreen extends StatefulWidget {
 }
 
 class _NoDeviceScreenState extends State<NoDeviceScreen> {
+  late final BleConnectionManager _bleMgr;
   bool _isAutoConnecting = false;
-  String? _autoConnectDeviceName;
 
   @override
   void initState() {
     super.initState();
+    _bleMgr = sl<BleConnectionManager>();
+    _bleMgr.addListener(_onBleStateChanged);
     _tryAutoConnect();
-    // 进入首页即检查 APP 更新（延迟 2 秒等 UI 加载完）
     Future.delayed(const Duration(seconds: 2), _checkAppUpdate);
+  }
+
+  @override
+  void dispose() {
+    _bleMgr.removeListener(_onBleStateChanged);
+    super.dispose();
   }
 
   Future<void> _checkAppUpdate() async {
@@ -40,51 +44,28 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
     AppUpdateDialog.checkAndShow(context);
   }
 
-  Future<void> _tryAutoConnect() async {
-    final prefs = sl<PreferenceService>();
-    final lastDevice = await prefs.getLastConnectedDevice();
-    if (lastDevice == null) return;
-
-    final deviceId = lastDevice['id']!;
-    final deviceName = lastDevice['name']!;
-
+  void _onBleStateChanged() {
     if (!mounted) return;
-    setState(() {
-      _isAutoConnecting = true;
-      _autoConnectDeviceName = deviceName;
-    });
-
-    try {
-      // Reconstruct BluetoothDevice from saved MAC address
-      final btDevice = fbp.BluetoothDevice.fromId(deviceId);
-      final deviceModel = DeviceModel(
-        id: deviceId,
-        name: deviceName,
-        rssi: -60,
-        bluetoothDevice: btDevice,
+    if (_bleMgr.state == BleState.connected && _bleMgr.device != null) {
+      DeviceManagementScreen.recordDevice(
+          _bleMgr.device!.id, _bleMgr.device!.name);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => MainPagerScreen(device: _bleMgr.device!),
+        ),
       );
-
-      final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
-      final success = await btProvider.connectToDevice(deviceModel);
-
-      if (!mounted) return;
-
-      if (success) {
-        // 记录设备到设备管理列表
-        DeviceManagementScreen.recordDevice(deviceId, deviceName);
-        // Navigate to control screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => MainPagerScreen(device: deviceModel),
-          ),
-        );
-        return;
-      }
-    } catch (e) {
-      debugPrint('Auto-connect failed: $e');
+      return;
     }
+    if (_bleMgr.state == BleState.idle && _isAutoConnecting) {
+      setState(() { _isAutoConnecting = false; });
+    }
+  }
 
-    if (mounted) {
+  Future<void> _tryAutoConnect() async {
+    setState(() { _isAutoConnecting = true; });
+    final success = await _bleMgr.autoConnect();
+    if (!mounted) return;
+    if (!success) {
       setState(() { _isAutoConnecting = false; });
     }
   }
@@ -476,7 +457,7 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          '正在连接 ${_autoConnectDeviceName ?? ""}...',
+                          '正在连接 ${_bleMgr.device?.name ?? ""}...',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

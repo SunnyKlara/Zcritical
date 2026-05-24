@@ -17,6 +17,7 @@ import '../services/feature_guide_service.dart';
 import '../configs/device_connect_config.dart';
 import '../controllers/colorize_controller.dart';
 import '../core/service_locator.dart';
+import '../services/ble_connection_manager.dart';
 import '../widgets/colorize_preset_view.dart';
 import '../widgets/colorize_rgb_detail_view.dart';
 import 'no_device_screen.dart';
@@ -72,8 +73,6 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
       GlobalKey<RunningModeWidgetState>(debugLabel: 'runningModeState');
 
   // Event subscriptions from controller
-  StreamSubscription<void>? _disconnectSub;
-  StreamSubscription<void>? _reconnectFailedSub;
   StreamSubscription<int>? _presetPageSub;
 
   ControlMode get _currentMode {
@@ -100,12 +99,10 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
       viewportFraction: 0.155,
     );
 
-    _disconnectSub = _session.onDisconnectConfirmed.listen((_) {
-      if (mounted) _showDisconnectDialog();
-    });
-    _reconnectFailedSub = _session.onReconnectFailed.listen((_) {
-      if (mounted) _showReconnectFailedDialog();
-    });
+    // Listen to BLE state machine for disconnect (only fires on BleState.failed)
+    final bleMgr = sl<BleConnectionManager>();
+    bleMgr.addListener(_onBleManagerStateChanged);
+
     _presetPageSub = _session.onPresetPageChanged.listen((appIndex) {
       if (mounted && _colorPageController.hasClients) {
         _colorPageController.animateToPage(
@@ -129,6 +126,14 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
     if (mounted) setState(() {});
   }
 
+  void _onBleManagerStateChanged() {
+    if (!mounted) return;
+    final bleMgr = sl<BleConnectionManager>();
+    if (bleMgr.state == BleState.failed) {
+      _showDisconnectDialog();
+    }
+  }
+
   Future<void> _restorePreferencesAndRebuildPageController() async {
     final restoredIndex = await _session.restorePreferences();
     if (restoredIndex > 0 && mounted) {
@@ -146,8 +151,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _session.removeListener(_onSessionChanged);
-    _disconnectSub?.cancel();
-    _reconnectFailedSub?.cancel();
+    sl<BleConnectionManager>().removeListener(_onBleManagerStateChanged);
     _presetPageSub?.cancel();
     _modePageController.dispose();
     _colorPageController.dispose();
