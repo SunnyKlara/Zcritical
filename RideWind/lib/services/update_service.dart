@@ -14,9 +14,10 @@ class UpdateInfo {
   final int latestBuild;
   final String minVersion;
   final String downloadUrl;
+  final String? fallbackDownloadUrl;
   final String releaseNotes;
   final bool forceUpdate;
-  final String? iosAppStoreUrl; // iOS App Store 链接
+  final String? iosAppStoreUrl;
 
   UpdateInfo({
     required this.latestVersion,
@@ -25,6 +26,7 @@ class UpdateInfo {
     required this.downloadUrl,
     required this.releaseNotes,
     required this.forceUpdate,
+    this.fallbackDownloadUrl,
     this.iosAppStoreUrl,
   });
 
@@ -34,31 +36,54 @@ class UpdateInfo {
       latestBuild: json['latest_build'] ?? 1,
       minVersion: json['min_version'] ?? '1.0.0',
       downloadUrl: json['download_url'] ?? '',
+      fallbackDownloadUrl: json['fallback_download_url'],
       releaseNotes: json['release_notes'] ?? '',
       forceUpdate: json['force_update'] ?? false,
       iosAppStoreUrl: json['ios_app_store_url'],
     );
   }
+
+  /// 获取所有可用的下载地址（主地址 + fallback）
+  List<String> get allDownloadUrls {
+    final urls = <String>[];
+    if (downloadUrl.isNotEmpty) urls.add(downloadUrl);
+    if (fallbackDownloadUrl != null && fallbackDownloadUrl!.isNotEmpty) {
+      urls.add(fallbackDownloadUrl!);
+    }
+    return urls;
+  }
 }
 
 class UpdateService {
-  // GitHub raw URL for version check
+  // GitHub raw URL for version check（主）
   static const String _versionJsonUrl =
       'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/RideWind/app_version.json';
 
+  // 备用版本检测 URL（jsdelivr CDN，国内更快）
+  static const String _versionJsonFallbackUrl =
+      'https://cdn.jsdelivr.net/gh/SunnyKlara/Zcritical@main/RideWind/app_version.json';
+
   /// Check if a newer version is available.
-  /// Returns [UpdateInfo] if update available, null otherwise.
+  /// 自动尝试主 URL 和备用 URL。
   static Future<UpdateInfo?> checkForUpdate() async {
+    Map<String, dynamic>? data;
+
+    // 尝试主 URL
+    data = await _fetchVersionJson(_versionJsonUrl);
+
+    // 主 URL 失败，尝试 CDN 备用
+    if (data == null) {
+      debugPrint('Primary version check failed, trying fallback CDN...');
+      data = await _fetchVersionJson(_versionJsonFallbackUrl);
+    }
+
+    if (data == null) {
+      debugPrint('All version check URLs failed');
+      return null;
+    }
+
     try {
-      final response = await http
-          .get(Uri.parse(_versionJsonUrl))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200) return null;
-
-      final data = json.decode(response.body);
       final updateInfo = UpdateInfo.fromJson(data);
-
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
@@ -67,8 +92,22 @@ class UpdateService {
       }
       return null;
     } catch (e) {
-      // Network error, timeout, parse error — silently ignore
-      debugPrint('Update check failed: $e');
+      debugPrint('Version parse error: $e');
+      return null;
+    }
+  }
+
+  /// 从指定 URL 获取版本 JSON，失败返回 null
+  static Future<Map<String, dynamic>?> _fetchVersionJson(String url) async {
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) return null;
+      return json.decode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Fetch $url failed: $e');
       return null;
     }
   }
@@ -89,27 +128,54 @@ class UpdateService {
   }
 
   /// Download APK and trigger install.
-  /// [onProgress] callback receives 0.0 - 1.0 progress.
+  /// 自动尝试多个下载地址（主地址失败自动 fallback 到 GitHub Release）。
   static Future<void> downloadAndInstall(
     String url, {
     Function(double)? onProgress,
+    String? fallbackUrl,
   }) async {
     final dir = await getTemporaryDirectory();
     final filePath = '${dir.path}/ridewind_update.apk';
 
-    final dio = Dio();
-    await dio.download(
-      url,
-      filePath,
-      onReceiveProgress: (received, total) {
-        if (total > 0) {
-          onProgress?.call(received / total);
-        }
-      },
-    );
+    final urls = [url, if (fallbackUrl != null) fallbackUrl];
+    Exception? lastError;
 
-    // Trigger system installer
-    await OpenFilex.open(filePath);
+    for (final downloadUrl in urls) {
+      try {
+        debugPrint('Attempting download from: $downloadUrl');
+        final dio = Dio();
+        dio.options.connectTimeout = const Duration(seconds: 15);
+        dio.options.receiveTimeout = const Duration(minutes: 10);
+
+        await dio.download(
+          downloadUrl,
+          filePath,
+          onReceiveProgress: (received, total) {
+            if (total > 0) {
+              onProgress?.call(received / total);
+            }
+          },
+        );
+
+        // 验证文件大小（APK 至少 1MB）
+        final file = File(filePath);
+        if (await file.length() < 1024 * 1024) {
+          throw Exception('下载文件异常（体积过小），可能不是有效 APK');
+        }
+
+        // 下载成功，触发安装
+        await OpenFilex.open(filePath);
+        return;
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        debugPrint('Download failed from $downloadUrl: $e');
+        // 重置进度，准备尝试下一个 URL
+        onProgress?.call(0);
+      }
+    }
+
+    // 所有 URL 都失败
+    throw lastError ?? Exception('所有下载地址均不可用');
   }
 
   /// Show update dialog.
@@ -139,6 +205,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   bool _downloading = false;
   double _progress = 0;
   String? _error;
+  int _retryCount = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +251,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         if (!_downloading)
           ElevatedButton(
             onPressed: _startDownload,
-            child: const Text('立即更新'),
+            child: Text(_retryCount > 0 ? '重试下载' : '立即更新'),
           ),
       ],
     );
@@ -198,13 +265,13 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         setState(() => _error = 'App Store 链接未配置');
         return;
       }
-      // 使用 url_launcher 或直接关闭对话框提示用户去 App Store
       if (mounted) Navigator.of(context).pop();
       return;
     }
 
     // Android: 下载 APK 并安装
-    if (widget.updateInfo.downloadUrl.isEmpty) {
+    final urls = widget.updateInfo.allDownloadUrls;
+    if (urls.isEmpty) {
       setState(() => _error = '下载地址未配置');
       return;
     }
@@ -217,17 +284,19 @@ class _UpdateDialogState extends State<_UpdateDialog> {
 
     try {
       await UpdateService.downloadAndInstall(
-        widget.updateInfo.downloadUrl,
+        urls.first,
+        fallbackUrl: urls.length > 1 ? urls[1] : null,
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
+      _retryCount++;
       if (mounted) {
         setState(() {
           _downloading = false;
-          _error = '下载失败: $e';
+          _error = '下载失败，请检查网络后重试\n($e)';
         });
       }
     }

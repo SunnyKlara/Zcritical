@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/widgets/ripple_effect_painter.dart';
+import 'package:zcritical_t1/widgets/ripple_effect_painter.dart';
 
 /// RippleEffectPainter 单元测试
 ///
@@ -9,7 +9,7 @@ import 'package:ridewind/widgets/ripple_effect_painter.dart';
 /// 测试内容:
 /// 1. shouldRepaint 在属性变化时返回 true
 /// 2. shouldRepaint 在属性不变时返回 false
-/// 3. 默认波纹颜色为 0xFF25C485
+/// 3. 默认波纹颜色�?0xFF25C485
 /// 4. 绘制不抛出异常（各种 progress 值）
 void main() {
   group('RippleEffectPainter', () {

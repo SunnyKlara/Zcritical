@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ridewind/main.dart';
+import 'package:zcritical_t1/main.dart';
 
 void main() {
   testWidgets('Critical app smoke test', (WidgetTester tester) async {

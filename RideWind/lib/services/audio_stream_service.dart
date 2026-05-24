@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   3. APP starts audio capture service with ESP32's IP
 ///   4. Service captures system audio and streams PCM via TCP
 class AudioStreamService {
-  static const _channel = MethodChannel('com.example.ridewind/audio_capture');
+  static const _channel = MethodChannel('com.zcritical.t1/audio_capture');
 
   // SharedPreferences keys for WiFi credentials
   static const _kWifiSsid = 'wifi_ssid';

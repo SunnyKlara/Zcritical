@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/services/logo_transmission_manager.dart';
+import 'package:zcritical_t1/services/logo_transmission_manager.dart';
 import 'dart:typed_data';
 
 void main() {
   group('SlidingWindow Tests', () {
-    test('窗口初始化', () {
+    test('窗口初始�?, () {
       final window = SlidingWindow(windowSize: 10, totalPackets: 100);
       expect(window.sendBase, 0);
       expect(window.nextSeqNum, 0);
@@ -20,7 +20,7 @@ void main() {
       expect(window.inFlightCount, 5);
     });
 
-    test('窗口满判断', () {
+    test('窗口满判�?, () {
       final window = SlidingWindow(windowSize: 5, totalPackets: 100);
       window.nextSeqNum = 5;
       expect(window.isFull, true);
@@ -56,7 +56,7 @@ void main() {
   });
 
   group('PacketLossMonitor Tests', () {
-    test('丢包率计算', () {
+    test('丢包率计�?, () {
       final monitor = PacketLossMonitor();
 
       for (int i = 0; i < 100; i++) {
@@ -159,7 +159,7 @@ void main() {
   });
 
   group('AckInfo Tests', () {
-    test('SACK解析 - 无丢包', () {
+    test('SACK解析 - 无丢�?, () {
       final ack = AckInfo(
         type: AckType.selective,
         seq: 100,
@@ -170,7 +170,7 @@ void main() {
       expect(lost, isEmpty);
     });
 
-    test('SACK解析 - 有丢包', () {
+    test('SACK解析 - 有丢�?, () {
       final ack = AckInfo(
         type: AckType.selective,
         seq: 100,
@@ -184,7 +184,7 @@ void main() {
       expect(lost.length, 3);
     });
 
-    test('累积ACK不返回丢包', () {
+    test('累积ACK不返回丢�?, () {
       final ack = AckInfo(type: AckType.cumulative, seq: 100);
 
       final lost = ack.getLostPackets();

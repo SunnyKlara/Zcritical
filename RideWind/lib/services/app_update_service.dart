@@ -11,6 +11,7 @@ class AppVersionInfo {
   final String version;
   final int buildNumber;
   final String downloadUrl;
+  final String? fallbackDownloadUrl;
   final String releaseNotes;
   final bool forceUpdate;
 
@@ -19,6 +20,7 @@ class AppVersionInfo {
     required this.buildNumber,
     required this.downloadUrl,
     required this.releaseNotes,
+    this.fallbackDownloadUrl,
     this.forceUpdate = false,
   });
 
@@ -27,7 +29,8 @@ class AppVersionInfo {
       version: json['version'] as String,
       buildNumber: json['buildNumber'] as int,
       downloadUrl: json['downloadUrl'] as String,
-      releaseNotes: json['releaseNotes'] as String? ?? '',
+      fallbackDownloadUrl: json['fallbackDownloadUrl'] as String?,
+      releaseNotes: json['releaseNotes'] as String? ?? json['changelog'] as String? ?? '',
       forceUpdate: json['forceUpdate'] as bool? ?? false,
     );
   }
@@ -39,10 +42,13 @@ class AppUpdateService {
   factory AppUpdateService() => _instance;
   AppUpdateService._();
 
-  /// GitHub 版本信息文件地址
-  /// ⚠️ 发布前请替换为你的 GitHub 仓库地址
+  /// 版本信息文件地址（主）
   static const String _versionUrl =
-      'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/version.json';
+      'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/RideWind/app_version.json';
+
+  /// 版本信息文件地址（备用 CDN，国内更快）
+  static const String _versionUrlFallback =
+      'https://cdn.jsdelivr.net/gh/SunnyKlara/Zcritical@main/RideWind/app_version.json';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -52,7 +58,7 @@ class AppUpdateService {
   CancelToken? _cancelToken;
   bool _isDownloading = false;
 
-  /// 检查是否有新版本
+  /// 检查是否有新版本（自动尝试主 URL 和备用 URL）
   Future<AppVersionInfo?> checkForUpdate() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
@@ -60,13 +66,15 @@ class AppUpdateService {
 
       debugPrint('📱 当前版本: ${packageInfo.version}+$currentBuild');
 
-      final response = await _dio.get(_versionUrl);
-      final Map<String, dynamic> data;
-
-      if (response.data is String) {
-        data = jsonDecode(response.data as String);
-      } else {
-        data = response.data as Map<String, dynamic>;
+      Map<String, dynamic>? data;
+      data = await _fetchVersionJson(_versionUrl);
+      if (data == null) {
+        debugPrint('主 URL 失败，尝试 CDN 备用...');
+        data = await _fetchVersionJson(_versionUrlFallback);
+      }
+      if (data == null) {
+        debugPrint('⚠️ 所有版本检测 URL 均失败');
+        return null;
       }
 
       final remoteInfo = AppVersionInfo.fromJson(data);
@@ -83,8 +91,28 @@ class AppUpdateService {
     }
   }
 
+  /// 从指定 URL 获取版本 JSON
+  Future<Map<String, dynamic>?> _fetchVersionJson(String url) async {
+    try {
+      final response = await _dio.get(
+        url,
+        options: Options(receiveTimeout: const Duration(seconds: 8)),
+      );
+
+      if (response.statusCode != 200) return null;
+
+      if (response.data is String) {
+        return jsonDecode(response.data as String) as Map<String, dynamic>;
+      }
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Fetch $url failed: $e');
+      return null;
+    }
+  }
+
   /// 下载并安装APK（仅 Android）
-  /// iOS 上不应调用此方法，应跳转 App Store
+  /// 自动尝试主地址和 fallback 地址
   Future<void> downloadAndInstall(
     AppVersionInfo info, {
     ValueChanged<double>? onProgress,
@@ -101,6 +129,12 @@ class AppUpdateService {
     _isDownloading = true;
     _cancelToken = CancelToken();
 
+    final urls = [
+      info.downloadUrl,
+      if (info.fallbackDownloadUrl != null && info.fallbackDownloadUrl!.isNotEmpty)
+        info.fallbackDownloadUrl!,
+    ];
+
     try {
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
@@ -115,38 +149,56 @@ class AppUpdateService {
 
       final filePath = '${downloadDir.path}/Critical-${info.version}.apk';
 
-      // 如果已经下载过，直接安装
+      // 如果已经下载过，删除重新下载
       final file = File(filePath);
       if (file.existsSync()) {
         file.deleteSync();
       }
 
-      debugPrint('⬇️ 开始下载: ${info.downloadUrl}');
+      String? lastErrorMsg;
 
-      await _dio.download(
-        info.downloadUrl,
-        filePath,
-        cancelToken: _cancelToken,
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            onProgress?.call(received / total);
+      for (final url in urls) {
+        try {
+          debugPrint('⬇️ 尝试下载: $url');
+          onProgress?.call(0);
+
+          await _dio.download(
+            url,
+            filePath,
+            cancelToken: _cancelToken,
+            onReceiveProgress: (received, total) {
+              if (total > 0) {
+                onProgress?.call(received / total);
+              }
+            },
+          );
+
+          // 验证文件大小（APK 至少 1MB）
+          final downloadedFile = File(filePath);
+          if (downloadedFile.existsSync() && downloadedFile.lengthSync() < 1024 * 1024) {
+            downloadedFile.deleteSync();
+            throw Exception('下载文件异常（体积过小）');
           }
-        },
-      );
 
-      debugPrint('下载完成: $filePath');
-      onComplete?.call();
+          debugPrint('✅ 下载完成: $filePath');
+          onComplete?.call();
 
-      // 打开APK安装
-      final result = await OpenFilex.open(filePath);
-      debugPrint('安装结果: ${result.type} ${result.message}');
-    } catch (e) {
-      if (e is DioException && e.type == DioExceptionType.cancel) {
-        debugPrint('下载已取消');
-      } else {
-        debugPrint('下载失败: $e');
-        onError?.call('下载失败: $e');
+          // 打开APK安装
+          final result = await OpenFilex.open(filePath);
+          debugPrint('安装结果: ${result.type} ${result.message}');
+          return; // 成功，退出
+        } catch (e) {
+          if (e is DioException && e.type == DioExceptionType.cancel) {
+            debugPrint('下载已取消');
+            return;
+          }
+          lastErrorMsg = '$e';
+          debugPrint('⚠️ 从 $url 下载失败: $e，尝试下一个地址...');
+        }
       }
+
+      // 所有 URL 都失败
+      onError?.call('下载失败，请检查网络后重试\n($lastErrorMsg)');
     } finally {
       _isDownloading = false;
       _cancelToken = null;

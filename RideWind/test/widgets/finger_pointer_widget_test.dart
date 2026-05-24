@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/models/guide_models.dart';
-import 'package:ridewind/widgets/finger_pointer_widget.dart';
+import 'package:zcritical_t1/models/guide_models.dart';
+import 'package:zcritical_t1/widgets/finger_pointer_widget.dart';
 
 /// FingerPointerWidget 单元测试
 ///
 /// **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7**
 ///
 /// 测试内容:
-/// 1. calculatePosition 静态方法对所有 8 种手势类型的正确性
-/// 2. 默认参数值
+/// 1. calculatePosition 静态方法对所�?8 种手势类型的正确�?
+/// 2. 默认参数�?
 /// 3. Widget 渲染
 void main() {
   group('FingerPointerWidget', () {
@@ -211,7 +211,7 @@ void main() {
           expect(pos0.dx, closeTo(defaultRect.center.dx, 0.01));
           // At 0.25: sin(π/2) = 1, max right
           expect(pos25.dx, closeTo(defaultRect.center.dx + FingerPointerWidget.dragDistance, 0.01));
-          // At 0.5: sin(π) ≈ 0, back to center
+          // At 0.5: sin(π) �?0, back to center
           expect(pos50.dx, closeTo(defaultRect.center.dx, 0.01));
           // At 0.75: sin(3π/2) = -1, max left
           expect(pos75.dx, closeTo(defaultRect.center.dx - FingerPointerWidget.dragDistance, 0.01));
@@ -237,7 +237,7 @@ void main() {
           expect(pos0.dy, closeTo(defaultRect.center.dy, 0.01));
           // At 0.25: sin(π/2) = 1, max down
           expect(pos25.dy, closeTo(defaultRect.center.dy + FingerPointerWidget.dragDistance, 0.01));
-          // At 0.5: sin(π) ≈ 0, back to center
+          // At 0.5: sin(π) �?0, back to center
           expect(pos50.dy, closeTo(defaultRect.center.dy, 0.01));
           // At 0.75: sin(3π/2) = -1, max up
           expect(pos75.dy, closeTo(defaultRect.center.dy - FingerPointerWidget.dragDistance, 0.01));

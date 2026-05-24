@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ridewind/models/guide_models.dart';
+import 'package:zcritical_t1/models/guide_models.dart';
 
 /// 手势事件数据，用于手势匹配判断
 class GestureData {

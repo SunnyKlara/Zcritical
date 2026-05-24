@@ -1,4 +1,4 @@
-package com.example.ridewind
+package com.zcritical.t1
 
 import android.app.*
 import android.content.Intent
@@ -36,7 +36,7 @@ class AudioCaptureService : Service() {
 
         @Volatile var isRunning = false
         @Volatile var statusMessage = "未启动"
-        @Volatile var esp32Ip = "192.168.4.1"  // Updated via setEsp32Ip()
+        @Volatile var esp32Ip = "192.168.4.1"
     }
 
     private var mediaProjection: MediaProjection? = null
@@ -85,14 +85,14 @@ class AudioCaptureService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID, "音频投射", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "正在将音频投射到 Critical 设备" }
+            ).apply { description = "正在将音频投射到 Zcritical T1 设备" }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(text: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Critical 音频投射")
+            .setContentTitle("Zcritical T1 音频投射")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)
@@ -113,7 +113,6 @@ class AudioCaptureService : Service() {
     private fun startCaptureAndStream(resultCode: Int, resultData: Intent) {
         Log.i(TAG, "Starting capture pipeline...")
 
-        // Step 1: Get MediaProjection
         val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = mpm.getMediaProjection(resultCode, resultData)
         if (mediaProjection == null) {
@@ -124,7 +123,6 @@ class AudioCaptureService : Service() {
         }
         Log.i(TAG, "MediaProjection obtained")
 
-        // Step 2: Create AudioRecord with AudioPlaybackCapture
         val minBuf = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT
         )
@@ -167,7 +165,6 @@ class AudioCaptureService : Service() {
         audioRecord?.startRecording()
         isRunning = true
 
-        // Step 3: Start TCP streaming thread
         streamThread = Thread {
             streamLoop(bufSize)
         }.apply {
@@ -195,7 +192,7 @@ class AudioCaptureService : Service() {
 
                 Log.i(TAG, "TCP connected to ESP32!")
                 updateNotification("正在投射音频 ♪")
-                connectRetries = 0  // 连接成功，重置重试计数
+                connectRetries = 0
 
                 while (isRunning && !socket.isClosed) {
                     val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: -1

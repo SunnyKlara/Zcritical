@@ -1,4 +1,4 @@
-name: ridewind
+name: zcritical_t1
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -108,13 +108,12 @@ flutter:
     - assets/icon/
     - assets/sound/
     - assets/sound/engine/
-    - assets/sound/engine_individual/
     - assets/bmp/
     - assets/car_thumbnails/car_index.json
     - assets/car_thumbnails/car_specs.json
+    - assets/car_thumbnails/car_scale_map.json
     - assets/car_thumbnails/engine_sound_map.json
     - assets/car_thumbnails/car_stories.json
-    - assets/car_thumbnails/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

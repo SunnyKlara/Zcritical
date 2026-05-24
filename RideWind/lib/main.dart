@@ -90,7 +90,7 @@ class _CriticalAppState extends State<CriticalApp> {
       ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
-        title: 'Critical',
+        title: 'Zcritical T1',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,

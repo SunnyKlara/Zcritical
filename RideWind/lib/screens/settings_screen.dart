@@ -110,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _onAboutTap() {
     showAboutDialog(
       context: context,
-      applicationName: 'RideWind',
+      applicationName: 'Zcritical T1',
       applicationVersion: 'v$_version (build $_build)',
       applicationLegalese: '智能风洞模拟器 · ESP32-S3 + Flutter',
       children: const [
@@ -147,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   _SettingsRow(
                     icon: Icons.info_outline,
-                    title: '关于 RideWind',
+                    title: '关于 Zcritical T1',
                     onTap: _onAboutTap,
                   ),
                 ],
@@ -203,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'RideWind',
+            'Zcritical T1',
             style: TextStyle(
               color: Colors.white,
               fontSize: 32,

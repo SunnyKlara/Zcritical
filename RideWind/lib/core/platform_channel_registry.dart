@@ -103,7 +103,7 @@ class UnsupportedWifiChannel implements WifiChannel {
 //  Android 实现（桥接现有 MethodChannel）
 // ═══════════════════════════════════════════════════════════════
 
-const _channel = MethodChannel('com.example.ridewind/audio_capture');
+const _channel = MethodChannel('com.zcritical.t1/audio_capture');
 
 class AndroidAudioCaptureChannel implements AudioCaptureChannel {
   @override

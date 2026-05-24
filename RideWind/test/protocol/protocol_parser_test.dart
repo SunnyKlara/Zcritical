@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/protocol/protocol_parser.dart';
+import 'package:zcritical_t1/protocol/protocol_parser.dart';
 
 void main() {
   group('ProtocolParser', () {

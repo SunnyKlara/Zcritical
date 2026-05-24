@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/widgets/enhanced_guide_overlay.dart';
-import 'package:ridewind/models/guide_models.dart';
+import 'package:zcritical_t1/widgets/enhanced_guide_overlay.dart';
+import 'package:zcritical_t1/models/guide_models.dart';
 
 /// EnhancedGuideOverlay Widget 测试
 ///
-/// 新流程：演示阶段（系统自动操作）→ 用户上手阶段（自由探索）→ 用户点击下一步
+/// 新流程：演示阶段（系统自动操作）�?用户上手阶段（自由探索）�?用户点击下一�?
 void main() {
   group('EnhancedGuideOverlay', () {
     late GlobalKey targetKey1;
@@ -33,7 +33,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    /// Helper: pump through demo phase (no demoAction → 3500ms wait)
+    /// Helper: pump through demo phase (no demoAction �?3500ms wait)
     /// then into userTrying phase
     Future<void> pumpThroughDemo(WidgetTester tester) async {
       // 1000ms initial delay + 3500ms no-demoAction wait + buffer
@@ -96,9 +96,9 @@ void main() {
     }
 
     // ============================================================
-    // 演示 → 用户上手 → 手动推进
+    // 演示 �?用户上手 �?手动推进
     // ============================================================
-    group('Demo → User Trying → Manual Advance', () {
+    group('Demo �?User Trying �?Manual Advance', () {
       testWidgets('demo phase shows tooltip, then user trying shows continue',
           (tester) async {
         final keys = [targetKey1, targetKey2];
@@ -128,12 +128,12 @@ void main() {
         expect(find.text('描述 1'), findsOneWidget);
         expect(find.text('1 / 2'), findsOneWidget);
 
-        // Pump through demo → user trying
+        // Pump through demo �?user trying
         await pumpThroughDemo(tester);
 
         // User trying: continue button visible
-        expect(find.text('下一步'), findsOneWidget);
-        expect(find.text('试试看，自由操作体验一下'), findsOneWidget);
+        expect(find.text('下一�?), findsOneWidget);
+        expect(find.text('试试看，自由操作体验一�?), findsOneWidget);
       });
 
       testWidgets('tapping continue advances to next step', (tester) async {
@@ -160,13 +160,13 @@ void main() {
         await pumpThroughDemo(tester);
 
         // Tap continue
-        await tester.tap(find.text('下一步'));
+        await tester.tap(find.text('下一�?));
         await pumpForTransition(tester);
         // Pump through next step's demo phase too
         await pumpThroughDemo(tester);
 
         // Step 2 user trying phase
-        expect(find.text('下一步'), findsNothing); // last step shows '完成'
+        expect(find.text('下一�?), findsNothing); // last step shows '完成'
         expect(find.text('完成'), findsOneWidget);
       });
 
@@ -189,7 +189,7 @@ void main() {
         await pumpForAnimations(tester);
         await pumpThroughDemo(tester);
 
-        // Last step → "完成" button
+        // Last step �?"完成" button
         expect(find.text('完成'), findsOneWidget);
 
         await tester.tap(find.text('完成'));
@@ -339,12 +339,12 @@ void main() {
         final steps = [
           GuideStep(
             targetKey: orphanKey1,
-            title: '不可见 1',
+            title: '不可�?1',
             description: '描述',
           ),
           GuideStep(
             targetKey: orphanKey2,
-            title: '不可见 2',
+            title: '不可�?2',
             description: '描述',
           ),
         ];
@@ -455,7 +455,7 @@ void main() {
     const tooltipSize = Size(300, 120);
     const screenSize = Size(400, 800);
 
-    test('target in upper half → tooltip below target', () {
+    test('target in upper half �?tooltip below target', () {
       final position = calculateTooltipPosition(
         targetRect: const Rect.fromLTWH(100, 100, 80, 40),
         screenSize: screenSize,
@@ -464,7 +464,7 @@ void main() {
       expect(position.dy, greaterThan(140.0));
     });
 
-    test('target in lower half → tooltip above target', () {
+    test('target in lower half �?tooltip above target', () {
       final position = calculateTooltipPosition(
         targetRect: const Rect.fromLTWH(100, 600, 80, 40),
         screenSize: screenSize,
