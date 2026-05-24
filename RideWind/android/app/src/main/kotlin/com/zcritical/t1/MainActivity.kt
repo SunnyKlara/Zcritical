@@ -1,4 +1,4 @@
-package com.example.ridewind
+package com.zcritical.t1
 
 import android.app.Activity
 import android.content.Intent
@@ -11,7 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     companion object {
-        const val CHANNEL = "com.example.ridewind/audio_capture"
+        const val CHANNEL = "com.zcritical.t1/audio_capture"
         const val REQUEST_MEDIA_PROJECTION = 1001
     }
 
@@ -51,7 +51,6 @@ class MainActivity : FlutterActivity() {
                         @Suppress("DEPRECATION")
                         val success = wifiManager.startScan()
                         if (success) {
-                            // Small delay for scan to complete
                             android.os.Handler(mainLooper).postDelayed({
                                 @Suppress("DEPRECATION")
                                 val results = wifiManager.scanResults
@@ -68,7 +67,6 @@ class MainActivity : FlutterActivity() {
                                 result.success(wifiList)
                             }, 3000)
                         } else {
-                            // Return cached results
                             @Suppress("DEPRECATION")
                             val results = wifiManager.scanResults
                             val wifiList = results
@@ -90,11 +88,9 @@ class MainActivity : FlutterActivity() {
                         val info = wifiManager.connectionInfo
                         if (info != null && info.networkId != -1) {
                             var ssid = info.ssid ?: ""
-                            // Remove surrounding quotes from SSID
                             if (ssid.startsWith("\"") && ssid.endsWith("\"")) {
                                 ssid = ssid.substring(1, ssid.length - 1)
                             }
-                            // Get frequency in MHz
                             val frequency = info.frequency
                             result.success(mapOf(
                                 "ssid" to ssid,

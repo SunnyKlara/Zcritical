@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:ridewind/models/guide_models.dart';
+import 'package:zcritical_t1/models/guide_models.dart';
 
 /// 手指指针组件
 /// 使用系统 emoji 渲染真实手指效果，根据手势类型播放不同动画

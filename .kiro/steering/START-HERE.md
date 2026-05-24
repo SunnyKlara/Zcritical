@@ -6,7 +6,7 @@ inclusion: auto
 
 ## 产品
 智能风洞模拟器。ESP32-S3 固件(C/ESP-IDF) + Flutter APP(Dart)，BLE 控制 + WiFi 音频投射。
-品牌名 Critical，代码内部仍用 ridewind（改名会破坏构建）。
+品牌名 Zcritical T1。**RideWind 品牌已退出，所有面向用户的地方不得出现 ridewind 字样。** 详见 `brand-rules.md`。
 
 ## 当前状态
 → 见 `CONTINUATION_GUIDE.md`（session handoff，≤100 行）

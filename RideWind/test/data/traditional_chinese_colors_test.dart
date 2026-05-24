@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/data/traditional_chinese_colors.dart';
+import 'package:zcritical_t1/data/traditional_chinese_colors.dart';
 
 void main() {
   group('ChineseColor', () {
@@ -16,9 +16,9 @@ void main() {
     });
 
     test('textColor returns darker variant for bright colors', () {
-      // White: very high lightness → should return a darker variant
+      // White: very high lightness �?should return a darker variant
       const bright = ChineseColor(
-        name: '白',
+        name: '�?,
         r: 255,
         g: 255,
         b: 255,
@@ -31,9 +31,9 @@ void main() {
     });
 
     test('textColor returns lighter variant for dark colors', () {
-      // Black: very low lightness → should return a lighter variant
+      // Black: very low lightness �?should return a lighter variant
       const dark = ChineseColor(
-        name: '黑',
+        name: '�?,
         r: 0,
         g: 0,
         b: 0,
@@ -53,7 +53,7 @@ void main() {
         b: 128,
         family: 'neutral',
       );
-      // HSL lightness of (128,128,128) ≈ 0.502, which is < 0.55
+      // HSL lightness of (128,128,128) �?0.502, which is < 0.55
       // so it should return a lighter variant
       final tc = boundary.textColor;
       final lum = 0.299 * tc.red + 0.587 * tc.green + 0.114 * tc.blue;
@@ -96,14 +96,14 @@ void main() {
     test('stores all fields correctly', () {
       const family = ColorFamily(
         id: 'red',
-        name: '红色系',
+        name: '红色�?,
         colors: [
           ChineseColor(name: '朱砂', r: 255, g: 46, b: 0, family: 'red'),
           ChineseColor(name: '胭脂', r: 157, g: 41, b: 51, family: 'red'),
         ],
       );
       expect(family.id, 'red');
-      expect(family.name, '红色系');
+      expect(family.name, '红色�?);
       expect(family.colors.length, 2);
       expect(family.colors[0].name, '朱砂');
       expect(family.colors[1].name, '胭脂');
@@ -112,7 +112,7 @@ void main() {
     test('can be constructed with empty colors list', () {
       const family = ColorFamily(
         id: 'empty',
-        name: '空色系',
+        name: '空色�?,
         colors: [],
       );
       expect(family.colors, isEmpty);

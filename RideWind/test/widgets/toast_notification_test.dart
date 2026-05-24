@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/widgets/toast_notification.dart';
+import 'package:zcritical_t1/widgets/toast_notification.dart';
 
 void main() {
   group('ToastNotification', () {

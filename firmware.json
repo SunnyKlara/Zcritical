@@ -1,6 +1,6 @@
 {
   "version": "1.1.1",
   "size": 3037152,
-  "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.1.1/ridewind-fw-v1.1.1.bin",
+  "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.1.1/zcritical-fw-v1.1.1.bin",
   "changelog": "v1.1.1 小更新\n- 集成产测自检（开机长按编码器进入）\n- 隐藏跑步机菜单，恢复音量菜单\n- 音量软件增益实际生效\n- 默认白色LED + 静音\n- 修复storage默认值不同步问题"
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/widgets/chinese_color_wheel_overlay.dart';
+import 'package:zcritical_t1/widgets/chinese_color_wheel_overlay.dart';
 
-/// ChineseColorWheelOverlay widget 测试（COPIC 风格）
+/// ChineseColorWheelOverlay widget 测试（COPIC 风格�?
 void main() {
   Widget buildTestWidget({
     Function(int, int, int)? onColorSelected,
@@ -27,7 +27,7 @@ void main() {
 
     testWidgets('shows default hint text when no color is selected', (tester) async {
       await tester.pumpWidget(buildTestWidget());
-      expect(find.text('中华传统色'), findsOneWidget);
+      expect(find.text('中华传统�?), findsOneWidget);
       expect(find.text('双指缩放查看 · 点击色块选色'), findsOneWidget);
     });
 

@@ -1,10 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridewind/data/traditional_chinese_colors.dart';
-import 'package:ridewind/widgets/chinese_color_wheel_painter.dart';
+import 'package:zcritical_t1/data/traditional_chinese_colors.dart';
+import 'package:zcritical_t1/widgets/chinese_color_wheel_painter.dart';
 
-/// ChineseColorWheelPainter 单元测试（COPIC 风格）
+/// ChineseColorWheelPainter 单元测试（COPIC 风格�?
 void main() {
   group('ChineseColorWheelPainter', () {
     final testFamilies = TraditionalChineseColors.families;
@@ -110,7 +110,7 @@ void main() {
       // innerRadius = 600 * 0.10 = 60
       // familyCount = 6, totalSectorAngle = 2*pi/6 = pi/3
       // maxColors = 9, totalRadial = 228
-      // ringGap = 1.5, ringThickness = (228 - 1.5*8) / 9 ≈ 24.0
+      // ringGap = 1.5, ringThickness = (228 - 1.5*8) / 9 �?24.0
       const canvasSize = Size(600, 600);
 
       test('returns null when tapping the center', () {
@@ -128,7 +128,7 @@ void main() {
       test('returns a color when tapping a valid swatch', () {
         final painter = ChineseColorWheelPainter(families: testFamilies);
         // Tap at angle 0 (right of center), distance = 70 (inside first ring)
-        // angle 0 → family index 0 (red), ring index 0 → 暗红
+        // angle 0 �?family index 0 (red), ring index 0 �?暗红
         final result = painter.colorHitTest(const Offset(370, 300), canvasSize);
         expect(result, isNotNull);
         expect(result!.family, equals('red'));

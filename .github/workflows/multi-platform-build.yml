@@ -1,10 +1,10 @@
-name: Multi-Platform Build
+name: Multi-Platform Build & Release
 
 on:
   push:
     branches: [main]
     paths: ['RideWind/**']
-    tags: ['app-v*']
+    tags: ['v*', 'app-v*']  # 兼容两种 tag 命名
   pull_request:
     branches: [main]
     paths: ['RideWind/**']
@@ -24,7 +24,7 @@ env:
 
 jobs:
   # ═══════════════════════════════════════════════════════════════
-  #  代码质量检查（所有平台共享）
+  #  代码质量检查
   # ═══════════════════════════════════════════════════════════════
   analyze:
     name: Flutter Analyze
@@ -97,52 +97,125 @@ jobs:
       - name: Build iOS (no codesign)
         run: flutter build ios --release --no-codesign
         working-directory: RideWind
-      # 签名构建（需要配置 secrets）
-      # - name: Build IPA (signed)
-      #   run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
-      #   working-directory: RideWind
-      #   env:
-      #     APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      #     APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      #     APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
-      # - name: Upload IPA artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: ios-ipa
-      #     path: RideWind/build/ios/ipa/*.ipa
-      #     retention-days: 30
 
   # ═══════════════════════════════════════════════════════════════
   #  Release 自动分发（tag 触发）
+  #  1. 创建 GitHub Release + 上传 APK
+  #  2. 上传 APK 到阿里云服务器（国内加速）
+  #  3. 自动更新 app_version.json 并 push 回 main
   # ═══════════════════════════════════════════════════════════════
   release:
-    name: Create Release
-    needs: [build-android, build-ios]
+    name: Create Release & Deploy
+    needs: [build-android]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/app-v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/app-v')
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Download Android APK
         uses: actions/download-artifact@v4
         with:
           name: android-apk
           path: ./artifacts/
-      # - name: Download iOS IPA
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: ios-ipa
-      #     path: ./artifacts/
+
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/app-v}" >> $GITHUB_OUTPUT
+        run: |
+          # 兼容 v1.2.1 和 app-v1.2.1 两种格式
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#app-}"
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
       - name: Rename APK
         run: mv ./artifacts/app-release.apk ./artifacts/ridewind-v${{ steps.version.outputs.VERSION }}.apk
+
+      # ─── GitHub Release ───
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "APP v${{ steps.version.outputs.VERSION }}"
+          tag_name: ${{ steps.version.outputs.TAG }}
           files: |
             ./artifacts/ridewind-v${{ steps.version.outputs.VERSION }}.apk
           generate_release_notes: true
+
+      # ─── 上传到阿里云服务器（国内加速下载） ───
+      - name: Deploy APK to China server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "./artifacts/ridewind-v${{ steps.version.outputs.VERSION }}.apk"
+          target: "/www/wwwroot/sunnyklara.com/releases/"
+          strip_components: 1
+
+      # ─── 验证阿里云部署 ───
+      - name: Verify China server deployment
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${{ secrets.DEPLOY_HOST }}/releases/ridewind-v${{ steps.version.outputs.VERSION }}.apk" --connect-timeout 10)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::China server deployment verification failed (HTTP $HTTP_CODE). APK still available on GitHub Releases."
+          else
+            echo "✅ China server deployment verified"
+          fi
+
+      # ─── 自动更新 app_version.json ───
+      - name: Update app_version.json
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DATE=$(date +%Y-%m-%d)
+          DOWNLOAD_URL="http://${{ secrets.DEPLOY_HOST }}/releases/ridewind-v${VERSION}.apk"
+          GITHUB_URL="https://github.com/SunnyKlara/Zcritical/releases/download/${{ steps.version.outputs.TAG }}/ridewind-v${VERSION}.apk"
+          
+          # 从 tag annotation 提取 release notes
+          NOTES=$(git tag -l --format='%(contents)' "${{ steps.version.outputs.TAG }}" 2>/dev/null | head -20 || echo "")
+          if [ -z "$NOTES" ]; then
+            NOTES="v${VERSION} 更新"
+          fi
+          NOTES_JSON=$(echo "$NOTES" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
+          
+          # 读取当前 build number
+          CURRENT_BUILD=$(python3 -c "import json; d=json.load(open('RideWind/app_version.json')); print(d.get('latest_build', d.get('buildNumber', 1)))")
+          
+          # 写入新的 app_version.json
+          python3 -c "
+          import json
+          data = {
+            'latest_version': '${VERSION}',
+            'latest_build': ${CURRENT_BUILD},
+            'min_version': '1.0.0',
+            'download_url': '${DOWNLOAD_URL}',
+            'fallback_download_url': '${GITHUB_URL}',
+            'ios_app_store_url': '',
+            'release_notes': ${NOTES_JSON},
+            'force_update': False,
+            'version': '${VERSION}',
+            'buildNumber': ${CURRENT_BUILD},
+            'minSupportedVersion': '1.0.0',
+            'downloadUrl': '${DOWNLOAD_URL}',
+            'fallbackDownloadUrl': '${GITHUB_URL}',
+            'changelog': ${NOTES_JSON},
+            'releaseDate': '${DATE}',
+            'forceUpdate': False
+          }
+          with open('RideWind/app_version.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write('\n')
+          "
+
+      - name: Commit and push app_version.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add RideWind/app_version.json
+          git diff --cached --quiet && echo "No changes to commit" || {
+            git commit -m "chore(release): auto-update app_version.json for v${{ steps.version.outputs.VERSION }} [skip ci]"
+            git push origin HEAD:main
+          }
