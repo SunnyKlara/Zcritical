@@ -117,7 +117,7 @@ jobs:
           retention-days: 30
 
   # ---------------------------------------------------------------
-  #  iOS Build + TestFlight Upload
+  #  iOS Build + TestFlight Upload (App Store Connect API Auto-Signing)
   # ---------------------------------------------------------------
   build-ios:
     name: Build iOS & Upload TestFlight
@@ -138,74 +138,93 @@ jobs:
           cd RideWind/ios
           pod install --repo-update
 
-      # --- iOS signing setup (only for tag builds) ---
-      - name: Install Apple certificate and provisioning profile
-        if: startsWith(github.ref, 'refs/tags/')
+      # --- Check API Key availability ---
+      - name: Check signing prerequisites
+        id: signing
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          APPSTORE_CONNECT_API_KEY: ${{ secrets.APPSTORE_CONNECT_API_KEY }}
         run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "::warning::Apple signing secrets not configured, building without codesign"
-            echo "HAS_SIGNING=false" >> $GITHUB_ENV
-            exit 0
+          if [ -z "$APPSTORE_CONNECT_API_KEY_ID" ] || [ -z "$APPSTORE_CONNECT_ISSUER_ID" ] || [ -z "$APPSTORE_CONNECT_API_KEY" ]; then
+            echo "::warning::App Store Connect API Key not fully configured. Need: APPSTORE_CONNECT_API_KEY_ID, APPSTORE_CONNECT_ISSUER_ID, APPSTORE_CONNECT_API_KEY"
+            echo "HAS_API_KEY=false" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_API_KEY=true" >> $GITHUB_OUTPUT
           fi
-          echo "HAS_SIGNING=true" >> $GITHUB_ENV
 
-          # Create temporary keychain
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+      # --- Setup API Key for xcodebuild automatic signing ---
+      - name: Setup App Store Connect API Key
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
+        env:
+          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          APPSTORE_CONNECT_API_KEY: ${{ secrets.APPSTORE_CONNECT_API_KEY }}
+        run: |
+          # Write API Key .p8 file for xcodebuild
+          API_KEY_DIR="$RUNNER_TEMP/private_keys"
+          mkdir -p "$API_KEY_DIR"
+          echo -n "$APPSTORE_CONNECT_API_KEY" > "$API_KEY_DIR/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8"
+          chmod 600 "$API_KEY_DIR/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8"
 
-          # Import certificate
-          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
-          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
-          security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          # Export paths for subsequent steps
+          echo "API_KEY_PATH=$API_KEY_DIR/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8" >> $GITHUB_ENV
+          echo "API_KEY_ID=$APPSTORE_CONNECT_API_KEY_ID" >> $GITHUB_ENV
+          echo "API_ISSUER_ID=$APPSTORE_CONNECT_ISSUER_ID" >> $GITHUB_ENV
 
-          # Install provisioning profile (must use UUID as filename)
-          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
-          echo -n "$APPLE_PROVISIONING_PROFILE" | base64 --decode -o $PROFILE_PATH
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "✅ API Key written to $API_KEY_DIR"
 
-          # Extract UUID and Name from profile
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i $PROFILE_PATH))
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(security cms -D -i $PROFILE_PATH))
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "Profile Name: $PROFILE_NAME"
-
-          # Copy with UUID filename (required by Xcode)
-          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
-
-          # Export for later steps
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
-
-      # --- Build iOS (no-codesign for PR, signed for tags) ---
-      - name: Build iOS (no codesign)
+      # --- Build iOS (no-codesign for PR builds) ---
+      - name: Build iOS (no codesign - PR only)
         if: "!startsWith(github.ref, 'refs/tags/')"
         run: flutter build ios --release --no-codesign
         working-directory: RideWind
 
-      - name: Configure manual signing for CI
-        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+      # --- Ensure Xcode project uses automatic signing ---
+      - name: Configure automatic signing
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
         run: |
-          # Switch Xcode project from automatic to manual signing
           PBXPROJ="RideWind/ios/Runner.xcodeproj/project.pbxproj"
-          # Set CODE_SIGN_STYLE to Manual for all targets
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
-          # Add PROVISIONING_PROFILE_SPECIFIER where DEVELOPMENT_TEAM is set (Runner target)
-          sed -i '' "s/DEVELOPMENT_TEAM = 9YSTN2JSTJ;/DEVELOPMENT_TEAM = 9YSTN2JSTJ; CODE_SIGN_STYLE = Manual; PROVISIONING_PROFILE_SPECIFIER = \"${PROFILE_NAME}\";/g" "$PBXPROJ"
-          echo "Configured manual signing with profile: $PROFILE_NAME"
 
-      - name: Generate ExportOptions.plist
-        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+          # Ensure CODE_SIGN_STYLE is Automatic (in case it was changed to Manual)
+          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PBXPROJ"
+
+          # Remove any hardcoded PROVISIONING_PROFILE_SPECIFIER (let Xcode manage it)
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";//g' "$PBXPROJ"
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*;//g' "$PBXPROJ"
+
+          echo "✅ Xcode project configured for automatic signing"
+
+      # --- Archive with xcodebuild + API Key auto-signing ---
+      - name: Archive iOS app (auto-signed)
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
         run: |
-          cat > RideWind/ios/ExportOptions.plist << EOF
+          # First, let Flutter generate the Xcode project with proper build settings
+          cd RideWind
+          flutter build ios --release --no-codesign
+
+          # Now archive with xcodebuild using API Key for automatic signing
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            DEVELOPMENT_TEAM=9YSTN2JSTJ \
+            CODE_SIGN_STYLE=Automatic \
+            archive
+
+          echo "✅ Archive created at $RUNNER_TEMP/Runner.xcarchive"
+
+      # --- Export IPA with automatic signing ---
+      - name: Generate ExportOptions.plist
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -215,14 +234,9 @@ jobs:
             <key>destination</key>
             <string>upload</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>teamID</key>
             <string>9YSTN2JSTJ</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.example.ridewind</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
             <key>uploadSymbols</key>
             <true/>
             <key>compileBitcode</key>
@@ -230,59 +244,62 @@ jobs:
           </dict>
           </plist>
           EOF
-          echo "Generated ExportOptions.plist with profile: $PROFILE_NAME"
+          echo "✅ ExportOptions.plist generated (automatic signing, no profile needed)"
 
-      - name: Build IPA (signed)
-        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
-        working-directory: RideWind
-
-      - name: Build iOS (no codesign fallback)
-        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING != 'true'
-        run: flutter build ios --release --no-codesign
-        working-directory: RideWind
-
-      # --- Upload to TestFlight ---
-      - name: Upload to TestFlight
-        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
-        env:
-          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
-          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
-          APPSTORE_CONNECT_API_KEY: ${{ secrets.APPSTORE_CONNECT_API_KEY }}
+      - name: Export IPA
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
         run: |
-          if [ -z "$APPSTORE_CONNECT_API_KEY_ID" ]; then
-            echo "::warning::App Store Connect API key not configured, skipping TestFlight upload"
-            exit 0
-          fi
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/ipa_output" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
 
-          # Write API key to file
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo -n "$APPSTORE_CONNECT_API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8
+          # Copy IPA to expected Flutter output location
+          mkdir -p RideWind/build/ios/ipa
+          cp "$RUNNER_TEMP/ipa_output/"*.ipa RideWind/build/ios/ipa/
+          echo "✅ IPA exported successfully"
+          ls -la RideWind/build/ios/ipa/
 
-          # Upload using xcrun
-          xcrun notarytool store-credentials "AC_PASSWORD" \
-            --key ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8 \
-            --key-id "$APPSTORE_CONNECT_API_KEY_ID" \
-            --issuer "$APPSTORE_CONNECT_ISSUER_ID"
+      # --- Fallback: no signing available ---
+      - name: Build iOS (no codesign fallback)
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY != 'true'
+        run: |
+          echo "::warning::No API Key configured. Building without codesign."
+          flutter build ios --release --no-codesign
+        working-directory: RideWind
 
+      # --- Upload to TestFlight using xcrun notarytool + altool ---
+      - name: Upload to TestFlight
+        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
+        run: |
           IPA_PATH=$(find RideWind/build/ios/ipa -name "*.ipa" | head -1)
-          if [ -n "$IPA_PATH" ]; then
-            xcrun altool --upload-app -f "$IPA_PATH" -t ios \
-              --apiKey "$APPSTORE_CONNECT_API_KEY_ID" \
-              --apiIssuer "$APPSTORE_CONNECT_ISSUER_ID"
-            echo "✅ IPA uploaded to TestFlight"
-          else
-            echo "::warning::No IPA found, skipping upload"
+          if [ -z "$IPA_PATH" ]; then
+            echo "::error::No IPA found for upload"
+            exit 1
           fi
+
+          echo "Uploading $IPA_PATH to TestFlight..."
+
+          xcrun altool --upload-app \
+            -f "$IPA_PATH" \
+            -t ios \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$API_ISSUER_ID"
+
+          echo "✅ IPA uploaded to TestFlight successfully"
 
       # --- Cleanup ---
-      - name: Clean up keychain
+      - name: Clean up API Key
         if: always()
         run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          if [ -f "$KEYCHAIN_PATH" ]; then
-            security delete-keychain $KEYCHAIN_PATH
-          fi
+          rm -rf "$RUNNER_TEMP/private_keys"
+          rm -f "$RUNNER_TEMP/ExportOptions.plist"
+          rm -rf "$RUNNER_TEMP/Runner.xcarchive"
+          rm -rf "$RUNNER_TEMP/ipa_output"
 
   # ---------------------------------------------------------------
   #  Release: GitHub Release + China Server + app_version.json
