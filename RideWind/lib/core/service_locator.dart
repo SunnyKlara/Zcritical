@@ -6,6 +6,7 @@ import '../providers/bluetooth_provider.dart';
 import '../controllers/colorize_controller.dart';
 import '../controllers/device_session_controller.dart';
 import '../services/preference_service.dart';
+import '../services/ble_connection_manager.dart';
 import '../models/device_model.dart';
 
 /// 全局服务定位器
@@ -44,6 +45,14 @@ void setupServiceLocator() {
 
   // 偏好服务
   sl.registerLazySingleton<PreferenceService>(() => PreferenceService());
+
+  // BLE 连接状态机
+  sl.registerLazySingleton<BleConnectionManager>(
+    () => BleConnectionManager(
+      bluetoothProvider: sl<BluetoothProvider>(),
+      preferenceService: sl<PreferenceService>(),
+    )..initialize(),
+  );
 }
 
 /// 创建 DeviceSessionController 实例（每次连接设备时调用）
