@@ -27,13 +27,26 @@
 **决策**：
 - 重构只涉及 Flutter APP 端（`RideWind/lib/`），不动固件
 - 每阶段独立提交+tag，`flutter analyze` + 51 个协议测试必须通过才进入下一阶段
-- DI：引入 `get_it` 极简模式，只注册 4 个核心 service（IBleService / IOtaService / IAudioStreamService / IPreferenceService）
-- Provider 拆分：只拆出 `LedColorProvider` + `AudioCastProvider`，BluetoothProvider 保持为核心（连接+速度+设备信息）
+- DI：GetIt 已在用（`core/service_locator.dart`），只需改注册类型为接口（当需要时）
+- **Provider 不拆**：BluetoothProvider 保持为唯一核心 Provider，只拆文件不拆类（用 part 或 extension 拆到多个文件）
 - 死代码：彻底删除（含调用点+未用依赖如 audioplayers），不留空壳
-- 层级规则：严格执行但分阶段——Phase 1-2 不动层级，Phase 3 统一修复所有违规，之后 CI 门禁拦截新违规
+- 层级规则修正：无状态工具类（PreferenceService/FirstLaunchManager/EngineSoundService）允许 UI 层直接调用；有状态通信类（BLEService/AudioStreamService）必须通过 Provider
+- 接口抽象：**降级为可选**（当需要写测试或换库时再做）
 - 质量门禁：层级违规检查脚本 + 文件长度检查脚本，集成到 CI
 
-**状态**：规划+设计决策完成，未开始执行。下一步是生成 tasks.md 然后开始 Phase 1（死代码清除）。
+**修正后执行顺序**：
+- 必做 Phase 1: 死代码清除（~2-3h）
+- 必做 Phase 2: 大文件拆分（~1-2天，34 个文件超 400 行）
+- 必做 Phase 3: CI 质量门禁脚本（~2h）
+- 可选 Phase 4: 接口抽象（当要写测试或换库时）
+- 可选 Phase 5: 状态管理统一（当 widget 本地状态导致 bug 时）
+
+**代码实证**（2026-05-24 分析）：
+- 层级违规实际只有 14 处（12 个 screen 文件），其中真正需要改的只有 5-6 处
+- 34 个文件超 400 行（最大 logo_transmission_manager.dart 1600 行）
+- BluetoothProvider 747 行，暴露 15+ Stream getter，拆 Provider 会破坏 screen 层稳定性
+
+**状态**：方案经代码实证修正完成，待用户确认后更新 design.md 并生成 tasks.md 开始执行。
 
 ### 本次新增：工程标准体系 + 项目健康审计 (2026-05-24)
 
