@@ -214,36 +214,53 @@ class DeviceSessionController extends ChangeNotifier {
     if (_navigatedOnDisconnect) return;
     if (_disconnectedByBackground) return;
 
-    // BLE service has its own auto-reconnect (up to 5 attempts).
-    // We wait silently for reconnection. Only show popup if still
-    // disconnected after a generous timeout (15 seconds).
+    // NEVER show a popup for transient disconnects.
+    // BLE service handles auto-reconnect internally (up to 5 attempts).
+    // We only mark as disconnected after exhausting all options silently.
     _disconnectDebounceTimer?.cancel();
     _reconnectAttemptCount = 0;
+    _lastConnectionEvent = ConnectionEvent.disconnected;
+    notifyListeners(); // UI can show a subtle indicator if desired
+
     _startSilentReconnectWatch();
   }
 
   int _reconnectAttemptCount = 0;
-  static const int _maxSilentReconnectWaitSeconds = 15;
+  static const int _maxSilentReconnectWaitSeconds = 30;
+  static const int _maxManualReconnectAttempts = 3;
 
   void _startSilentReconnectWatch() {
     _disconnectDebounceTimer?.cancel();
     _disconnectDebounceTimer = Timer(
       const Duration(seconds: _maxSilentReconnectWaitSeconds),
-      () {
+      () async {
         if (_navigatedOnDisconnect) return;
-        // After 15s, check if BLE service reconnected
-        if (_bt.isConnected) return;
-
-        // Still disconnected — try one more manual reconnect
-        _bt.connectToDevice(device).then((success) {
-          if (success) return;
-          // Truly disconnected — now notify UI
-          saveSettings();
-          _navigatedOnDisconnect = true;
-          _lastConnectionEvent = ConnectionEvent.disconnected;
+        if (_bt.isConnected) {
+          _lastConnectionEvent = ConnectionEvent.connected;
           notifyListeners();
-          _disconnectConfirmed.add(null);
-        });
+          return;
+        }
+
+        // Try manual reconnect attempts
+        _reconnectAttemptCount++;
+        if (_reconnectAttemptCount <= _maxManualReconnectAttempts) {
+          final success = await _bt.connectToDevice(device);
+          if (success) {
+            _lastConnectionEvent = ConnectionEvent.connected;
+            notifyListeners();
+            return;
+          }
+          // Try again after another wait
+          _startSilentReconnectWatch();
+          return;
+        }
+
+        // All attempts exhausted — NOW show disconnect dialog
+        saveSettings();
+        _navigatedOnDisconnect = true;
+        _lastConnectionEvent = ConnectionEvent.disconnected;
+        notifyListeners();
+        _disconnectConfirmed.add(null);
       },
     );
   }
