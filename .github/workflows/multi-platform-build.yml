@@ -246,7 +246,7 @@ jobs:
           EOF
           echo "✅ ExportOptions.plist generated (automatic signing, no profile needed)"
 
-      - name: Export IPA
+      - name: Export IPA & Upload to TestFlight
         if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
         run: |
           xcodebuild -exportArchive \
@@ -258,11 +258,7 @@ jobs:
             -authenticationKeyID "$API_KEY_ID" \
             -authenticationKeyIssuerID "$API_ISSUER_ID"
 
-          # Copy IPA to expected Flutter output location
-          mkdir -p RideWind/build/ios/ipa
-          cp "$RUNNER_TEMP/ipa_output/"*.ipa RideWind/build/ios/ipa/
-          echo "✅ IPA exported successfully"
-          ls -la RideWind/build/ios/ipa/
+          echo "✅ IPA exported and uploaded to TestFlight via App Store Connect"
 
       # --- Fallback: no signing available ---
       - name: Build iOS (no codesign fallback)
@@ -271,26 +267,6 @@ jobs:
           echo "::warning::No API Key configured. Building without codesign."
           flutter build ios --release --no-codesign
         working-directory: RideWind
-
-      # --- Upload to TestFlight using xcrun notarytool + altool ---
-      - name: Upload to TestFlight
-        if: startsWith(github.ref, 'refs/tags/') && steps.signing.outputs.HAS_API_KEY == 'true'
-        run: |
-          IPA_PATH=$(find RideWind/build/ios/ipa -name "*.ipa" | head -1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "::error::No IPA found for upload"
-            exit 1
-          fi
-
-          echo "Uploading $IPA_PATH to TestFlight..."
-
-          xcrun altool --upload-app \
-            -f "$IPA_PATH" \
-            -t ios \
-            --apiKey "$API_KEY_ID" \
-            --apiIssuer "$API_ISSUER_ID"
-
-          echo "✅ IPA uploaded to TestFlight successfully"
 
       # --- Cleanup ---
       - name: Clean up API Key
