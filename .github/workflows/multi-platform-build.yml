@@ -1,4 +1,4 @@
-name: Multi-Platform Build & Release
+name: Multi-Platform Build and Release
 
 on:
   push:
@@ -279,8 +279,15 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Notify Telegram
-        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets not configured, skipping"
+            exit 0
+          fi
           STATUS="${{ needs.release.result }}"
           if [ "$STATUS" = "success" ]; then
             EMOJI="✅"
@@ -306,8 +313,14 @@ jobs:
         continue-on-error: true
 
       - name: Notify 企业微信
-        if: ${{ secrets.WECOM_WEBHOOK_URL != '' }}
+        continue-on-error: true
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
         run: |
+          if [ -z "$WECOM_WEBHOOK_URL" ]; then
+            echo "WeCom webhook not configured, skipping"
+            exit 0
+          fi
           STATUS="${{ needs.release.result }}"
           if [ "$STATUS" = "success" ]; then
             CONTENT="✅ Zcritical T1 v${{ steps.version.outputs.VERSION }} 发布成功\n\n📦 GitHub Release: https://github.com/SunnyKlara/Zcritical/releases/tag/${GITHUB_REF#refs/tags/}\n🇨🇳 国内下载已部署"
