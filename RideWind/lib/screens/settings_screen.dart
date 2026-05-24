@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/preference_service.dart';
 
@@ -98,11 +99,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _onFeedbackTap() {
-    // P1 再接真实的反馈表单页或 mailto，这里先给一个占位提示。
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('反馈通道开发中，敬请期待'),
-        duration: Duration(seconds: 2),
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('反馈问题', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '遇到问题或有建议？通过以下方式联系我们：',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            _FeedbackContactRow(
+              icon: Icons.email_outlined,
+              label: '邮箱',
+              value: 'support@zcritical.com',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '反馈时请附上：\n• APP 版本号（v$_version）\n• 手机型号和系统版本\n• 问题描述和复现步骤',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
       ),
     );
   }
@@ -336,6 +364,45 @@ class _SettingsRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 反馈联系方式行（图标 + 标签 + 可复制值）
+class _FeedbackContactRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _FeedbackContactRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70, size: 20),
+        const SizedBox(width: 8),
+        Text('$label: ', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: value));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('已复制: $value'), duration: const Duration(seconds: 1)),
+              );
+            },
+            child: Text(
+              value,
+              style: const TextStyle(color: Color(0xFF00FF94), fontSize: 14),
+            ),
+          ),
+        ),
+        const Icon(Icons.copy, color: Colors.white38, size: 16),
+      ],
     );
   }
 }

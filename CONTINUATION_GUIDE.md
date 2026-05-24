@@ -50,6 +50,13 @@
 | ⏳ 进行中 | Mac 首次 iOS 克隆+编译+真机运行 | 2026-05-22 |
 | ⏳ 待处理 | 背景图左上角 "RideWind T1" 文字需替换为 "T1"（等后续换图时一并处理） | 2026-05-23 |
 
+## 工作流优化记录 (2026-05-24)
+
+**终端命令自动执行**：已配置 `"kiroAgent.trustedCommands": ["*"]`（用户级 settings.json），所有终端命令自动执行不再弹确认。
+- 安全保障：`.kiro/steering/terminal-safety.md` 禁止 AI 使用破坏性命令（del/rm/rmdir/Remove-Item 等）
+- 删除文件走 Kiro 内置 `delete_file` 工具，不走终端
+- 设置路径：`C:\Users\Klara\AppData\Roaming\Kiro\User\settings.json`
+
 ## 下一步
 
 1. **P0 四大功能分支开发**（详见 `knowledge/feature-roadmap.md`）：
