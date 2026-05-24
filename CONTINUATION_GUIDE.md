@@ -10,6 +10,28 @@
 所有实验性功能分支已暂存保留，工作区已切回 main 干净状态。
 **当前重心**：建立专业开发体系（500+用户，不能再小作坊模式）。
 
+### 本次新增：工程化重构 Spec 规划完成 (2026-05-24)
+
+**Spec 位置**：`.kiro/specs/engineering-refactor/`
+- `requirements.md` — 8 个需求（大文件拆分、分层架构、死代码清除、接口抽象、状态统一、安全保障、执行顺序、质量验证）
+- `design.md` — 技术设计（架构图、4 个抽象接口、Service Locator 方案、拆分策略、CI 门禁脚本）
+- `tasks.md` — ⏳ 待生成
+
+**重构执行顺序（固定）**：
+1. 死代码清除（空方法、未用 import、注释代码）
+2. 接口抽象引入（IBleService / IOtaService / IAudioStreamService / IPreferenceService）
+3. 分层架构建立（UI → Business → Data，禁止跨层导入）
+4. 状态管理统一（Provider 为唯一机制，BluetoothProvider 拆分为领域 Provider）
+5. 大文件拆分（400 行触发，500 行硬上限，barrel file 保持兼容）
+
+**决策**：
+- 重构只涉及 Flutter APP 端（`RideWind/lib/`），不动固件
+- 每阶段独立提交+tag，`flutter analyze` + 51 个协议测试必须通过才进入下一阶段
+- 引入 GetIt 做依赖注入（Service Locator 模式）
+- 质量门禁：层级违规检查脚本 + 文件长度检查脚本，集成到 CI
+
+**状态**：规划完成，未开始执行。下一步是生成 tasks.md 或直接开始 Phase 1（死代码清除）。
+
 ### 本次新增：工程标准体系 + 项目健康审计 (2026-05-24)
 
 **工程标准**：创建 `.kiro/steering/engineering-standards.md` — 10 条不可违反的工程规则

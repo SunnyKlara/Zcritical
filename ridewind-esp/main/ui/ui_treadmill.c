@@ -35,6 +35,7 @@ static float    s_display_speed = 0.0f;
 static uint32_t s_last_tick = 0;
 static float    s_last_needle_rad = 0;
 static uint8_t  s_last_drawn_pct = 0;
+static uint16_t s_last_display_num = 0xFFFF;  /* last drawn number value */
 
 /* == Config == */
 #define TREAD_ACCEL_MS      120
@@ -292,6 +293,8 @@ static void draw_speed_number(void)
 {
     uint16_t display_spd = (uint16_t)(s_display_speed * 10.0f + 0.5f);
     if (display_spd > DISPLAY_MAX) display_spd = DISPLAY_MAX;
+    if (display_spd == s_last_display_num) return;  /* Skip if unchanged */
+    s_last_display_num = display_spd;
 
     drv_lcd_fill_rect(40, NUM_CENTER_Y - 26, 160, F4_SPEED_NUM_HIGH, COLOR_BG);
 
@@ -440,7 +443,7 @@ void ui_treadmill_update(void)
 
     encoder_event_t evt;
     while (drv_encoder_poll(&evt)) {
-        if (evt.type == ENC_EVT_DOUBLE_CLICK) {
+        if (evt.type == ENC_EVT_DOUBLE_CLICK || evt.type == ENC_EVT_CLICK) {
             ui_manager_set_ui(5);
             return;
         }
