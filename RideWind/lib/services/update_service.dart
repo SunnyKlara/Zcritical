@@ -32,14 +32,14 @@ class UpdateInfo {
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
     return UpdateInfo(
-      latestVersion: json['latest_version'] ?? '1.0.0',
-      latestBuild: json['latest_build'] ?? 1,
-      minVersion: json['min_version'] ?? '1.0.0',
-      downloadUrl: json['download_url'] ?? '',
+      latestVersion: json['version'] ?? json['latest_version'] ?? '1.0.0',
+      latestBuild: json['buildNumber'] ?? json['latest_build'] ?? 1,
+      minVersion: json['minSupportedVersion'] ?? json['min_version'] ?? '1.0.0',
+      downloadUrl: json['downloadUrl'] ?? json['download_url'] ?? '',
       fallbackDownloadUrl: json['fallback_download_url'],
-      releaseNotes: json['release_notes'] ?? '',
-      forceUpdate: json['force_update'] ?? false,
-      iosAppStoreUrl: json['ios_app_store_url'],
+      releaseNotes: json['changelog'] ?? json['release_notes'] ?? '',
+      forceUpdate: json['forceUpdate'] ?? json['force_update'] ?? false,
+      iosAppStoreUrl: json['iosAppStoreUrl'] ?? json['ios_app_store_url'],
     );
   }
 
@@ -135,7 +135,7 @@ class UpdateService {
     String? fallbackUrl,
   }) async {
     final dir = await getTemporaryDirectory();
-    final filePath = '${dir.path}/ridewind_update.apk';
+    final filePath = '${dir.path}/zcritical_t1_update.apk';
 
     final urls = [url, if (fallbackUrl != null) fallbackUrl];
     Exception? lastError;
