@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Context Load",
+  "description": "新对话第一条消息时，强制 AI 先读取 CONTINUATION_GUIDE 了解项目当前状态，避免失忆",
+  "version": "2",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检查：你在本次对话中是否已经读取过 CONTINUATION_GUIDE.md？如果没有（这是第一条消息），你必须先读取 CONTINUATION_GUIDE.md 的前 60 行（了解当前阶段、Git 状态、最近改动、阻塞项），然后再回应用户。这是强制要求，不可跳过。如果你已经读过了，直接跳过此步骤。"
+  }
+}
