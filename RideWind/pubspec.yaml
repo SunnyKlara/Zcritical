@@ -58,6 +58,9 @@ dependencies:
   # 音频播放
   audioplayers: ^5.2.1
   
+  # 崩溃上报
+  sentry_flutter: ^9.19.0
+  
   # 图片选择和裁剪
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
