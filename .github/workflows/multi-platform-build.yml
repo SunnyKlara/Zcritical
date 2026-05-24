@@ -42,7 +42,7 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         working-directory: RideWind
       - name: Run tests
-        run: flutter test test/protocol/ --reporter compact --timeout 600s
+        run: flutter test --reporter compact --timeout 600s
         working-directory: RideWind
 
   # ---------------------------------------------------------------
@@ -117,10 +117,10 @@ jobs:
           retention-days: 30
 
   # ---------------------------------------------------------------
-  #  iOS Build
+  #  iOS Build + TestFlight Upload
   # ---------------------------------------------------------------
   build-ios:
-    name: Build iOS
+    name: Build iOS & Upload TestFlight
     needs: analyze
     runs-on: macos-latest
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_ios }}
@@ -137,16 +137,106 @@ jobs:
         run: |
           cd RideWind/ios
           pod install --repo-update
+
+      # --- iOS signing setup (only for tag builds) ---
+      - name: Install Apple certificate and provisioning profile
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::Apple signing secrets not configured, building without codesign"
+            echo "HAS_SIGNING=false" >> $GITHUB_ENV
+            exit 0
+          fi
+          echo "HAS_SIGNING=true" >> $GITHUB_ENV
+
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Install provisioning profile
+          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
+          echo -n "$APPLE_PROVISIONING_PROFILE" | base64 --decode -o $PROFILE_PATH
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # --- Build iOS (no-codesign for PR, signed for tags) ---
       - name: Build iOS (no codesign)
+        if: "!startsWith(github.ref, 'refs/tags/')"
         run: flutter build ios --release --no-codesign
         working-directory: RideWind
+
+      - name: Build IPA (signed)
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        working-directory: RideWind
+
+      - name: Build iOS (no codesign fallback)
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING != 'true'
+        run: flutter build ios --release --no-codesign
+        working-directory: RideWind
+
+      # --- Upload to TestFlight ---
+      - name: Upload to TestFlight
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+        env:
+          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_API_KEY_ID }}
+          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          APPSTORE_CONNECT_API_KEY: ${{ secrets.APPSTORE_CONNECT_API_KEY }}
+        run: |
+          if [ -z "$APPSTORE_CONNECT_API_KEY_ID" ]; then
+            echo "::warning::App Store Connect API key not configured, skipping TestFlight upload"
+            exit 0
+          fi
+
+          # Write API key to file
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo -n "$APPSTORE_CONNECT_API_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8
+
+          # Upload using xcrun
+          xcrun notarytool store-credentials "AC_PASSWORD" \
+            --key ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_CONNECT_API_KEY_ID}.p8 \
+            --key-id "$APPSTORE_CONNECT_API_KEY_ID" \
+            --issuer "$APPSTORE_CONNECT_ISSUER_ID"
+
+          IPA_PATH=$(find RideWind/build/ios/ipa -name "*.ipa" | head -1)
+          if [ -n "$IPA_PATH" ]; then
+            xcrun altool --upload-app -f "$IPA_PATH" -t ios \
+              --apiKey "$APPSTORE_CONNECT_API_KEY_ID" \
+              --apiIssuer "$APPSTORE_CONNECT_ISSUER_ID"
+            echo "✅ IPA uploaded to TestFlight"
+          else
+            echo "::warning::No IPA found, skipping upload"
+          fi
+
+      # --- Cleanup ---
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain $KEYCHAIN_PATH
+          fi
 
   # ---------------------------------------------------------------
   #  Release: GitHub Release + China Server + app_version.json
   # ---------------------------------------------------------------
   release:
     name: Create Release & Deploy
-    needs: [build-android]
+    needs: [build-android, build-ios]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/app-v')
     permissions:
