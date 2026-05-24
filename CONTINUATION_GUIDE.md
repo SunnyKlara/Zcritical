@@ -27,10 +27,13 @@
 **决策**：
 - 重构只涉及 Flutter APP 端（`RideWind/lib/`），不动固件
 - 每阶段独立提交+tag，`flutter analyze` + 51 个协议测试必须通过才进入下一阶段
-- 引入 GetIt 做依赖注入（Service Locator 模式）
+- DI：引入 `get_it` 极简模式，只注册 4 个核心 service（IBleService / IOtaService / IAudioStreamService / IPreferenceService）
+- Provider 拆分：只拆出 `LedColorProvider` + `AudioCastProvider`，BluetoothProvider 保持为核心（连接+速度+设备信息）
+- 死代码：彻底删除（含调用点+未用依赖如 audioplayers），不留空壳
+- 层级规则：严格执行但分阶段——Phase 1-2 不动层级，Phase 3 统一修复所有违规，之后 CI 门禁拦截新违规
 - 质量门禁：层级违规检查脚本 + 文件长度检查脚本，集成到 CI
 
-**状态**：规划完成，未开始执行。下一步是生成 tasks.md 或直接开始 Phase 1（死代码清除）。
+**状态**：规划+设计决策完成，未开始执行。下一步是生成 tasks.md 然后开始 Phase 1（死代码清除）。
 
 ### 本次新增：工程标准体系 + 项目健康审计 (2026-05-24)
 
