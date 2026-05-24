@@ -358,7 +358,7 @@ jobs:
           fi
           NOTES_JSON=$(echo "$NOTES" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
 
-          CURRENT_BUILD=$(python3 -c "import json; d=json.load(open('RideWind/app_version.json')); print(d.get('latest_build', d.get('buildNumber', 1)))")
+          CURRENT_BUILD=$(grep '^version:' RideWind/pubspec.yaml | sed 's/.*+//')
 
           python3 -c "
           import json
