@@ -105,7 +105,7 @@ jobs:
               --build-name=${{ steps.version.outputs.VERSION }} \
               --build-number=$BUILD_NUMBER
           else
-            flutter build apk --release --split-per-abi
+            flutter build apk --debug
           fi
         working-directory: RideWind
 
