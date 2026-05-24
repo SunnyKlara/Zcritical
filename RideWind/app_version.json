@@ -1,6 +1,6 @@
 {
   "latest_version": "1.2.3",
-  "latest_build": 5,
+  "latest_build": 7,
   "min_version": "1.0.0",
   "download_url": "https://sunnyklara.com/releases/zcritical-t1-v1.2.3-arm64-v8a.apk",
   "fallback_download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.2.3/zcritical-t1-v1.2.3-arm64-v8a.apk",
@@ -9,7 +9,7 @@
   "force_update": false,
   "rollout_percentage": 100,
   "version": "1.2.3",
-  "buildNumber": 5,
+  "buildNumber": 7,
   "minSupportedVersion": "1.0.0",
   "downloadUrl": "https://sunnyklara.com/releases/zcritical-t1-v1.2.3-arm64-v8a.apk",
   "fallbackDownloadUrl": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.2.3/zcritical-t1-v1.2.3-arm64-v8a.apk",
