@@ -2,70 +2,70 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'screens/splash_screen.dart';
 import 'screens/no_device_screen.dart';
 import 'providers/bluetooth_provider.dart';
 import 'core/service_locator.dart';
-// import 'services/engine_audio_manager.dart';  // 已禁用
 import 'services/first_launch_manager.dart';
 import 'widgets/app_update_dialog.dart';
 
+/// Sentry DSN — 注册 https://sentry.io 后替换为你的项目 DSN
+/// 免费版每月 5000 事件，足够小规模用户使用
+const String _sentryDsn = 'https://YOUR_DSN_HERE@o0.ingest.sentry.io/0';
+
 void main() async {
-  // 🔧 全局错误处理（捕获Release模式下的未处理异常）
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('❌ Flutter错误: ${details.exception}');
-    debugPrint('📍 堆栈: ${details.stack}');
-  };
-  
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    
-    // 锁定竖屏模式（禁止横屏）
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    
-    // 设置系统UI样式
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-    );
-    
-    // 🚗 引擎音效管理器 — 已禁用（音频由硬件端处理）
-    // try {
-    //   await EngineAudioManager().initialize();
-    // } catch (e) {
-    //   debugPrint('⚠️ 引擎音效初始化失败（非致命）: $e');
-    // }
-    
-    // 🔧 初始化依赖注入
-    setupServiceLocator();
-    
-    // 检查是否为首次启动，决定入口页面
-    final firstLaunchManager = FirstLaunchManager();
-    final isFirstLaunch = await firstLaunchManager.isFirstLaunch();
-    
-    runApp(CriticalApp(isFirstLaunch: isFirstLaunch));
-  }, (error, stackTrace) {
-    debugPrint('❌ 未捕获异常: $error');
-    debugPrint('📍 堆栈: $stackTrace');
-  });
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 锁定竖屏模式
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // 设置系统UI样式
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
+  // Sentry 初始化（包裹整个 APP，自动捕获未处理异常）
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = _sentryDsn;
+      options.environment = const String.fromEnvironment(
+        'SENTRY_ENV',
+        defaultValue: 'production',
+      );
+      options.tracesSampleRate = 0.2; // 20% 性能追踪采样
+      options.attachScreenshot = true;
+      options.sendDefaultPii = false; // 不发送用户隐私信息
+    },
+    appRunner: () async {
+      // 🔧 初始化依赖注入
+      setupServiceLocator();
+
+      // 检查是否为首次启动
+      final firstLaunchManager = FirstLaunchManager();
+      final isFirstLaunch = await firstLaunchManager.isFirstLaunch();
+
+      runApp(ZcriticalApp(isFirstLaunch: isFirstLaunch));
+    },
+  );
 }
 
-class CriticalApp extends StatefulWidget {
+class ZcriticalApp extends StatefulWidget {
   final bool isFirstLaunch;
-  
-  const CriticalApp({super.key, required this.isFirstLaunch});
+
+  const ZcriticalApp({super.key, required this.isFirstLaunch});
 
   @override
-  State<CriticalApp> createState() => _CriticalAppState();
+  State<ZcriticalApp> createState() => _ZcriticalAppState();
 }
 
-class _CriticalAppState extends State<CriticalApp> {
+class _ZcriticalAppState extends State<ZcriticalApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override

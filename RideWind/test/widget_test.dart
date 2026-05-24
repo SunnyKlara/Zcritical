@@ -12,7 +12,7 @@ import 'package:zcritical_t1/main.dart';
 void main() {
   testWidgets('Critical app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const CriticalApp(isFirstLaunch: true));
+    await tester.pumpWidget(const ZcriticalApp(isFirstLaunch: true));
 
     // Verify that the app launches and shows the splash screen
     expect(find.text('Critical'), findsOneWidget);
