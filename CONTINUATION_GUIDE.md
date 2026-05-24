@@ -15,7 +15,7 @@
 | # | 目标 | 状态 | 下一步 |
 |---|------|------|--------|
 | 1 | OTA 能用 | ✅ WiFi OTA 已实现，效果好。速度优化在 `feat/ota-speed-boost` 分支 | 速度优化待合并（非阻塞） |
-| 2 | CI/CD 能跑 | ✅ Android 全自动 | iOS 已改用 App Store Connect API 自动签名（无需 .p12/.mobileprovision），待 tag 触发验证 |
+| 2 | CI/CD 能跑 | ✅ Android + iOS 全自动 | iOS TestFlight 上传成功（rc4），App Store Connect API 自动签名 + macos-26 runner |
 | 3 | 关键路径有测试 | 🟡 协议 51/51，BLE 连接无测试 | BLE 状态机单元测试 |
 | 4 | 代码可维护 | 🟡 34 文件超 400 行 | 死代码清除 + 每次改功能时顺手拆文件 |
 
