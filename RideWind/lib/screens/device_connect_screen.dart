@@ -20,7 +20,6 @@ import '../core/service_locator.dart';
 import '../services/ble_connection_manager.dart';
 import '../widgets/colorize_preset_view.dart';
 import '../widgets/colorize_rgb_detail_view.dart';
-import 'no_device_screen.dart';
 import 'dialogs/device_dialogs.dart' as device_dialogs;
 
 enum ControlMode { running, colorize, rgb }
@@ -297,9 +296,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const NoDeviceScreen(skipAutoConnect: true)),
-      );
+      SystemNavigator.pop();
     }
   }
 

@@ -1,176 +1,177 @@
-/// 设备能力矩阵 — 根据固件协议版本决定哪些功能可用
+/// 设备能力矩阵 — 基于固件返回的 capabilities bitmap
 ///
-/// 核心原则：
-///   - APP 永远不崩溃，只是功能多少不同
-///   - 新 APP + 旧固件 = 旧功能正常，新功能隐藏
-///   - 旧 APP + 新固件 = 旧功能正常，新功能不展示
+/// 行业标准做法：
+///   - 固件是真值源，通过 HELLO 握手返回 caps_bitmap
+///   - APP 根据 bitmap 动态渲染 UI（不支持的功能隐藏/灰色）
+///   - 运行时根据 ERR:UNKNOWN_CMD 动态降级
 ///
-/// 协议版本演进规则：
-///   proto=1: 基础功能（风扇/LED/雾化器/Logo/OTA/音频/WiFi/油门灯效）
-///   proto=2: 预留（车库联动/Colorize v2 等）
-///   proto=3: 预留（跑步机/高级音频等）
-///
-/// 使用方式：
-///   final caps = DeviceCapabilities.forProtocol(firmwareInfo?.protocolVersion);
-///   if (caps.hasAudioCasting) { /* 显示音频投射入口 */ }
+/// Bitmap 定义（与固件 board_config.h 保持同步）：
+///   bit 0:  speed_control
+///   bit 1:  led_preset
+///   bit 2:  led_rgb
+///   bit 3:  atomizer
+///   bit 4:  fan_control
+///   bit 5:  ota
+///   bit 6:  wifi_provisioning
+///   bit 7:  logo_upload
+///   bit 8:  audio_engine
+///   bit 9:  speed_max_config
+///   bit 10: fan_range_config
+///   bit 11: volume_control
+///   bit 12: throttle_mode
+///   bit 13: throttle_fx
+///   bit 14: streamlight
+///   bit 15: audio_upload
+///   bit 16: wifi_audio
+///   bit 17: led_gradient
 
 import 'firmware_compatibility.dart';
 
+/// Capability bit positions (must match firmware board_config.h)
+class CapBit {
+  static const int speedControl = 0;
+  static const int ledPreset = 1;
+  static const int ledRgb = 2;
+  static const int atomizer = 3;
+  static const int fanControl = 4;
+  static const int ota = 5;
+  static const int wifiProvision = 6;
+  static const int logoUpload = 7;
+  static const int audioEngine = 8;
+  static const int speedMaxConfig = 9;
+  static const int fanRangeConfig = 10;
+  static const int volumeControl = 11;
+  static const int throttleMode = 12;
+  static const int throttleFx = 13;
+  static const int streamlight = 14;
+  static const int audioUpload = 15;
+  static const int wifiAudio = 16;
+  static const int ledGradient = 17;
+}
+
 /// 设备能力集合
 class DeviceCapabilities {
-  /// 基础控制（风扇、LED 颜色、亮度、预设）
-  final bool hasFanControl;
+  /// Raw bitmap from firmware (0 = unknown/disconnected)
+  final int bitmap;
 
-  /// LED 流水灯效果
-  final bool hasStreamlight;
+  const DeviceCapabilities(this.bitmap);
 
-  /// LED 渐变效果
-  final bool hasGradient;
+  // ── Feature queries ──
 
-  /// 雾化器控制
-  final bool hasAtomizer;
+  bool get hasSpeedControl => _has(CapBit.speedControl);
+  bool get hasLedPreset => _has(CapBit.ledPreset);
+  bool get hasLedRgb => _has(CapBit.ledRgb);
+  bool get hasAtomizer => _has(CapBit.atomizer);
+  bool get hasFanControl => _has(CapBit.fanControl);
+  bool get hasOTA => _has(CapBit.ota);
+  bool get hasWifiProvision => _has(CapBit.wifiProvision);
+  bool get hasLogoUpload => _has(CapBit.logoUpload);
+  bool get hasAudioEngine => _has(CapBit.audioEngine);
+  bool get hasSpeedMaxConfig => _has(CapBit.speedMaxConfig);
+  bool get hasFanRangeConfig => _has(CapBit.fanRangeConfig);
+  bool get hasVolumeControl => _has(CapBit.volumeControl);
+  bool get hasThrottleMode => _has(CapBit.throttleMode);
+  bool get hasThrottleFx => _has(CapBit.throttleFx);
+  bool get hasStreamlight => _has(CapBit.streamlight);
+  bool get hasAudioUpload => _has(CapBit.audioUpload);
+  bool get hasWifiAudio => _has(CapBit.wifiAudio);
+  bool get hasLedGradient => _has(CapBit.ledGradient);
 
-  /// Logo 上传与管理
-  final bool hasLogoUpload;
+  // ── Convenience groups ──
 
-  /// OTA 固件升级
-  final bool hasOTA;
+  /// Basic LED control (preset + RGB)
+  bool get hasLedControl => hasLedPreset || hasLedRgb;
 
-  /// 音量控制
-  final bool hasVolumeControl;
+  /// Any audio feature
+  bool get hasAnyAudio => hasAudioEngine || hasAudioUpload || hasWifiAudio;
 
-  /// 油门模式（硬件端模拟）
-  final bool hasThrottleMode;
+  /// Garage mode (requires speed_max + fan_range + volume)
+  bool get hasGarageMode =>
+      hasSpeedMaxConfig && hasFanRangeConfig && hasVolumeControl;
 
-  /// 油门灯效（1-6 模式）
-  final bool hasThrottleEffects;
+  bool _has(int bit) => (bitmap >> bit) & 1 == 1;
 
-  /// WiFi 音频投射
-  final bool hasAudioCasting;
+  // ── Runtime degradation ──
 
-  /// WiFi 扫描
-  final bool hasWifiScan;
+  /// Create a new capabilities with a specific feature disabled
+  /// (used when ERR:UNKNOWN_CMD is received for a command)
+  DeviceCapabilities withoutFeature(int bit) {
+    return DeviceCapabilities(bitmap & ~(1 << bit));
+  }
 
-  /// 自定义音频上传（引擎声浪）
-  final bool hasCustomAudio;
+  // ── Factory constructors ──
 
-  /// 速度显示最大值设置
-  final bool hasSpeedMaxConfig;
+  /// From HELLO response bitmap (hex string → int)
+  factory DeviceCapabilities.fromHexBitmap(String hex) {
+    final value = int.tryParse(hex, radix: 16) ?? 0;
+    return DeviceCapabilities(value);
+  }
 
-  /// 风扇 PWM 范围设置
-  final bool hasFanRangeConfig;
-
-  /// 车库模式（选车联动）
-  final bool hasGarageMode;
-
-  /// Colorize v2（高级灯光编排）
-  final bool hasColorizeV2;
-
-  /// 跑步机模式
-  final bool hasTreadmill;
-
-  const DeviceCapabilities({
-    this.hasFanControl = false,
-    this.hasStreamlight = false,
-    this.hasGradient = false,
-    this.hasAtomizer = false,
-    this.hasLogoUpload = false,
-    this.hasOTA = false,
-    this.hasVolumeControl = false,
-    this.hasThrottleMode = false,
-    this.hasThrottleEffects = false,
-    this.hasAudioCasting = false,
-    this.hasWifiScan = false,
-    this.hasCustomAudio = false,
-    this.hasSpeedMaxConfig = false,
-    this.hasFanRangeConfig = false,
-    this.hasGarageMode = false,
-    this.hasColorizeV2 = false,
-    this.hasTreadmill = false,
-  });
-
-  /// 根据协议版本生成能力集合
-  ///
-  /// [protocolVersion] 为 null 时表示旧固件（不支持 GET:VERSION），
-  /// 按 proto=0 处理，只开放最基础的功能。
+  /// From protocol version (fallback for old firmware without HELLO)
+  /// Maps protocol version to a conservative bitmap
   factory DeviceCapabilities.forProtocol(int? protocolVersion) {
     final proto = protocolVersion ?? 0;
 
-    return DeviceCapabilities(
-      // proto >= 0: 基础功能（即使旧固件不响应版本查询也能用）
-      hasFanControl: true,
-      hasStreamlight: true,
-      hasGradient: true,
-      hasAtomizer: true,
-      hasLogoUpload: proto >= 1,
-      hasOTA: proto >= 1,
-      hasVolumeControl: proto >= 1,
-      hasThrottleMode: proto >= 1,
-      hasThrottleEffects: proto >= 1,
-      hasAudioCasting: proto >= 1,
-      hasWifiScan: proto >= 1,
-      hasCustomAudio: proto >= 1,
-      hasSpeedMaxConfig: proto >= 1,
-      hasFanRangeConfig: proto >= 1,
+    int bitmap = 0;
 
-      // proto >= 2: 未来功能（当前固件还没实现）
-      hasGarageMode: proto >= 2,
-      hasColorizeV2: proto >= 2,
+    // proto >= 0: basic features (even old firmware without version query)
+    bitmap |= (1 << CapBit.speedControl);
+    bitmap |= (1 << CapBit.ledPreset);
+    bitmap |= (1 << CapBit.ledRgb);
+    bitmap |= (1 << CapBit.atomizer);
+    bitmap |= (1 << CapBit.fanControl);
+    bitmap |= (1 << CapBit.streamlight);
+    bitmap |= (1 << CapBit.ledGradient);
 
-      // proto >= 3: 远期功能
-      hasTreadmill: proto >= 3,
-    );
+    if (proto >= 1) {
+      bitmap |= (1 << CapBit.ota);
+      bitmap |= (1 << CapBit.wifiProvision);
+      bitmap |= (1 << CapBit.logoUpload);
+      bitmap |= (1 << CapBit.audioEngine);
+      bitmap |= (1 << CapBit.speedMaxConfig);
+      bitmap |= (1 << CapBit.fanRangeConfig);
+      bitmap |= (1 << CapBit.volumeControl);
+      bitmap |= (1 << CapBit.throttleMode);
+      bitmap |= (1 << CapBit.throttleFx);
+      bitmap |= (1 << CapBit.audioUpload);
+      bitmap |= (1 << CapBit.wifiAudio);
+    }
+
+    return DeviceCapabilities(bitmap);
   }
 
-  /// 从 FirmwareInfo 生成（便捷方法）
+  /// From FirmwareInfo (convenience)
   factory DeviceCapabilities.fromFirmwareInfo(FirmwareInfo? info) {
     return DeviceCapabilities.forProtocol(info?.protocolVersion);
   }
 
-  /// 未连接时的空能力集（所有功能不可用）
-  static const DeviceCapabilities disconnected = DeviceCapabilities();
+  /// Disconnected state — no capabilities
+  static const DeviceCapabilities disconnected = DeviceCapabilities(0);
 
-  /// 所有功能可用（仅用于调试/测试）
-  static const DeviceCapabilities all = DeviceCapabilities(
-    hasFanControl: true,
-    hasStreamlight: true,
-    hasGradient: true,
-    hasAtomizer: true,
-    hasLogoUpload: true,
-    hasOTA: true,
-    hasVolumeControl: true,
-    hasThrottleMode: true,
-    hasThrottleEffects: true,
-    hasAudioCasting: true,
-    hasWifiScan: true,
-    hasCustomAudio: true,
-    hasSpeedMaxConfig: true,
-    hasFanRangeConfig: true,
-    hasGarageMode: true,
-    hasColorizeV2: true,
-    hasTreadmill: true,
-  );
+  /// All capabilities enabled (debug/test only)
+  static const DeviceCapabilities all = DeviceCapabilities(0x3FFFF); // 18 bits
 
   @override
   String toString() {
-    final enabled = <String>[];
-    if (hasFanControl) enabled.add('fan');
-    if (hasStreamlight) enabled.add('streamlight');
-    if (hasGradient) enabled.add('gradient');
-    if (hasAtomizer) enabled.add('atomizer');
-    if (hasLogoUpload) enabled.add('logo');
-    if (hasOTA) enabled.add('ota');
-    if (hasVolumeControl) enabled.add('volume');
-    if (hasThrottleMode) enabled.add('throttle');
-    if (hasThrottleEffects) enabled.add('throttleFx');
-    if (hasAudioCasting) enabled.add('audioCast');
-    if (hasWifiScan) enabled.add('wifiScan');
-    if (hasCustomAudio) enabled.add('customAudio');
-    if (hasSpeedMaxConfig) enabled.add('speedMax');
-    if (hasFanRangeConfig) enabled.add('fanRange');
-    if (hasGarageMode) enabled.add('garage');
-    if (hasColorizeV2) enabled.add('colorizeV2');
-    if (hasTreadmill) enabled.add('treadmill');
-    return 'DeviceCapabilities(${enabled.join(', ')})';
+    final features = <String>[];
+    if (hasSpeedControl) features.add('speed');
+    if (hasLedPreset) features.add('preset');
+    if (hasLedRgb) features.add('rgb');
+    if (hasAtomizer) features.add('atomizer');
+    if (hasFanControl) features.add('fan');
+    if (hasOTA) features.add('ota');
+    if (hasWifiProvision) features.add('wifi');
+    if (hasLogoUpload) features.add('logo');
+    if (hasAudioEngine) features.add('audio');
+    if (hasSpeedMaxConfig) features.add('speed_max');
+    if (hasFanRangeConfig) features.add('fan_range');
+    if (hasVolumeControl) features.add('volume');
+    if (hasThrottleMode) features.add('throttle');
+    if (hasThrottleFx) features.add('throttle_fx');
+    if (hasStreamlight) features.add('streamlight');
+    if (hasAudioUpload) features.add('audio_upload');
+    if (hasWifiAudio) features.add('wifi_audio');
+    if (hasLedGradient) features.add('gradient');
+    return 'Caps(0x${bitmap.toRadixString(16)})[${features.join(",")}]';
   }
 }

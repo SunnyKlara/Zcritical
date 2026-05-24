@@ -587,26 +587,8 @@ class RunningModeWidgetState extends State<RunningModeWidget>
   }
 
   Future<void> _initAudio() async {
-    try {
-      await _enginePlayer.setReleaseMode(ReleaseMode.loop);
-      // ✅ 强制低延迟模式 (适用于音效)
-      await _enginePlayer.setPlayerMode(PlayerMode.lowLatency);
-      // 预加载音频
-      await _enginePlayer.setSource(AssetSource('sound/engine.mp3'));
-      // ✅ 关键：设置音量后先启动再停止，确保音频轨道预热，彻底解决首次不响的问题
-      await _enginePlayer.setVolume(0.0);
-      await _enginePlayer.resume();
-      await Future.delayed(const Duration(milliseconds: 100));
-      await _enginePlayer.stop(); // ← 修复：使用stop()而不是pause()
-
-      // 设置正常工作音量
-      await _enginePlayer.setVolume(0.6);
-      await _enginePlayer.setPlaybackRate(1.0);
-      _isAudioInitialized = true;
-      debugPrint('🔊 引擎音效预热及初始化成功（已停止）');
-    } catch (e) {
-      debugPrint('❌ 引擎音效初始化失败: $e');
-    }
+    // 已禁用 — 所有音频由硬件端处理，APP 不再播放引擎音效
+    _isAudioInitialized = false;
   }
 
   @override
@@ -623,19 +605,14 @@ class RunningModeWidgetState extends State<RunningModeWidget>
     super.dispose();
   }
 
-  // 🔊 播放引擎声
+  // 🔊 播放引擎声（已禁用 — 所有音频由硬件端处理）
   void _playEngineSound() {
-    if (_isAudioInitialized) {
-      _enginePlayer.resume();
-      _updateEngineSoundProperties();
-    }
+    // 不再播放 APP 端音效
   }
 
-  // 🔊 停止引擎声
+  // 🔊 停止引擎声（已禁用 — 所有音频由硬件端处理）
   void _stopEngineSound() {
-    if (_isAudioInitialized) {
-      _enginePlayer.pause();
-    }
+    // 不再播放 APP 端音效
   }
 
   // 🔊 根据速度更新音量和音调（模拟转速）

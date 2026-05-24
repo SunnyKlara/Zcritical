@@ -203,6 +203,28 @@ class CommandSender {
 
   /// 由 ResponseRouter 调用：尝试匹配前缀等待请求
   void matchPrefixRequest(String response) {
+    // Handle ERR:UNKNOWN_CMD — resolve the matching pending request as error
+    if (response.startsWith('ERR:UNKNOWN_CMD:')) {
+      final failedCmd = response.substring(16).trim();
+      final keysToRemove = <String>[];
+      for (final entry in _pendingPrefixRequests.entries) {
+        // Match if the failed command starts with what we're waiting for
+        // e.g. ERR:UNKNOWN_CMD:HELLO:1.2.1:1:android → resolves HELLO: waiter
+        if (failedCmd.startsWith(entry.key.replaceAll(':', '')) ||
+            entry.key.startsWith(failedCmd.split(':').first)) {
+          if (!entry.value.isCompleted) {
+            entry.value.completeError(Exception('ERR:UNKNOWN_CMD'));
+          }
+          keysToRemove.add(entry.key);
+          break;
+        }
+      }
+      for (final key in keysToRemove) {
+        _pendingPrefixRequests.remove(key);
+      }
+      return;
+    }
+
     final keysToRemove = <String>[];
     for (final entry in _pendingPrefixRequests.entries) {
       if (response.startsWith(entry.key) && !entry.value.isCompleted) {

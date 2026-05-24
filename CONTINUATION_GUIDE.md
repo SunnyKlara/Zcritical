@@ -37,10 +37,11 @@
 
 ## Git 状态
 
-- **分支**：`main`（v1.2.1，工作区干净）
-- **当前 tag**：`v1.2.1`（UI polish + new app icon + BLE stability）
-- **远程**：origin/main 已同步
+- **分支**：`main`（准备发布 v1.2.2）
+- **当前 tag**：`v1.2.1`（待推送 v1.2.2）
+- **远程**：origin/main
 - **规范**：见 `git-and-release.md`（唯一 git 规范文件）
+- **待执行**：`git add -A && git commit -m "release: APP v1.2.2" && git tag v1.2.2 && git push origin main --tags`
 
 ### 暂搁功能分支（保留不删，后续有空再开发）
 
@@ -118,7 +119,7 @@
 | 状态 | 问题 | verified |
 |------|------|----------|
 | ✅ 已修复 | **v1.2.1 APP 升级失败** — tag 命名不匹配已修复（CI 兼容 `v*`+`app-v*`），APK 已手动上传到 GitHub Release + 阿里云，app_version.json 已加 fallback_download_url | 2026-05-24 |
-| ⏳ 待实机验证 | 风扇 PWM 调速（引脚已修正 IO10，代码已实现，NVS fan_range_max=0 保护已加） | 2026-05-24 |
+| ⏳ 待实机验证 | BLE 连接前清缓存修复（disconnect+delay+存活验证，解决 Android GATT 缓存导致连接后立即断开） | 2026-05-24 |
 | ⏳ 待实机验证 | WiFi+BLE 共存配网流程（代码完成，需全量烧录验证） | 2026-05-21 |
 | ⏳ 待实机验证 | 引擎音效最终效果（RC Engine 方案代码完成） | 2026-05-18 |
 | 🔲 暂搁 | LED 偶发闪烁（RMT DMA 通道不足，已回退） | 2026-05-18 |
@@ -127,6 +128,7 @@
 | ✅ 已完成 | 设备记忆+自动重连（保存上次设备，打开 APP 自动连接） | 2026-05-24 |
 | ✅ 已完成 | BLE 连接状态机（BleConnectionManager）— 正式状态机替代散落的 bool flags，只有 5 次重连全失败才弹窗 | 2026-05-24 |
 | ✅ 已完成 | 分支合并：feat/screen-refactor → main，从此单分支开发 | 2026-05-24 |
+| ✅ 已完成 | 自动重连循环修复：skipAutoConnect 参数，用户主动退出不触发重连 | 2026-05-24 |
 | 🔲 暂搁 | 车模识别（在 `feat/car-recognition` 分支，模型待训练，后续再开发） | 2026-05-24 |
 | 🔲 暂搁 | WiFi图传加速（在 `feat/wifi-main-channel` 分支） | 2026-05-24 |
 | ✅ 已完成 | WiFi OTA 全流程（APP 端 WebSocket 验证通过） | 2026-05-21 |
@@ -175,8 +177,9 @@
 
 **待用户操作**：
 - 配置 GitHub Secrets：`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`（Telegram）或 `WECOM_WEBHOOK_URL`（企业微信）
-- 替换 `main.dart` 中 Sentry DSN 占位值
+- ✅ ~~替换 `main.dart` 中 Sentry DSN 占位值~~ — 已完成，DSN 已填入
 - 灰度使用：发版后编辑 app_version.json 的 `rolloutPercentage` 字段（10/20/50等），push 到 main
+- `git push` 推送本次所有改动到 GitHub
 
 ## 本次新增：软硬件版本协商 (2026-05-24)
 
@@ -236,9 +239,110 @@ FW → APP:  VERSION:1.1.1:3:T1\r\n
 - UI 层按 capabilities 动态显示/隐藏功能入口（settings_screen / device_connect_screen）
 - 实机验证 GET:VERSION 响应格式正确（proto=1）
 
-## 下一步
+## 下一步（已完成）：设备列表首页改造 ✅ (2026-05-24)
 
-1. **P0 四大功能分支开发**（详见 `knowledge/feature-roadmap.md`）：
+**改动文件**：
+- `RideWind/lib/main.dart` — 启动路由决策（首次→Splash，有设备→DeviceListScreen，无设备→NoDeviceScreen）
+- `RideWind/lib/screens/device_list_screen.dart` — **完全重写**，StatefulWidget 首页，合并设备管理功能
+- `RideWind/lib/screens/device_connect_screen.dart` — 返回逻辑改为 `Navigator.pop()`，移除 NoDeviceScreen 引用
+- `RideWind/lib/screens/no_device_screen.dart` — 连接成功后导航到 DeviceListScreen
+- `RideWind/lib/screens/device_scan_screen.dart` — 连接成功后导航到 DeviceListScreen
+- `RideWind/lib/screens/settings_screen.dart` — 移除"设备管理"入口
+
+**导航流程**：
+```
+启动 → 有设备 → DeviceListScreen（自动连接最近设备）→ 成功 → push MainPagerScreen
+                                                    → 失败 → 停留列表，用户手动点击
+     → 无设备 → NoDeviceScreen → 扫描连接 → pushReplacement DeviceListScreen
+     → 首次   → SplashScreen → Onboarding → NoDeviceScreen
+控制页面返回 → pop → DeviceListScreen（栈底）
+DeviceListScreen 返回 → SystemNavigator.pop()（退出 APP）
+```
+
+**DeviceListScreen 新功能**：
+- ~~自动连接最近使用的设备~~ **已移除** — 用户反馈不需要自动重连
+- 设备卡片：显示名称、连接状态、上次连接时间
+- 点击已连接设备 → 直接 push 控制页面
+- 点击未连接设备 → 发起连接（卡片显示 spinner）→ 成功后 push 控制页面
+- 长按设备 → 重命名/删除（从 DeviceManagementScreen 合并）
+- "+" 按钮 → push DeviceScanScreen
+- 设置按钮 → push SettingsScreen
+- APP 升级弹窗（2秒延迟后检查）
+- 无自动重连，无遮罩弹窗，纯手动操作
+
+**DeviceManagementScreen 处理**：文件保留（`recordDevice` 静态方法仍被多处调用），但不再有独立入口。
+
+**编译状态**：Flutter getDiagnostics ✅（所有修改文件 0 error 0 warning）
+
+**本次额外修复**：
+- `RideWind/lib/widgets/running_mode_widget.dart` — 彻底禁用 APP 端引擎音效（`_initAudio`/`_playEngineSound`/`_stopEngineSound` 全部置空），所有音频由硬件端处理
+- `RideWind/lib/services/ble_service.dart` — 回退了 GATT 缓存清除修改（不是根因，根因是自动重连竞态）
+
+**待实机验证**：
+- 启动路由决策正确性（有/无设备两种场景）
+- 点击设备卡片 → 连接 → push 控制页面流程
+- 控制页面返回 → 回到设备列表
+- 设备列表返回 → 退出 APP
+- APP 端不再播放任何引擎音效
+
+**待排查**：
+- 设备时不时重启（疑似 WDT，可能与自定义 SPEED_MAX 大数字 LCD 绘制有关，需串口日志确认）
+
+## 本次新增：专业级 Capability Negotiation 系统 (2026-05-24)
+
+**设计理念**：行业标准做法（参考 Philips Hue / DJI / Xiaomi IoT）
+- 固件是真值源 — 通过 HELLO 握手返回 capabilities bitmap
+- APP 根据 bitmap 动态渲染 UI
+- 未知命令有明确回复（ERR:UNKNOWN_CMD）
+- 功能发现基于 bitmap 而非版本号查表
+
+**固件端改动**：
+- `protocol.h` — 新增 `CMD_HELLO` 枚举
+- `protocol.c` — 新增 HELLO 命令解析 + 未知命令仍返回 false（由 ble_service 回复 ERR）
+- `board_config.h` — 新增 18 个 `CAP_*` 位定义 + `DEVICE_CAPABILITIES` 组合宏
+- `main.c` — 新增 `CMD_HELLO` handler，回复 `HELLO:fw_ver:proto_ver:hw_model:caps_hex`
+- `ble_service.c` — `protocol_parse` 返回 false 时回复 `ERR:UNKNOWN_CMD:原始命令\r\n`
+
+**APP 端改动**：
+- `device_capabilities.dart` — **完全重写**，基于 bitmap 的能力系统（18 个功能位）
+- `bluetooth_provider.dart` — `_negotiateFirmwareVersion` 改为先尝试 HELLO，fallback 到 GET:VERSION
+- `command_sender.dart` — `matchPrefixRequest` 新增 ERR:UNKNOWN_CMD 处理（解析错误命令，resolve pending request）
+
+**协议格式**：
+```
+APP → FW:  HELLO:app_ver:proto_ver:platform
+FW  → APP: HELLO:fw_ver:proto_ver:hw_model:caps_hex\r\n
+
+未知命令:
+APP → FW:  SOME_NEW_CMD:123
+FW  → APP: ERR:UNKNOWN_CMD:SOME_NEW_CMD:123\r\n
+```
+
+**Capability Bitmap（18 位）**：
+```
+bit 0:  speed_control    bit 9:  speed_max_config
+bit 1:  led_preset       bit 10: fan_range_config
+bit 2:  led_rgb          bit 11: volume_control
+bit 3:  atomizer         bit 12: throttle_mode
+bit 4:  fan_control      bit 13: throttle_fx
+bit 5:  ota              bit 14: streamlight
+bit 6:  wifi_provision   bit 15: audio_upload
+bit 7:  logo_upload      bit 16: wifi_audio
+bit 8:  audio_engine     bit 17: led_gradient
+```
+
+**向后兼容**：
+- 旧固件不认识 HELLO → 回复 ERR:UNKNOWN_CMD → APP fallback 到 GET:VERSION
+- 旧固件不认识 GET:VERSION → 超时 → APP 按 proto=0 基础模式运行
+- 新固件收到旧 APP 的 GET:VERSION → 仍然正常回复 VERSION:...
+
+**编译状态**：Flutter ✅ 0 error | ESP32 ⚠️ 待 `idf.py build` 验证
+
+**Phase 2 待实现**（下次对话）：
+- UI 层根据 capabilities 隐藏/灰色化不支持的功能入口
+- 设备列表卡片显示固件版本
+- 所有命令统一 OK/ERR 确认机制
+- 强制升级阈值（proto 大版本不兼容时阻止使用）
    - `feat/garage-v2` — 车库大更新 **← 系统设计已完成，见 `RideWind/docs/GARAGE_SYSTEM_DESIGN.md`**
    - `feat/colorize-v2` — 灯光系统升级
    - `feat/audio-casting-v2` — 音频投射升级

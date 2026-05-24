@@ -17,6 +17,35 @@
 #define HW_MODEL                "T1"    /* Hardware model identifier */
 #define MIN_APP_VERSION         "1.2.0" /* Minimum compatible APP version */
 
+/* ── Capability Bitmap (each bit = one feature the firmware supports) ── */
+#define CAP_SPEED_CONTROL       (1 << 0)   /* Speed/fan control */
+#define CAP_LED_PRESET          (1 << 1)   /* LED preset colors */
+#define CAP_LED_RGB             (1 << 2)   /* LED individual RGB control */
+#define CAP_ATOMIZER            (1 << 3)   /* Atomizer on/off */
+#define CAP_FAN_CONTROL         (1 << 4)   /* Fan PWM control */
+#define CAP_OTA                 (1 << 5)   /* OTA firmware upgrade */
+#define CAP_WIFI_PROVISION      (1 << 6)   /* WiFi provisioning */
+#define CAP_LOGO_UPLOAD         (1 << 7)   /* Logo upload to LCD */
+#define CAP_AUDIO_ENGINE        (1 << 8)   /* Engine sound playback */
+#define CAP_SPEED_MAX_CONFIG    (1 << 9)   /* SPEED_MAX command */
+#define CAP_FAN_RANGE_CONFIG    (1 << 10)  /* FAN_RANGE command */
+#define CAP_VOLUME_CONTROL      (1 << 11)  /* VOL command */
+#define CAP_THROTTLE_MODE       (1 << 12)  /* THROTTLE command */
+#define CAP_THROTTLE_FX         (1 << 13)  /* THROTTLE_FX command */
+#define CAP_STREAMLIGHT         (1 << 14)  /* STREAMLIGHT command */
+#define CAP_AUDIO_UPLOAD        (1 << 15)  /* Custom audio upload */
+#define CAP_WIFI_AUDIO          (1 << 16)  /* WiFi audio streaming */
+#define CAP_LED_GRADIENT        (1 << 17)  /* LED gradient effect */
+
+/* Current device capabilities — OR together all supported features */
+#define DEVICE_CAPABILITIES ( \
+    CAP_SPEED_CONTROL | CAP_LED_PRESET | CAP_LED_RGB | CAP_ATOMIZER | \
+    CAP_FAN_CONTROL | CAP_OTA | CAP_WIFI_PROVISION | CAP_LOGO_UPLOAD | \
+    CAP_AUDIO_ENGINE | CAP_SPEED_MAX_CONFIG | CAP_FAN_RANGE_CONFIG | \
+    CAP_VOLUME_CONTROL | CAP_THROTTLE_MODE | CAP_THROTTLE_FX | \
+    CAP_STREAMLIGHT | CAP_AUDIO_UPLOAD | CAP_WIFI_AUDIO | CAP_LED_GRADIENT \
+)
+
 /* LED strip physical counts */
 #define LED_STRIP1_COUNT        10
 #define LED_STRIP2_COUNT        3
