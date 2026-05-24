@@ -122,7 +122,7 @@ jobs:
   build-ios:
     name: Build iOS & Upload TestFlight
     needs: analyze
-    runs-on: macos-latest
+    runs-on: macos-26
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_ios }}
     steps:
       - uses: actions/checkout@v4
