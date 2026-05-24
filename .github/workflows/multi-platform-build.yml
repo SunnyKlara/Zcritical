@@ -205,7 +205,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           DATE=$(date +%Y-%m-%d)
-          DOWNLOAD_URL="http://${{ secrets.DEPLOY_HOST }}/releases/zcritical-t1-v${VERSION}.apk"
+          DOWNLOAD_URL="https://sunnyklara.com/releases/zcritical-t1-v${VERSION}.apk"
           GITHUB_URL="https://github.com/SunnyKlara/Zcritical/releases/download/${{ steps.version.outputs.TAG }}/zcritical-t1-v${VERSION}.apk"
 
           NOTES=$(git tag -l --format='%(contents)' "${{ steps.version.outputs.TAG }}" 2>/dev/null | head -20 || echo "")
