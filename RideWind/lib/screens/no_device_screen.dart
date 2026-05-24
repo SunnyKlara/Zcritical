@@ -6,11 +6,13 @@ import 'package:provider/provider.dart';
 import 'device_scan_screen.dart';
 import 'main_pager_screen.dart';
 import 'device_list_screen.dart';
+import 'device_management_screen.dart';
 import 'settings_screen.dart';
 import '../models/device_model.dart';
 import '../utils/responsive_utils.dart';
 import '../providers/bluetooth_provider.dart';
 import '../services/preference_service.dart';
+import '../widgets/app_update_dialog.dart';
 import '../core/service_locator.dart';
 
 /// 未连接设备页面（空状态）+ 自动重连上次设备
@@ -29,6 +31,13 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
   void initState() {
     super.initState();
     _tryAutoConnect();
+    // 进入首页即检查 APP 更新（延迟 2 秒等 UI 加载完）
+    Future.delayed(const Duration(seconds: 2), _checkAppUpdate);
+  }
+
+  Future<void> _checkAppUpdate() async {
+    if (!mounted) return;
+    AppUpdateDialog.checkAndShow(context);
   }
 
   Future<void> _tryAutoConnect() async {
@@ -61,6 +70,8 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
       if (!mounted) return;
 
       if (success) {
+        // 记录设备到设备管理列表
+        DeviceManagementScreen.recordDevice(deviceId, deviceName);
         // Navigate to control screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(

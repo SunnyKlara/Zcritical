@@ -61,6 +61,9 @@ dependencies:
   # 崩溃上报
   sentry_flutter: ^9.19.0
   
+  # 灰度发布哈希
+  crypto: ^3.0.3
+  
   # 图片选择和裁剪
   image_picker: ^1.1.2
   image_cropper: ^8.0.2

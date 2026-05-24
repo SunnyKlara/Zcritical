@@ -6,6 +6,7 @@ import '../models/sound_wave_scanner.dart';
 import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
 import 'main_pager_screen.dart';
+import 'device_management_screen.dart';
 
 class DeviceScanScreen extends StatefulWidget {
   const DeviceScanScreen({super.key});
@@ -514,6 +515,11 @@ class _DeviceScanScreenState extends State<DeviceScanScreen>
                     height: 58,
                     child: ElevatedButton(
                       onPressed: () {
+                        // 记录设备到设备管理列表
+                        DeviceManagementScreen.recordDevice(
+                          _foundDevice!.id,
+                          _foundDevice!.name,
+                        );
                         // 替换 ScanScreen 为 MainPagerScreen
                         // 栈变为: [NoDevice, MainPager]
                         // 回退: MainPager → NoDevice
