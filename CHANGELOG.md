@@ -4,6 +4,16 @@
 
 ---
 
+## [v1.2.4] - 2026-05-25
+
+修复 release 构建车库图片不显示的问题。
+
+### 修复
+- 将 913 张车辆缩略图 PNG 加入 git 仓库（之前被 .gitignore 排除，导致 CI 构建的 APK 缺少图片）
+- 修复 CI 脚本 buildNumber 读取来源（从 pubspec.yaml 读取，而非旧的 app_version.json）
+
+---
+
 ## [v1.2.3] - 2026-05-25
 
 CI/CD 基础设施完善：iOS 自动签名 + TestFlight 全自动上传。
