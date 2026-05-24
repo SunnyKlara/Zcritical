@@ -310,7 +310,6 @@ jobs:
             echo "::warning::Telegram attempt $i failed (HTTP $HTTP_CODE)"
             sleep 2
           done
-        continue-on-error: true
 
       - name: Notify 企业微信
         continue-on-error: true
@@ -341,4 +340,3 @@ jobs:
             echo "::warning::WeCom attempt $i failed (HTTP $HTTP_CODE)"
             sleep 2
           done
-        continue-on-error: true
