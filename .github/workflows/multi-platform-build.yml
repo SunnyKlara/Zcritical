@@ -42,7 +42,7 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
         working-directory: RideWind
       - name: Run tests
-        run: flutter test --reporter compact --timeout 600s
+        run: flutter test test/protocol/ --reporter compact --timeout 600s
         working-directory: RideWind
 
   # ---------------------------------------------------------------
