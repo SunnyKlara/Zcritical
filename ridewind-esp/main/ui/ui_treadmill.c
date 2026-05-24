@@ -34,6 +34,7 @@ static int16_t  s_last_drawn_speed = -1;
 static float    s_display_speed = 0.0f;
 static uint32_t s_last_tick = 0;
 static float    s_last_needle_rad = 0;
+static uint8_t  s_last_drawn_pct = 0;
 
 /* == Config == */
 #define TREAD_ACCEL_MS      120
@@ -77,7 +78,6 @@ static float    s_last_needle_rad = 0;
 
 /* == Gear position == */
 #define GEAR_CENTER_Y       (ARC_CY + 55)
-#define GEAR_BLOCK_H        4
 #define GEAR_BLOCK_GAP      4
 
 /* ====== Arc LUT (precomputed) ====== */
@@ -253,10 +253,6 @@ static void draw_needle_wedge(float rad, uint16_t color, uint16_t tip_color)
 
     int16_t base_cx = ARC_CX + (int16_t)(NEEDLE_BASE_R * cos_n);
     int16_t base_cy = ARC_CY + (int16_t)(NEEDLE_BASE_R * sin_n);
-    int16_t bl_x = base_cx - (int16_t)(NEEDLE_BASE_HALF_W * cos_p);
-    int16_t bl_y = base_cy - (int16_t)(NEEDLE_BASE_HALF_W * sin_p);
-    int16_t br_x = base_cx + (int16_t)(NEEDLE_BASE_HALF_W * cos_p);
-    int16_t br_y = base_cy + (int16_t)(NEEDLE_BASE_HALF_W * sin_p);
 
     /* Fill triangle with fan of lines from tip to base */
     for (int i = -NEEDLE_BASE_HALF_W; i <= NEEDLE_BASE_HALF_W; i++) {
@@ -287,7 +283,6 @@ static void update_needle_smooth(void)
     draw_needle_wedge(s_last_needle_rad, COLOR_BG, COLOR_BG);
     draw_needle_wedge(new_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
     drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
-    drv_lcd_draw_circle(ARC_CX, ARC_CY, 6, COLOR_ARC_BORDER, false);
 
     s_last_needle_rad = new_rad;
 }
@@ -338,25 +333,11 @@ static void draw_speed_number(void)
 /* ====== Gear (progressive width + gradient color) ====== */
 static uint16_t gear_color(int idx)
 {
-    /* Blue(1) -> Cyan -> Yellow -> Orange -> Red(8) */
-    uint8_t r, g, b;
+    /* Pure red: light pink(1) -> deep red(8) */
     uint8_t t = (uint8_t)((idx - 1) * 100 / (GEAR_MAX - 1));
-    if (t <= 33) {
-        uint16_t s = t * 3;
-        r = (uint8_t)(0 + 255 * s / 100);
-        g = (uint8_t)(100 + 155 * s / 100);
-        b = (uint8_t)(255 - 155 * s / 100);
-    } else if (t <= 66) {
-        uint16_t s = (t - 33) * 3;
-        r = 255;
-        g = (uint8_t)(255 - 55 * s / 100);
-        b = (uint8_t)(100 - 100 * s / 100);
-    } else {
-        uint16_t s = (t - 66) * 3;
-        r = 255;
-        g = (uint8_t)(200 - 170 * s / 100);
-        b = 0;
-    }
+    uint8_t r = (uint8_t)(120 + 135 * t / 100);  /* 120 -> 255 */
+    uint8_t g = (uint8_t)(60 - 60 * t / 100);    /* 60 -> 0 */
+    uint8_t b = (uint8_t)(60 - 60 * t / 100);    /* 60 -> 0 */
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
@@ -369,26 +350,23 @@ static void draw_gear_blocks(void)
         if (gear > GEAR_MAX) gear = GEAR_MAX;
     }
 
-    /* Progressive width: gear 1=4px, gear 8=18px */
-    uint16_t total_w = 0;
-    uint8_t widths[8];
-    for (int i = 0; i < GEAR_MAX; i++) {
-        widths[i] = 4 + (uint8_t)(i * 2);
-        total_w += widths[i] + GEAR_BLOCK_GAP;
-    }
-    total_w -= GEAR_BLOCK_GAP;
-
+    /* Equal width (6px), progressive height: 4,6,8,10,12,14,16,18 */
+    #define GEAR_W  6
+    uint16_t total_w = GEAR_MAX * GEAR_W + (GEAR_MAX - 1) * GEAR_BLOCK_GAP;
     uint16_t start_x = ARC_CX - total_w / 2;
-    uint16_t y = GEAR_CENTER_Y;
+    uint16_t base_y = GEAR_CENTER_Y + 18;  /* bottom-aligned */
 
-    drv_lcd_fill_rect(start_x - 2, y - 1, total_w + 4, GEAR_BLOCK_H + 2, COLOR_BG);
+    /* Clear gear area */
+    drv_lcd_fill_rect(start_x - 2, GEAR_CENTER_Y - 2, total_w + 4, 22, COLOR_BG);
 
-    uint16_t bx = start_x;
     for (int i = 1; i <= GEAR_MAX; i++) {
+        uint8_t h = 4 + (uint8_t)((i - 1) * 2);  /* height: 4,6,8,10,12,14,16,18 */
+        uint16_t bx = start_x + (i - 1) * (GEAR_W + GEAR_BLOCK_GAP);
+        uint16_t by = base_y - h;  /* bottom-aligned */
         uint16_t color = (i <= gear) ? gear_color(i) : COLOR_GEAR_DIM;
-        drv_lcd_fill_rect(bx, y, widths[i-1], GEAR_BLOCK_H, color);
-        bx += widths[i-1] + GEAR_BLOCK_GAP;
+        drv_lcd_fill_rect(bx, by, GEAR_W, h, color);
     }
+    #undef GEAR_W
 }
 
 /* ====== Full Screen ====== */
@@ -405,7 +383,6 @@ static void draw_full_screen(void)
     s_last_needle_rad = deg * (float)M_PI / 180.0f;
     draw_needle_wedge(s_last_needle_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
     drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
-    drv_lcd_draw_circle(ARC_CX, ARC_CY, 6, COLOR_ARC_BORDER, false);
 
     draw_speed_number();
     draw_gear_blocks();
@@ -482,7 +459,6 @@ void ui_treadmill_update(void)
 
     speed_process();
 
-    /* Smooth interpolation */
     float target = (float)s_treadmill_speed;
     if (fabsf(s_display_speed - target) > 0.05f) {
         s_display_speed += (target - s_display_speed) * SMOOTH_FACTOR;
@@ -490,21 +466,21 @@ void ui_treadmill_update(void)
         s_display_speed = target;
     }
 
-    /* Visual update */
+    /* ONLY redraw when integer speed changes - prevents WDT and lag */
     int16_t visual_speed = (int16_t)(s_display_speed + 0.5f);
-    if (visual_speed != s_last_drawn_speed || fabsf(s_display_speed - (float)s_last_drawn_speed) > 0.3f) {
-        uint8_t old_pct = (s_last_drawn_speed <= 0) ? 0 : (uint8_t)((uint32_t)s_last_drawn_speed * 100 / TREAD_MAX_SPEED);
-        uint8_t new_pct = (uint8_t)(s_display_speed * 100.0f / TREAD_MAX_SPEED);
-        if (new_pct > 100) new_pct = 100;
+    if (visual_speed == s_last_drawn_speed) return;
 
-        if (old_pct != new_pct) {
-            update_arc_fast(old_pct, new_pct);
-            draw_ticks(new_pct);
-        }
-        update_needle_smooth();
-        draw_speed_number();
-        draw_gear_blocks();
+    uint8_t new_pct = (uint8_t)((uint32_t)visual_speed * 100 / TREAD_MAX_SPEED);
+    if (new_pct > 100) new_pct = 100;
 
-        s_last_drawn_speed = visual_speed;
+    if (new_pct != s_last_drawn_pct) {
+        update_arc_fast(s_last_drawn_pct, new_pct);
+        draw_ticks(new_pct);
+        s_last_drawn_pct = new_pct;
     }
+
+    update_needle_smooth();
+    draw_speed_number();
+    draw_gear_blocks();
+    s_last_drawn_speed = visual_speed;
 }

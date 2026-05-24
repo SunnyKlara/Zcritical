@@ -848,6 +848,22 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         break;
     }
 
+    case CMD_GET_VERSION: {
+        /* Reply with full version info for APP compatibility check
+         * Format: VERSION:fw_ver:proto_ver:hw_model
+         * - fw_ver: firmware semantic version (e.g. "1.1.1")
+         * - proto_ver: protocol version integer (increment on breaking changes)
+         * - hw_model: hardware model identifier
+         */
+        const esp_app_desc_t *desc = esp_app_get_description();
+        snprintf(resp, sizeof(resp), "VERSION:%s:%d:%s\r\n",
+                 desc->version,
+                 PROTOCOL_VERSION,
+                 HW_MODEL);
+        ble_service_notify_str(resp);
+        break;
+    }
+
     // ═══ SECTION: WiFi 音频命令 (WIFI/WIFI_SCAN) ═══
 
     /* ── WIFI:ssid:password ── */

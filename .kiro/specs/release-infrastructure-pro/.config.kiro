@@ -1,1 +1,5 @@
-{"specId": "4bb2dfb5-f250-43b5-926c-8dc28d3253b9", "workflowType": "requirements-first", "specType": "feature"}
+{
+  "specType": "feature",
+  "workflowType": "requirements-first",
+  "featureName": "release-infrastructure-pro"
+}

@@ -12,6 +12,11 @@
  *  Critical Hardware & Timing Constants
  * ═══════════════════════════════════════════════════════════════ */
 
+/* ── Version & Compatibility ── */
+#define PROTOCOL_VERSION        3       /* Increment on breaking protocol changes */
+#define HW_MODEL                "T1"    /* Hardware model identifier */
+#define MIN_APP_VERSION         "1.2.0" /* Minimum compatible APP version */
+
 /* LED strip physical counts */
 #define LED_STRIP1_COUNT        10
 #define LED_STRIP2_COUNT        3

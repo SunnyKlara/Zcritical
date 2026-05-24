@@ -5,14 +5,15 @@
   "download_url": "https://sunnyklara.com/releases/ridewind-v1.2.1.apk",
   "fallback_download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.2.1/ridewind-v1.2.1.apk",
   "ios_app_store_url": "",
-  "release_notes": "UI 细节优化\n- 更换全新 Z 字 App 图标\n- 修复添加设备页面图标重叠问题\n- BLE 连接稳定性优化（断开去抖/后台释放/设备占用提示）\n- 雾化器指示器自动隐藏",
+  "release_notes": "界面优化与稳定性提升\n- 全新 Z 字应用图标\n- 修复添加设备页面图标重叠的显示问题\n- 蓝牙连接稳定性优化（断开防抖、后台资源释放、设备占用提示）\n- 雾化器状态指示器支持自动隐藏",
   "force_update": false,
   "version": "1.2.1",
   "buildNumber": 5,
   "minSupportedVersion": "1.0.0",
   "downloadUrl": "https://sunnyklara.com/releases/ridewind-v1.2.1.apk",
   "fallbackDownloadUrl": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.2.1/ridewind-v1.2.1.apk",
-  "changelog": "UI 细节优化\n- 更换全新 Z 字 App 图标\n- 修复添加设备页面图标重叠问题\n- BLE 连接稳定性优化（断开去抖/后台释放/设备占用提示）\n- 雾化器指示器自动隐藏",
+  "changelog": "界面优化与稳定性提升\n- 全新 Z 字应用图标\n- 修复添加设备页面图标重叠的显示问题\n- 蓝牙连接稳定性优化（断开防抖、后台资源释放、设备占用提示）\n- 雾化器状态指示器支持自动隐藏",
   "releaseDate": "2026-05-23",
-  "forceUpdate": false
+  "forceUpdate": false,
+  "rolloutPercentage": 100
 }
