@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "ESP 自动编译",
+  "description": "ridewind-esp 下的 .c/.h 文件被修改后自动增量编译，无需手动确认 Run",
+  "version": "1.2",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["ridewind-esp/**/*.c", "ridewind-esp/**/*.h"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "powershell -ExecutionPolicy Bypass -Command \"Set-Location 'c:\\Users\\Klara\\Desktop\\4.8\\ridewind-esp'; & .\\build.ps1\""
+  }
+}
