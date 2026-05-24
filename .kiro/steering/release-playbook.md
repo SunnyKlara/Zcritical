@@ -38,14 +38,26 @@ gh secret set DEPLOY_SSH_KEY < "C:\Users\Klara\Downloads\apk.pem"
 # ═══ 2. 更新 CHANGELOG.md ═══
 # 记录本次变更内容
 
-# ═══ 3. Commit ═══
+# ═══ 3. Commit（必须遵守 git-and-release.md 的 commit 规范） ═══
+# 先分析变更：
+git diff --stat
+# 根据 diff 结果，按 git-and-release.md 的模板写完整 commit message：
+# - 标题行：类型(范围): 描述
+# - 正文：背景/改动文件/影响范围（≥3 文件时必须写）
+# - 不相关改动必须拆分成多个 commit
 git add -A
-git commit -m "release: APP vX.Y.Z"
+git commit  # 用编辑器写完整 message，不要用 -m 一行带过
 
 # ═══ 4. Tag + Push（触发 CI 全自动流程） ═══
 git tag vX.Y.Z
 git push origin main --tags
 ```
+
+**⚠️ 关键规则（来自 git-and-release.md）**：
+- 改动 ≥3 文件或 ≥2 模块时，commit message **必须写正文**
+- 正文必须列出改了哪些文件/模块 + 为什么这样改
+- 不相关的改动不混在一个 commit 里（拆分提交）
+- commit 前必须 `git diff --stat` 确认实际变更范围
 
 **就这样。** 推送 tag 后 CI 自动完成：
 1. `flutter analyze` 代码检查

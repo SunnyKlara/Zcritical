@@ -3,7 +3,6 @@ name: Multi-Platform Build & Release
 on:
   push:
     branches: [main]
-    paths: ['RideWind/**']
     tags: ['v*', 'app-v*']
   pull_request:
     branches: [main]
