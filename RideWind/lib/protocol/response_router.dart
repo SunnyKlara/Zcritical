@@ -135,6 +135,32 @@ class ResponseRouter {
   // ═══════════════════════════════════════════════════════════════
 
   void _routeResponse(String response) {
+    // Filter out echoed commands. Some Android BLE stacks echo writes back
+    // through the notify stream. We only filter patterns that are clearly
+    // outbound commands and can never be valid firmware responses.
+    // Firmware responses: STATUS:, OK:, PRESET:, VOL:, LOGO_SLOTS:,
+    //   WIFI_IP:, WIFI_ERR:, WIFI_SCAN:, AUDIO_READY:, STREAMLIGHT:, REPORT:
+    if (response.startsWith('GET:') ||
+        response.startsWith('UNIT:') ||
+        response.startsWith('THROTTLE:') ||
+        response.startsWith('LED:') ||
+        response.startsWith('LCD:') ||
+        response.startsWith('WUHUAQI:') ||
+        response.startsWith('LOGO_START:') ||
+        response.startsWith('LOGO_DATA:') ||
+        response.startsWith('LOGO_END') ||
+        response.startsWith('SPEED_MAX:') ||
+        response.startsWith('FAN_RANGE:') ||
+        response.startsWith('AUDIO_START') ||
+        response.startsWith('AUDIO_END') ||
+        response.startsWith('OTA_START') ||
+        response.startsWith('OTA_END') ||
+        (response.startsWith('SPEED:') && !response.contains('REPORT')) ||
+        (response.startsWith('UI:') && response.length <= 4)) {
+      debugPrint('🔇 [ResponseRouter] filtered echo: "$response"');
+      return;
+    }
+
     // 1. 广播原始响应（调试 + 向后兼容）
     _rawResponseCtrl.add(response);
 
