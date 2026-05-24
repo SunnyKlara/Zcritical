@@ -4,6 +4,22 @@
 
 ---
 
+## [v1.2.3] - 2026-05-25
+
+CI/CD 基础设施完善：iOS 自动签名 + TestFlight 全自动上传。
+
+### CI/CD
+- iOS 构建改用 App Store Connect API 自动签名（彻底移除手动 .p12 + .mobileprovision）
+- xcodebuild + `-allowProvisioningUpdates` 自动创建/下载证书和 provisioning profile
+- 构建完成后直接上传 TestFlight（`destination: upload`）
+- Runner 升级到 `macos-26`（Xcode 26 + iOS 26 SDK，满足 Apple 2026 新要求）
+- 不再需要 APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / APPLE_PROVISIONING_PROFILE secrets
+
+### 文档
+- Release Playbook 更新：补充 iOS 签名配置说明和踩坑记录
+
+---
+
 ## [v1.2.2] - 2026-05-24
 
 设备列表首页 + 专业级软硬件版本协商系统。
