@@ -167,17 +167,70 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Install provisioning profile
+          # Install provisioning profile (must use UUID as filename)
           PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
           echo -n "$APPLE_PROVISIONING_PROFILE" | base64 --decode -o $PROFILE_PATH
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+          # Extract UUID and Name from profile
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i $PROFILE_PATH))
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(security cms -D -i $PROFILE_PATH))
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "Profile Name: $PROFILE_NAME"
+
+          # Copy with UUID filename (required by Xcode)
+          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+
+          # Export for later steps
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
 
       # --- Build iOS (no-codesign for PR, signed for tags) ---
       - name: Build iOS (no codesign)
         if: "!startsWith(github.ref, 'refs/tags/')"
         run: flutter build ios --release --no-codesign
         working-directory: RideWind
+
+      - name: Configure manual signing for CI
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+        run: |
+          # Switch Xcode project from automatic to manual signing
+          PBXPROJ="RideWind/ios/Runner.xcodeproj/project.pbxproj"
+          # Set CODE_SIGN_STYLE to Manual for all targets
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+          # Add PROVISIONING_PROFILE_SPECIFIER where DEVELOPMENT_TEAM is set (Runner target)
+          sed -i '' "s/DEVELOPMENT_TEAM = 9YSTN2JSTJ;/DEVELOPMENT_TEAM = 9YSTN2JSTJ; CODE_SIGN_STYLE = Manual; PROVISIONING_PROFILE_SPECIFIER = \"${PROFILE_NAME}\";/g" "$PBXPROJ"
+          echo "Configured manual signing with profile: $PROFILE_NAME"
+
+      - name: Generate ExportOptions.plist
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'
+        run: |
+          cat > RideWind/ios/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>9YSTN2JSTJ</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.example.ridewind</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+          echo "Generated ExportOptions.plist with profile: $PROFILE_NAME"
 
       - name: Build IPA (signed)
         if: startsWith(github.ref, 'refs/tags/') && env.HAS_SIGNING == 'true'

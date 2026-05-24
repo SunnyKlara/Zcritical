@@ -8,7 +8,42 @@
 ## 当前阶段：工程体系建设 + 稳定性优先
 
 所有实验性功能分支已暂存保留，工作区已切回 main 干净状态。
-**当前重心**：建立专业开发体系（500+用户，不能再小作坊模式）。
+**当前重心**：阶段 1 产品化（500+用户，稳定交付）。
+
+### 阶段 1 四件事（2026-05-24 确认）
+
+| # | 目标 | 状态 | 下一步 |
+|---|------|------|--------|
+| 1 | OTA 能用 | ✅ WiFi OTA 已实现，效果好。速度优化在 `feat/ota-speed-boost` 分支 | 速度优化待合并（非阻塞） |
+| 2 | CI/CD 能跑 | ✅ Android 全自动 | iOS 签名已修复（manual signing），待验证 |
+| 3 | 关键路径有测试 | 🟡 协议 51/51，BLE 连接无测试 | BLE 状态机单元测试 |
+| 4 | 代码可维护 | 🟡 34 文件超 400 行 | 死代码清除 + 每次改功能时顺手拆文件 |
+
+**当前无 P0 阻塞项。** OTA 和 CI/CD 均已完成。剩余工作（测试+可维护性）是提升开发效率，不阻塞用户使用。
+
+**2026-05-24 痛点分析结论**：
+- **真正的 P0 是真机调试** — DEBUG_PLAN 5 轮全部"待开始"，3 个功能"待实机验证"，设备偶发重启未定位
+- 开发者最大痛点：大量代码改动从未在真机验证，不知道是否正常工作
+- 用户最大痛点：BLE 连接不稳定 + 设备偶发重启（疑似 WDT）
+
+**下一步行动（按顺序）**：
+1. 真机调试 DEBUG_PLAN 第 1-2 轮（验证硬件 + BLE 基础通信）
+2. 定位"设备时不时重启"根因（串口日志）
+3. 修复真机发现的 bug
+4. 提交所有未提交改动，清理工作区
+5. 发版 v1.2.3（只含稳定性修复）
+6. 死代码清除（低风险，半天）
+7. iOS 上架准备
+
+**阶段路线图**：
+- 阶段 1（现在）：OTA ✅ + CI/CD ✅ + 测试 + 可维护 → 稳定交付
+- 阶段 1.5（当前）：体验打磨 + iOS 上架 + 音频质量
+- 阶段 2（用户破 5k）：轻量后端 + 数据统计 + WiFi OTA
+
+**协作模式（2026-05-24 确认）**：
+- 用户角色 = 产品负责人（说想要什么效果、什么不对、做不做）
+- AI 角色 = 技术负责人（翻译需求为方案、直接写代码、告知风险）
+- 用户不需要用技术术语，描述想要的效果即可，AI 主动驱动实现
 
 ### 本次新增：工程化重构 Spec 规划完成 (2026-05-24)
 
@@ -41,6 +76,15 @@
 - 可选 Phase 4: 接口抽象（当要写测试或换库时）
 - 可选 Phase 5: 状态管理统一（当 widget 本地状态导致 bug 时）
 
+**开发方法论文档**：`.kiro/steering/professional-development-methodology.md`（auto inclusion）
+- 分层架构思维框架（每层只回答一个问题）
+- 写代码前的 5 个问题检查清单
+- 300 行规则 + 拆分方法
+- 命名即文档标准
+- 提交纪律（一个 commit 一件事）
+- 状态管理唯一规则（Widget 不持有设备状态）
+- 加新功能/修 Bug 的标准化流程
+
 **代码实证**（2026-05-24 分析）：
 - 层级违规实际只有 14 处（12 个 screen 文件），其中真正需要改的只有 5-6 处
 - 34 个文件超 400 行（最大 logo_transmission_manager.dart 1600 行）
@@ -66,19 +110,23 @@
 
 **修复优先级**：
 1. ~~清理垃圾（删死代码+无用依赖+修损坏测试+CI 跑全量测试）~~
-2. iOS 全自动化 — **代码已完成，待配置 Secrets 后验证**
+2. iOS 全自动化 — **iOS CI 签名阻塞：缺 Provisioning Profile**
    - ✅ 创建 `ios/Podfile`（platform :ios, '13.0'）
    - ✅ 创建 `ios/ExportOptions.plist`（app-store-connect 分发）
-   - ✅ CI iOS job 升级：自动签名 + 构建 IPA + 上传 TestFlight
+   - ✅ CI iOS job：`pod install` + `flutter build ios --no-codesign` 通过
+   - ✅ CI iOS job 升级：自动签名 + 构建 IPA + 上传 TestFlight（待 Secrets）
    - ✅ CI release job 依赖 build-ios（iOS 失败阻塞发版）
-   - ✅ CI 测试改为 `flutter test`（全量）
-   - ✅ Secrets 未配时 fallback 到 `--no-codesign`（不阻塞）
-   - ⏳ 配置 6 个 GitHub Secrets（APPLE_CERTIFICATE / PASSWORD / PROVISIONING_PROFILE / API_KEY_ID / ISSUER_ID / API_KEY）
-   - ⏳ push 后验证 CI iOS 构建通过
+   - ✅ CI 测试全量化（删除 13 个编码损坏测试文件 + 1 个过时 widget_test）
+   - ✅ CI 非 tag 构建 Android 用 debug 模式（不需要 keystore）
+   - ✅ GitHub Secrets 已配置：APPLE_CERTIFICATE + PASSWORD + API_KEY_ID + ISSUER_ID + API_KEY
+   - ✅ project.pbxproj 添加 DEVELOPMENT_TEAM = 9YSTN2JSTJ
+   - ❌ **阻塞**：CI 签名需要 Provisioning Profile（`APPLE_PROVISIONING_PROFILE` Secret 未配）
+   - 需要在 Apple Developer Portal 创建 iOS App Development profile for `com.example.ridewind`
+   - 下载 .mobileprovision → base64 → 添加到 GitHub Secrets
+   - 测试 tag：v1.2.3-rc1 和 v1.2.3-rc2 已用（下次用 rc3）
 3. 每次发版只改一件事（从 v1.2.3 开始）
 
-**未提交文件**：
-- `RideWind/ios/Podfile` — 新建
+**所有文件已提交并 push 到 main。**
 - `RideWind/ios/ExportOptions.plist` — 新建
 - `.github/workflows/multi-platform-build.yml` — iOS 全自动签名+TestFlight + release 依赖双平台 + 测试全量化
 - `.kiro/steering/engineering-standards.md` — 新建
@@ -271,6 +319,29 @@
 - ✅ ~~替换 `main.dart` 中 Sentry DSN 占位值~~ — 已完成，DSN 已填入
 - 灰度使用：发版后编辑 app_version.json 的 `rolloutPercentage` 字段（10/20/50等），push 到 main
 - `git push` 推送本次所有改动到 GitHub
+
+## 本次新增：iOS CI 签名修复 (2026-05-25)
+
+**问题**：tag 构建时 `flutter build ipa` 报 "No Accounts" + "No profiles for com.example.ridewind"。根因是 ExportOptions.plist 使用 `signingStyle: automatic`，CI runner 无 Apple 账号登录，自动签名不可用。
+
+**修复**（3 处改动）：
+1. `.github/workflows/multi-platform-build.yml`:
+   - Profile 安装改为 UUID 文件名（`${UUID}.mobileprovision`），提取 profile UUID/Name 到环境变量
+   - 新增 "Configure manual signing for CI" 步骤：`sed` 修改 `project.pbxproj`，将 `CODE_SIGN_STYLE` 从 Automatic 改为 Manual，注入 `PROVISIONING_PROFILE_SPECIFIER`
+   - 新增 "Generate ExportOptions.plist" 步骤：动态生成 plist，使用提取到的 profile 名称
+2. `RideWind/ios/ExportOptions.plist` — 改为 manual signing 模板（CI 会动态覆盖）
+
+**前置条件**（用户已完成 ✅）：
+- `APPLE_CERTIFICATE` — .p12 base64
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_PROVISIONING_PROFILE` — .mobileprovision base64
+
+**待验证**：
+- ⚠️ Profile 必须是 **App Store Distribution** 类型（不是 Development）
+- ⚠️ 证书必须是 **Apple Distribution** 类型（不是 Apple Development）
+- 推送后打 tag 触发构建验证
+
+**编译状态**：CI 配置变更，无本地编译验证需求
 
 ## 本次新增：软硬件版本协商 (2026-05-24)
 
