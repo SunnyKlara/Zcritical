@@ -151,7 +151,7 @@ class ColorizeController extends ChangeNotifier {
       _wasConnected = true;
       await Future.delayed(_reapplyDelay);
       if (!_btProvider.isConnected) return; // 期间又断了
-      await reapplyCurrentSelection();
+      await reapplyCurrentSelection(skipUISwitch: true);
     } else if (!connected) {
       _wasConnected = false;
     }
@@ -363,23 +363,22 @@ class ColorizeController extends ChangeNotifier {
   /// - 自定义胶囊  → 走 [syncCapsuleToHardware]（连发 4 条 LED:strip）
   /// - 预设 + 自定义 RGB → 按 4 通道实际颜色重发 LED:strip（保留用户调色）
   /// - 纯预设       → 走 [syncCapsuleToHardware]（PRESET:n）
-  Future<void> reapplyCurrentSelection() async {
+  Future<void> reapplyCurrentSelection({bool skipUISwitch = false}) async {
     if (!_btProvider.isConnected) return;
 
     final isCustomCapsule = _selectedColorIndex >= presetCount &&
         _selectedColorIndex < presetCount + _customPresets.length;
+
+    // 重连时跳过 UI 切换，避免打断用户当前操作
+    final savedUI = _lastSentHardwareUI;
+    if (skipUISwitch) _lastSentHardwareUI = 2; // 假装已经在 UI2，跳过切换
 
     if (isCustomCapsule) {
       // Case A: 自定义胶囊
       await syncCapsuleToHardware(_selectedColorIndex);
     } else if (_hasCustomColors && _selectedColorIndex < presetCount) {
       // Case B: 预设胶囊 + RGB 调色叠加 → 按 4 通道实际颜色重发
-      // 先把硬件 LCD 切回配色预设页（与 syncCustomToHardware 一致）
-      if (_lastSentHardwareUI != 2) {
-        await _btProvider.setHardwareUI(2);
-        _lastSentHardwareUI = 2;
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
+      // 注意：不再发 UI:2 切换硬件界面，避免打断用户当前操作
       const posMap = {'M': 1, 'L': 2, 'R': 3, 'B': 4};
       for (final entry in posMap.entries) {
         final pos = entry.key;
@@ -396,6 +395,8 @@ class ColorizeController extends ChangeNotifier {
       // Case C: 纯预设
       await syncCapsuleToHardware(_selectedColorIndex);
     }
+
+    if (skipUISwitch) _lastSentHardwareUI = savedUI; // 恢复
 
     debugPrint(
         '🔁 重连后主动重发用户意图: idx=$_selectedColorIndex, hasCustom=$_hasCustomColors, isCustomCapsule=$isCustomCapsule');

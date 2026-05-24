@@ -14,7 +14,10 @@ import '../core/service_locator.dart';
 
 /// 未连接设备页面（空状态）+ 自动重连上次设备
 class NoDeviceScreen extends StatefulWidget {
-  const NoDeviceScreen({super.key});
+  /// 如果为 true，跳过自动重连（用户主动退出控制页面时）
+  final bool skipAutoConnect;
+
+  const NoDeviceScreen({super.key, this.skipAutoConnect = false});
 
   @override
   State<NoDeviceScreen> createState() => _NoDeviceScreenState();
@@ -29,7 +32,9 @@ class _NoDeviceScreenState extends State<NoDeviceScreen> {
     super.initState();
     _bleMgr = sl<BleConnectionManager>();
     _bleMgr.addListener(_onBleStateChanged);
-    _tryAutoConnect();
+    if (!widget.skipAutoConnect) {
+      _tryAutoConnect();
+    }
     Future.delayed(const Duration(seconds: 2), _checkAppUpdate);
   }
 

@@ -16,7 +16,7 @@ class DeviceListScreen extends StatelessWidget {
     } else {
       // 栈底兜底：直接回到 NoDeviceScreen
       await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const NoDeviceScreen()),
+        MaterialPageRoute(builder: (_) => const NoDeviceScreen(skipAutoConnect: true)),
       );
     }
   }
