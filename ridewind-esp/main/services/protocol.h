@@ -49,6 +49,7 @@ typedef enum {
     CMD_OTA_VERSION,    /* OTA_VERSION — query firmware version */
     CMD_SPEED_MAX,      /* SPEED_MAX:xxx — set max speed display value */
     CMD_FAN_RANGE,      /* FAN_RANGE:min,max — set fan PWM range */
+    CMD_GET_VERSION,    /* GET:VERSION — query firmware/protocol version */
 } cmd_type_t;
 
 typedef struct {

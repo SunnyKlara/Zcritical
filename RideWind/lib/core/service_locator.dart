@@ -4,6 +4,9 @@ import '../protocol/command_sender.dart';
 import '../protocol/response_router.dart';
 import '../providers/bluetooth_provider.dart';
 import '../controllers/colorize_controller.dart';
+import '../controllers/device_session_controller.dart';
+import '../services/preference_service.dart';
+import '../models/device_model.dart';
 
 /// 全局服务定位器
 final sl = GetIt.instance;
@@ -37,5 +40,18 @@ void setupServiceLocator() {
   // 控制器层
   sl.registerLazySingleton<ColorizeController>(
     () => ColorizeController(sl<BluetoothProvider>()),
+  );
+
+  // 偏好服务
+  sl.registerLazySingleton<PreferenceService>(() => PreferenceService());
+}
+
+/// 创建 DeviceSessionController 实例（每次连接设备时调用）
+DeviceSessionController createDeviceSessionController(DeviceModel device) {
+  return DeviceSessionController(
+    bluetoothProvider: sl<BluetoothProvider>(),
+    preferenceService: sl<PreferenceService>(),
+    colorize: sl<ColorizeController>(),
+    device: device,
   );
 }

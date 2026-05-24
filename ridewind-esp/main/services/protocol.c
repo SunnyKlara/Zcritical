@@ -70,6 +70,7 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         if (strcmp(param, "LOGO_SLOTS") == 0) { out->type = CMD_GET_LOGO; return true; }
         if (strcmp(param, "VOL") == 0)         { out->type = CMD_GET_VOLUME; return true; }
         if (strcmp(param, "AUDIO") == 0)       { out->type = CMD_GET_AUDIO; return true; }
+        if (strcmp(param, "VERSION") == 0)     { out->type = CMD_GET_VERSION; return true; }
         return false;  /* unknown GET */
     }
 
@@ -513,6 +514,7 @@ int protocol_format_cmd(const cmd_msg_t *cmd, char *buf, uint32_t buf_size)
     case CMD_GET_LOGO:        n = snprintf(buf, buf_size, "GET:LOGO\n"); break;
     case CMD_GET_VOLUME:      n = snprintf(buf, buf_size, "GET:VOL\n"); break;
     case CMD_GET_AUDIO:       n = snprintf(buf, buf_size, "GET:AUDIO\n"); break;
+    case CMD_GET_VERSION:     n = snprintf(buf, buf_size, "GET:VERSION\n"); break;
     case CMD_AUDIO_START:
         n = snprintf(buf, buf_size, "AUDIO_START:%d:%u:%u\n",
                      cmd->param.audio_start.layer,

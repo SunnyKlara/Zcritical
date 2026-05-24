@@ -16,6 +16,7 @@
 #include "brighttubiao.c"
 #include "logotubiao.c"
 #include "voicetubiao.c"
+#include "treadmill_icon.c"
 
 /* ── Text label bitmap arrays ── */
 #include "speed_99_33.c"
@@ -46,4 +47,7 @@ const menu_page_info_t menu_pages[MENU_PAGE_COUNT] = {
     /* 5 — Volume */
     { (const uint16_t *)gImage_voicetubiao,      73, 58,
       (const uint16_t *)gImage_voice,            90, 27, 7 },
+    /* 6 — Treadmill */
+    { (const uint16_t *)gImage_treadmill_68_68,  68, 68,
+      (const uint16_t *)gImage_treadmill_text,   80, 27, 8 },
 };

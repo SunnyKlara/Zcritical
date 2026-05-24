@@ -12,6 +12,7 @@ extern const unsigned char gImage_rgbtubiao[];         /* RGB icon:    65×68  *
 extern const unsigned char gImage_brighttubiao[];      /* Bright icon: 72×72  */
 extern const unsigned char gImage_logotubiao[];        /* Logo icon:   68×68  */
 extern const unsigned char gImage_voicetubiao[];       /* Volume icon: 73×58  */
+extern const unsigned char gImage_treadmill_68_68[];   /* Treadmill icon: 68×68 */
 
 /* Text labels */
 extern const unsigned char gImage_speed_99_33[];       /* "Speed":  99×33  */
@@ -20,6 +21,7 @@ extern const unsigned char gImage_rgb[];               /* "RGB":    72×27  */
 extern const unsigned char gImage_bright[];            /* "Bright": 103×33 */
 extern const unsigned char gImage_logo[];              /* "Logo":   79×33  */
 extern const unsigned char gImage_voice[];             /* "Volume": 90×27  */
+extern const unsigned char gImage_treadmill_text[];    /* "RUN":    80×27  */
 
 /* ── Lookup table ── */
 typedef struct {

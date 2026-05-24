@@ -364,4 +364,46 @@ class PreferenceService {
       // 重置失败时静默处理
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  上次连接的设备（自动重连用）
+  // ═══════════════════════════════════════════════════════════════
+
+  static const String _keyLastDeviceId = 'last_connected_device_id';
+  static const String _keyLastDeviceName = 'last_connected_device_name';
+
+  /// 保存上次成功连接的设备信息
+  Future<void> saveLastConnectedDevice(String deviceId, String deviceName) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyLastDeviceId, deviceId);
+      await prefs.setString(_keyLastDeviceName, deviceName);
+    } catch (e) {
+      // 静默处理
+    }
+  }
+
+  /// 获取上次连接的设备信息，返回 {id, name} 或 null
+  Future<Map<String, String>?> getLastConnectedDevice() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getString(_keyLastDeviceId);
+      final name = prefs.getString(_keyLastDeviceName);
+      if (id == null || id.isEmpty) return null;
+      return {'id': id, 'name': name ?? 'Unknown'};
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 清除上次连接的设备记录
+  Future<void> clearLastConnectedDevice() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyLastDeviceId);
+      await prefs.remove(_keyLastDeviceName);
+    } catch (e) {
+      // 静默处理
+    }
+  }
 }

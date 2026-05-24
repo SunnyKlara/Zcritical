@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// APP版本信息（从GitHub获取）
+/// APP版本信息（从远程 JSON 获取）
 class AppVersionInfo {
   final String version;
   final int buildNumber;
@@ -14,6 +16,7 @@ class AppVersionInfo {
   final String? fallbackDownloadUrl;
   final String releaseNotes;
   final bool forceUpdate;
+  final int rolloutPercentage;
 
   const AppVersionInfo({
     required this.version,
@@ -22,31 +25,81 @@ class AppVersionInfo {
     required this.releaseNotes,
     this.fallbackDownloadUrl,
     this.forceUpdate = false,
+    this.rolloutPercentage = 100,
   });
 
   factory AppVersionInfo.fromJson(Map<String, dynamic> json) {
+    // 解析 rolloutPercentage，容错处理
+    int rollout = 100;
+    final rawRollout = json['rolloutPercentage'] ?? json['rollout_percentage'];
+    if (rawRollout is int && rawRollout >= 0 && rawRollout <= 100) {
+      rollout = rawRollout;
+    } else if (rawRollout is double && rawRollout >= 0 && rawRollout <= 100) {
+      rollout = rawRollout.toInt();
+    }
+    // 非法值视为 100（全量推送）
+
     return AppVersionInfo(
-      version: json['version'] as String,
-      buildNumber: json['buildNumber'] as int,
-      downloadUrl: json['downloadUrl'] as String,
-      fallbackDownloadUrl: json['fallbackDownloadUrl'] as String?,
-      releaseNotes: json['releaseNotes'] as String? ?? json['changelog'] as String? ?? '',
-      forceUpdate: json['forceUpdate'] as bool? ?? false,
+      version: json['version'] as String? ?? json['latest_version'] as String? ?? '1.0.0',
+      buildNumber: json['buildNumber'] as int? ?? json['latest_build'] as int? ?? 1,
+      downloadUrl: json['downloadUrl'] as String? ?? json['download_url'] as String? ?? '',
+      fallbackDownloadUrl: json['fallbackDownloadUrl'] as String? ?? json['fallback_download_url'] as String?,
+      releaseNotes: json['changelog'] as String? ?? json['release_notes'] as String? ?? '',
+      forceUpdate: json['forceUpdate'] as bool? ?? json['force_update'] as bool? ?? false,
+      rolloutPercentage: rollout,
     );
   }
 }
 
-/// APP自动更新服务
+/// 灰度发布控制器
+class GrayscaleController {
+  static const String _deviceIdKey = 'grayscale_device_id';
+
+  /// 获取或生成设备唯一标识
+  static Future<String> getDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    var deviceId = prefs.getString(_deviceIdKey);
+    if (deviceId == null || deviceId.isEmpty) {
+      // 生成稳定的 UUID 并持久化
+      deviceId = _generateUuid();
+      await prefs.setString(_deviceIdKey, deviceId);
+    }
+    return deviceId;
+  }
+
+  /// 判断当前设备是否在灰度范围内
+  /// 使用 SHA-256 哈希确保均匀分布和单调递增特性
+  static Future<bool> isInRollout(int rolloutPercentage) async {
+    if (rolloutPercentage >= 100) return true;
+    if (rolloutPercentage <= 0) return false;
+
+    final deviceId = await getDeviceId();
+    final hash = sha256.convert(utf8.encode(deviceId));
+    // 取前 4 字节作为 uint32，对 100 取模
+    final bytes = hash.bytes;
+    final value = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+    final bucket = value.abs() % 100; // 0-99
+    return bucket < rolloutPercentage;
+  }
+
+  static String _generateUuid() {
+    final random = DateTime.now().microsecondsSinceEpoch;
+    return '${random.toRadixString(16)}-${Object().hashCode.toRadixString(16)}-${DateTime.now().millisecondsSinceEpoch.toRadixString(16)}';
+  }
+}
+
+/// APP自动更新服务（单例）
+/// 统一版本检测 + 下载安装 + 灰度控制
 class AppUpdateService {
   static final AppUpdateService _instance = AppUpdateService._();
   factory AppUpdateService() => _instance;
   AppUpdateService._();
 
-  /// 版本信息文件地址（主）
+  /// 版本信息 URL（主）
   static const String _versionUrl =
       'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/RideWind/app_version.json';
 
-  /// 版本信息文件地址（备用 CDN，国内更快）
+  /// 版本信息 URL（备用 CDN，国内更快）
   static const String _versionUrlFallback =
       'https://cdn.jsdelivr.net/gh/SunnyKlara/Zcritical@main/RideWind/app_version.json';
 
@@ -58,7 +111,8 @@ class AppUpdateService {
   CancelToken? _cancelToken;
   bool _isDownloading = false;
 
-  /// 检查是否有新版本（自动尝试主 URL 和备用 URL）
+  /// 检查是否有新版本（含灰度判定）
+  /// 返回 null 表示无需更新（无新版本或不在灰度范围内）
   Future<AppVersionInfo?> checkForUpdate() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
@@ -66,6 +120,7 @@ class AppUpdateService {
 
       debugPrint('📱 当前版本: ${packageInfo.version}+$currentBuild');
 
+      // 双 URL 版本检测
       Map<String, dynamic>? data;
       data = await _fetchVersionJson(_versionUrl);
       if (data == null) {
@@ -78,13 +133,24 @@ class AppUpdateService {
       }
 
       final remoteInfo = AppVersionInfo.fromJson(data);
-      debugPrint('🌐 远程版本: ${remoteInfo.version}+${remoteInfo.buildNumber}');
+      debugPrint('🌐 远程版本: ${remoteInfo.version}+${remoteInfo.buildNumber}, rollout: ${remoteInfo.rolloutPercentage}%');
 
-      if (remoteInfo.buildNumber > currentBuild) {
-        return remoteInfo;
+      // 版本比较
+      if (remoteInfo.buildNumber <= currentBuild) {
+        return null;
       }
 
-      return null;
+      // 灰度判定
+      if (remoteInfo.rolloutPercentage < 100) {
+        final inRollout = await GrayscaleController.isInRollout(remoteInfo.rolloutPercentage);
+        if (!inRollout) {
+          debugPrint('🎯 设备不在灰度范围内 (${remoteInfo.rolloutPercentage}%)，跳过更新');
+          return null;
+        }
+        debugPrint('🎯 设备在灰度范围内，展示更新');
+      }
+
+      return remoteInfo;
     } catch (e) {
       debugPrint('⚠️ 检查更新失败: $e');
       return null;
@@ -119,7 +185,6 @@ class AppUpdateService {
     VoidCallback? onComplete,
     ValueChanged<String>? onError,
   }) async {
-    // iOS 不支持 APK 下载安装
     if (Platform.isIOS) {
       onError?.call('iOS 请通过 App Store 更新');
       return;
@@ -147,9 +212,9 @@ class AppUpdateService {
         downloadDir.createSync(recursive: true);
       }
 
-      final filePath = '${downloadDir.path}/Critical-${info.version}.apk';
+      final filePath = '${downloadDir.path}/Zcritical-${info.version}.apk';
 
-      // 如果已经下载过，删除重新下载
+      // 删除旧文件
       final file = File(filePath);
       if (file.existsSync()) {
         file.deleteSync();
