@@ -31,6 +31,13 @@ static void nvs_load_config(void)
     if (nvs_get_u8(h, "volume", &u8) == ESP_OK) g_app_state.volume = u8;
 
     nvs_close(h);
+
+    /* Sanity check: if fan_range_max is 0 (corrupted NVS), reset to default */
+    if (g_app_state.fan_range_max == 0) {
+        g_app_state.fan_range_max = 100;
+        ESP_LOGW(TAG, "fan_range_max was 0, reset to 100");
+    }
+
     ESP_LOGI(TAG, "NVS loaded: speed_max=%u, fan=%u-%u, vol=%u",
              g_app_state.speed_max_display, g_app_state.fan_range_min,
              g_app_state.fan_range_max, g_app_state.volume);

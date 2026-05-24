@@ -1,89 +1,19 @@
-#include "ui_treadmill.h"
-#include "ui_common.h"
-#include "ui_images.h"
-#include "app_state.h"
-#include "ui_manager.h"
-#include "drv_lcd.h"
-#include "drv_encoder.h"
-#include "board_config.h"
-#include "ble_service.h"
-#include "esp_log.h"
-#include "font_8x16.h"
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include "esp_heap_caps.h"
+"""Generate optimized ui_treadmill.c v6 - complete rewrite"""
+import os
+output = r"c:\Users\Klara\Desktop\4.8\ridewind-esp\main\ui\ui_treadmill.c"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846f
-#endif
+# Read the partial txt we already have and extend it
+base_dir = os.path.dirname(os.path.abspath(__file__))
+txt_path = os.path.join(base_dir, "treadmill_v6.txt")
 
-/**
- * @file ui_treadmill.c
- * @brief UI8 - Treadmill gauge v6 (optimized)
- */
+with open(txt_path, "r", encoding="utf-8") as f:
+    header = f.read()
 
-static const char *TAG = "UI_TREAD";
-
-/* == State == */
-static uint8_t  s_need_full_redraw = 1;
-static uint8_t  s_lut_built = 0;
-static int16_t  s_treadmill_speed = 0;
-static int16_t  s_cruise_speed = 0;
-static int16_t  s_last_drawn_speed = -1;
-static float    s_display_speed = 0.0f;
-static uint32_t s_last_tick = 0;
-static float    s_last_needle_rad = 0;
-static uint8_t  s_last_drawn_pct = 0;
-
-/* == Config == */
-#define TREAD_ACCEL_MS      120
-#define TREAD_DECEL_MS      80
-#define TREAD_MAX_SPEED     20
-#define DISPLAY_MAX         200
-#define GEAR_MAX            8
-#define SMOOTH_FACTOR       0.25f
-
-/* == Colors (RGB565) == */
-#define COLOR_BG            0x0000
-#define COLOR_ARC_BG        0x1082
-#define COLOR_ARC_BORDER    0x2945
-#define COLOR_NEEDLE        0xF800
-#define COLOR_NEEDLE_TIP    0xFFFF
-#define COLOR_CENTER_DOT    0x4208
-#define COLOR_TICK_DIM      0x2945
-#define COLOR_LABEL_DIM     0x3186
-#define COLOR_WHITE         0xFFFF
-#define COLOR_GEAR_DIM      0x2104
-
-/* == Arc Geometry (widened: 15px band + 2px border) == */
-#define ARC_CX              120
-#define ARC_CY              120
-#define ARC_R_OUTER         110
-#define ARC_R_INNER         93
-#define ARC_START_DEG       135.0f
-#define ARC_SWEEP_DEG       270.0f
-
-/* == Tick Geometry == */
-#define TICK_R_OUTER        (ARC_R_INNER - 2)
-#define TICK_R_INNER_BIG    (TICK_R_OUTER - 13)
-
-/* == Needle == */
-#define NEEDLE_TIP_R        (ARC_R_INNER - 4)
-#define NEEDLE_BASE_R       10
-#define NEEDLE_BASE_HALF_W  3
-
-/* == Number position == */
-#define NUM_CENTER_Y        (ARC_CY + 15)
-
-/* == Gear position == */
-#define GEAR_CENTER_Y       (ARC_CY + 55)
-#define GEAR_BLOCK_GAP      4
-
+rest = '''
 /* ====== Arc LUT (precomputed) ====== */
-#define ARC_LUT_MAX     4000
+#define ARC_LUT_MAX     8000
 typedef struct { uint8_t x, y, pct; } arc_pixel_t;
-static arc_pixel_t *s_arc_lut = NULL;  /* Allocated in PSRAM on first use */
+static arc_pixel_t s_arc_lut[ARC_LUT_MAX];
 static uint16_t s_arc_lut_count = 0;
 
 #define ARC_ROW_COUNT   (ARC_R_OUTER * 2 + 1)
@@ -93,17 +23,8 @@ static uint8_t s_line_buf[480];
 
 static void build_arc_lut(void)
 {
-    /* Allocate LUT in PSRAM to save DRAM */
-    if (!s_arc_lut) {
-        s_arc_lut = (arc_pixel_t *)heap_caps_malloc(
-            ARC_LUT_MAX * sizeof(arc_pixel_t), MALLOC_CAP_SPIRAM);
-        if (!s_arc_lut) {
-            ESP_LOGE(TAG, "Failed to alloc arc LUT in PSRAM!");
-            return;
-        }
-    }
     s_arc_lut_count = 0;
-    int32_t r_out_sq = (int32_t)ARC_R_OUTER * ARC_R_OUTER;
+    int32_t r_out_sq = (int32_t)ARC_R_BORDER * ARC_R_BORDER;
     int32_t r_in_sq  = (int32_t)ARC_R_INNER * ARC_R_INNER;
     memset(s_row_start, 0xFF, sizeof(s_row_start));
     memset(s_row_end, 0, sizeof(s_row_end));
@@ -160,7 +81,29 @@ static uint16_t arc_color(uint8_t pct)
 /* ====== Arc Render ====== */
 static void draw_arc_full(uint8_t fill_pct)
 {
-    /* All arc pixels (including border) rendered via LUT */
+    /* Draw outer border ring pixel by pixel (only on full redraw) */
+    int32_t r_border_sq = (int32_t)ARC_R_BORDER * ARC_R_BORDER;
+    int32_t r_outer_sq = (int32_t)ARC_R_OUTER * ARC_R_OUTER;
+    for (int16_t py = ARC_CY - ARC_R_OUTER; py <= ARC_CY + ARC_R_OUTER; py++) {
+        if (py < 0 || py >= LCD_HEIGHT) continue;
+        int16_t dy = py - ARC_CY;
+        int32_t dy_sq = (int32_t)dy * dy;
+        for (int16_t px = ARC_CX - ARC_R_OUTER; px <= ARC_CX + ARC_R_OUTER; px++) {
+            if (px < 0 || px >= LCD_WIDTH) continue;
+            int16_t dx = px - ARC_CX;
+            int32_t d_sq = (int32_t)dx * dx + dy_sq;
+            if (d_sq > r_border_sq && d_sq <= r_outer_sq) {
+                float raw = atan2f((float)dy, (float)dx) * (180.0f / (float)M_PI);
+                if (raw < 0.0f) raw += 360.0f;
+                float rel = raw - ARC_START_DEG;
+                if (rel < -0.5f) rel += 360.0f;
+                if (rel >= 0.0f && rel <= ARC_SWEEP_DEG + 0.5f) {
+                    drv_lcd_fill_rect(px, py, 1, 1, COLOR_ARC_BORDER);
+                }
+            }
+        }
+    }
+
     /* Draw main arc band using LUT */
     for (uint16_t row = 0; row < ARC_ROW_COUNT; row++) {
         if (s_row_start[row] == 0xFFFF) continue;
@@ -211,8 +154,43 @@ static void update_arc_fast(uint8_t old_pct, uint8_t new_pct)
     }
 }
 
-/* ====== Tick Marks (5 major only, thick) ====== */
+/* ====== Tick Marks ====== */
 static void draw_ticks(uint8_t fill_pct)
+{
+    for (int val = 0; val <= DISPLAY_MAX; val += 10) {
+        float t = (float)val / DISPLAY_MAX;
+        float deg = ARC_START_DEG + ARC_SWEEP_DEG * t;
+        float rad = deg * (float)M_PI / 180.0f;
+
+        int is_big = (val % 50 == 0);
+        int16_t r_in = is_big ? TICK_R_INNER_BIG : TICK_R_INNER_SMALL;
+
+        uint16_t color;
+        uint8_t tick_pct = (uint8_t)(t * 100);
+        if (tick_pct <= fill_pct) {
+            color = arc_color(tick_pct);
+        } else {
+            color = COLOR_TICK_DIM;
+        }
+
+        int16_t x0 = ARC_CX + (int16_t)(TICK_R_OUTER * cosf(rad));
+        int16_t y0 = ARC_CY + (int16_t)(TICK_R_OUTER * sinf(rad));
+        int16_t x1 = ARC_CX + (int16_t)(r_in * cosf(rad));
+        int16_t y1 = ARC_CY + (int16_t)(r_in * sinf(rad));
+
+        drv_lcd_draw_line(x0, y0, x1, y1, color);
+        if (is_big) {
+            float perp = rad + (float)M_PI / 2.0f;
+            int16_t ox = (int16_t)(1.0f * cosf(perp));
+            int16_t oy = (int16_t)(1.0f * sinf(perp));
+            drv_lcd_draw_line(x0 + ox, y0 + oy, x1 + ox, y1 + oy, color);
+            drv_lcd_draw_line(x0 - ox, y0 - oy, x1 - ox, y1 - oy, color);
+        }
+    }
+}
+
+/* ====== Tick Labels ====== */
+static void draw_tick_labels(uint8_t fill_pct)
 {
     int labels[] = {0, 50, 100, 150, 200};
     for (int i = 0; i < 5; i++) {
@@ -220,22 +198,17 @@ static void draw_ticks(uint8_t fill_pct)
         float deg = ARC_START_DEG + ARC_SWEEP_DEG * t;
         float rad = deg * (float)M_PI / 180.0f;
 
-        uint16_t color;
-        uint8_t tick_pct = (uint8_t)(t * 100);
-        color = (tick_pct <= fill_pct) ? arc_color(tick_pct) : COLOR_TICK_DIM;
+        int16_t lx = ARC_CX + (int16_t)(LABEL_R * cosf(rad));
+        int16_t ly = ARC_CY + (int16_t)(LABEL_R * sinf(rad));
 
-        int16_t x0 = ARC_CX + (int16_t)(TICK_R_OUTER * cosf(rad));
-        int16_t y0 = ARC_CY + (int16_t)(TICK_R_OUTER * sinf(rad));
-        int16_t x1 = ARC_CX + (int16_t)(TICK_R_INNER_BIG * cosf(rad));
-        int16_t y1 = ARC_CY + (int16_t)(TICK_R_INNER_BIG * sinf(rad));
+        uint16_t color = ((uint8_t)(t * 100) <= fill_pct) ? COLOR_LABEL_DIM : COLOR_TICK_DIM;
 
-        /* Draw 3px wide tick */
-        drv_lcd_draw_line(x0, y0, x1, y1, color);
-        float perp = rad + (float)M_PI / 2.0f;
-        int16_t ox = (int16_t)(1.0f * cosf(perp));
-        int16_t oy = (int16_t)(1.0f * sinf(perp));
-        drv_lcd_draw_line(x0 + ox, y0 + oy, x1 + ox, y1 + oy, color);
-        drv_lcd_draw_line(x0 - ox, y0 - oy, x1 - ox, y1 - oy, color);
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d", labels[i]);
+        uint16_t tw = strlen(buf) * 8;
+        int16_t tx = lx - tw / 2;
+        int16_t ty = ly - 8;
+        drv_lcd_draw_string(tx, ty, buf, color, COLOR_BG, 1);
     }
 }
 
@@ -253,6 +226,10 @@ static void draw_needle_wedge(float rad, uint16_t color, uint16_t tip_color)
 
     int16_t base_cx = ARC_CX + (int16_t)(NEEDLE_BASE_R * cos_n);
     int16_t base_cy = ARC_CY + (int16_t)(NEEDLE_BASE_R * sin_n);
+    int16_t bl_x = base_cx - (int16_t)(NEEDLE_BASE_HALF_W * cos_p);
+    int16_t bl_y = base_cy - (int16_t)(NEEDLE_BASE_HALF_W * sin_p);
+    int16_t br_x = base_cx + (int16_t)(NEEDLE_BASE_HALF_W * cos_p);
+    int16_t br_y = base_cy + (int16_t)(NEEDLE_BASE_HALF_W * sin_p);
 
     /* Fill triangle with fan of lines from tip to base */
     for (int i = -NEEDLE_BASE_HALF_W; i <= NEEDLE_BASE_HALF_W; i++) {
@@ -277,12 +254,10 @@ static void update_needle_smooth(void)
     float deg = ARC_START_DEG + ARC_SWEEP_DEG * pct;
     float new_rad = deg * (float)M_PI / 180.0f;
 
-    /* Skip redraw if angle barely changed (reduces flicker + CPU) */
-    if (fabsf(new_rad - s_last_needle_rad) < 0.02f) return;
-
     draw_needle_wedge(s_last_needle_rad, COLOR_BG, COLOR_BG);
     draw_needle_wedge(new_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
     drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
+    drv_lcd_draw_circle(ARC_CX, ARC_CY, 6, COLOR_ARC_BORDER, false);
 
     s_last_needle_rad = new_rad;
 }
@@ -330,17 +305,7 @@ static void draw_speed_number(void)
                         unit, COLOR_LABEL_DIM, COLOR_BG, 1);
 }
 
-/* ====== Gear (progressive width + gradient color) ====== */
-static uint16_t gear_color(int idx)
-{
-    /* Pure red: light pink(1) -> deep red(8) */
-    uint8_t t = (uint8_t)((idx - 1) * 100 / (GEAR_MAX - 1));
-    uint8_t r = (uint8_t)(120 + 135 * t / 100);  /* 120 -> 255 */
-    uint8_t g = (uint8_t)(60 - 60 * t / 100);    /* 60 -> 0 */
-    uint8_t b = (uint8_t)(60 - 60 * t / 100);    /* 60 -> 0 */
-    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-}
-
+/* ====== Gear (graphical blocks) ====== */
 static void draw_gear_blocks(void)
 {
     int gear = 0;
@@ -350,23 +315,17 @@ static void draw_gear_blocks(void)
         if (gear > GEAR_MAX) gear = GEAR_MAX;
     }
 
-    /* Equal width (6px), progressive height: 4,6,8,10,12,14,16,18 */
-    #define GEAR_W  6
-    uint16_t total_w = GEAR_MAX * GEAR_W + (GEAR_MAX - 1) * GEAR_BLOCK_GAP;
+    uint16_t total_w = GEAR_MAX * GEAR_BLOCK_W + (GEAR_MAX - 1) * GEAR_BLOCK_GAP;
     uint16_t start_x = ARC_CX - total_w / 2;
-    uint16_t base_y = GEAR_CENTER_Y + 18;  /* bottom-aligned */
+    uint16_t y = GEAR_CENTER_Y;
 
-    /* Clear gear area */
-    drv_lcd_fill_rect(start_x - 2, GEAR_CENTER_Y - 2, total_w + 4, 22, COLOR_BG);
+    drv_lcd_fill_rect(start_x - 2, y - 1, total_w + 4, GEAR_BLOCK_H + 2, COLOR_BG);
 
     for (int i = 1; i <= GEAR_MAX; i++) {
-        uint8_t h = 4 + (uint8_t)((i - 1) * 2);  /* height: 4,6,8,10,12,14,16,18 */
-        uint16_t bx = start_x + (i - 1) * (GEAR_W + GEAR_BLOCK_GAP);
-        uint16_t by = base_y - h;  /* bottom-aligned */
-        uint16_t color = (i <= gear) ? gear_color(i) : COLOR_GEAR_DIM;
-        drv_lcd_fill_rect(bx, by, GEAR_W, h, color);
+        uint16_t bx = start_x + (i - 1) * (GEAR_BLOCK_W + GEAR_BLOCK_GAP);
+        uint16_t color = (i <= gear) ? COLOR_GEAR_ACTIVE : COLOR_GEAR_DIM;
+        drv_lcd_fill_rect(bx, y, GEAR_BLOCK_W, GEAR_BLOCK_H, color);
     }
-    #undef GEAR_W
 }
 
 /* ====== Full Screen ====== */
@@ -378,11 +337,13 @@ static void draw_full_screen(void)
 
     draw_arc_full(pct);
     draw_ticks(pct);
+    draw_tick_labels(pct);
 
     float deg = ARC_START_DEG + ARC_SWEEP_DEG * (float)s_treadmill_speed / TREAD_MAX_SPEED;
     s_last_needle_rad = deg * (float)M_PI / 180.0f;
     draw_needle_wedge(s_last_needle_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
     drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
+    drv_lcd_draw_circle(ARC_CX, ARC_CY, 6, COLOR_ARC_BORDER, false);
 
     draw_speed_number();
     draw_gear_blocks();
@@ -401,7 +362,7 @@ static void speed_process(void)
             if (s_treadmill_speed < TREAD_MAX_SPEED) {
                 s_treadmill_speed++;
                 char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
                 ble_service_notify_str(buf);
             }
         }
@@ -410,7 +371,7 @@ static void speed_process(void)
             s_last_tick = now;
             s_treadmill_speed--;
             char buf[32];
-            snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+            snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
             ble_service_notify_str(buf);
         }
     }
@@ -451,7 +412,7 @@ void ui_treadmill_update(void)
             if (!drv_encoder_button_pressed()) {
                 s_treadmill_speed = s_cruise_speed;
                 char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
                 ble_service_notify_str(buf);
             }
         }
@@ -459,6 +420,7 @@ void ui_treadmill_update(void)
 
     speed_process();
 
+    /* Smooth interpolation */
     float target = (float)s_treadmill_speed;
     if (fabsf(s_display_speed - target) > 0.05f) {
         s_display_speed += (target - s_display_speed) * SMOOTH_FACTOR;
@@ -466,21 +428,28 @@ void ui_treadmill_update(void)
         s_display_speed = target;
     }
 
-    /* ONLY redraw when integer speed changes - prevents WDT and lag */
+    /* Visual update */
     int16_t visual_speed = (int16_t)(s_display_speed + 0.5f);
-    if (visual_speed == s_last_drawn_speed) return;
+    if (visual_speed != s_last_drawn_speed || fabsf(s_display_speed - (float)s_last_drawn_speed) > 0.3f) {
+        uint8_t old_pct = (s_last_drawn_speed <= 0) ? 0 : (uint8_t)((uint32_t)s_last_drawn_speed * 100 / TREAD_MAX_SPEED);
+        uint8_t new_pct = (uint8_t)(s_display_speed * 100.0f / TREAD_MAX_SPEED);
+        if (new_pct > 100) new_pct = 100;
 
-    uint8_t new_pct = (uint8_t)((uint32_t)visual_speed * 100 / TREAD_MAX_SPEED);
-    if (new_pct > 100) new_pct = 100;
+        if (old_pct != new_pct) {
+            update_arc_fast(old_pct, new_pct);
+            draw_ticks(new_pct);
+        }
+        update_needle_smooth();
+        draw_speed_number();
+        draw_gear_blocks();
 
-    if (new_pct != s_last_drawn_pct) {
-        update_arc_fast(s_last_drawn_pct, new_pct);
-        draw_ticks(new_pct);
-        s_last_drawn_pct = new_pct;
+        s_last_drawn_speed = visual_speed;
     }
-
-    update_needle_smooth();
-    draw_speed_number();
-    draw_gear_blocks();
-    s_last_drawn_speed = visual_speed;
 }
+'''
+
+with open(output, "w", encoding="utf-8") as f:
+    f.write(header + rest)
+
+print(f"Written {os.path.getsize(output)} bytes to {output}")
+

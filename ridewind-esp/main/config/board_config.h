@@ -12,6 +12,11 @@
  *  Critical Hardware & Timing Constants
  * ═══════════════════════════════════════════════════════════════ */
 
+/* ── Version & Compatibility ── */
+#define PROTOCOL_VERSION        3       /* Increment on breaking protocol changes */
+#define HW_MODEL                "T1"    /* Hardware model identifier */
+#define MIN_APP_VERSION         "1.2.0" /* Minimum compatible APP version */
+
 /* LED strip physical counts */
 #define LED_STRIP1_COUNT        10
 #define LED_STRIP2_COUNT        3
@@ -81,7 +86,7 @@
 /* Menu */
 #define MENU_SWITCH_DEBOUNCE_MS     150
 #define MENU_DELTA_THRESHOLD        1
-#define MENU_PAGE_COUNT             6
+#define MENU_PAGE_COUNT             7
 
 /* Menu layout (matching F4 parameters) */
 #define MENU_ICON_CENTER_Y          90

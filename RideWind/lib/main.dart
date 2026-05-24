@@ -8,7 +8,6 @@ import 'screens/no_device_screen.dart';
 import 'providers/bluetooth_provider.dart';
 import 'core/service_locator.dart';
 import 'services/first_launch_manager.dart';
-import 'widgets/app_update_dialog.dart';
 
 /// Sentry DSN — 注册 https://sentry.io 后替换为你的项目 DSN
 /// 免费版每月 5000 事件，足够小规模用户使用
@@ -67,20 +66,6 @@ class ZcriticalApp extends StatefulWidget {
 
 class _ZcriticalAppState extends State<ZcriticalApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-
-  @override
-  void initState() {
-    super.initState();
-    // 延迟3秒检查更新，等页面加载完
-    Future.delayed(const Duration(seconds: 3), _checkUpdate);
-  }
-
-  Future<void> _checkUpdate() async {
-    final ctx = _navigatorKey.currentContext;
-    if (ctx != null && ctx.mounted) {
-      AppUpdateDialog.checkAndShow(ctx);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

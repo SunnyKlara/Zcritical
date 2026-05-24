@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/device_model.dart';
+import '../providers/bluetooth_provider.dart';
+import '../services/firmware_compatibility.dart';
 import 'garage_screen.dart';
 import 'device_connect_screen.dart';
 
@@ -28,6 +31,17 @@ class _MainPagerScreenState extends State<MainPagerScreen> {
     super.initState();
     // 默认显示 DeviceConnectScreen（index=1）
     _pageController = PageController(initialPage: 1);
+    // 延迟检查固件兼容性（等连接初始化完成）
+    Future.delayed(const Duration(seconds: 2), _checkFirmwareCompatibility);
+  }
+
+  void _checkFirmwareCompatibility() {
+    if (!mounted) return;
+    final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+    final result = btProvider.compatibilityResult;
+    if (result != null) {
+      FirmwareCompatibility.showWarningIfNeeded(context, result);
+    }
   }
 
   @override

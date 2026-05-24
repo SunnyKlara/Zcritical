@@ -6,6 +6,7 @@ import '../models/device_model.dart';
 import '../models/logo_slot_status.dart';
 import '../models/speed_report.dart';
 import '../services/ble_service.dart';
+import '../services/firmware_compatibility.dart';
 // import '../services/engine_audio_manager.dart';  // 已禁用
 import '../protocol/command_sender.dart';
 import '../protocol/response_router.dart';
@@ -76,6 +77,10 @@ class BluetoothProvider with ChangeNotifier {
   String? _esp32IpAddress;
   bool _isWifiProvisioning = false;
 
+  // 固件兼容性
+  FirmwareInfo? _firmwareInfo;
+  CompatibilityResult? _compatibilityResult;
+
   // ── 转发流（从 ResponseRouter 转发到 UI 层）──
   // 这些流保持与旧版完全相同的公开接口
   final _wifiErrorCtrl = StreamController<String>.broadcast();
@@ -101,6 +106,8 @@ class BluetoothProvider with ChangeNotifier {
   LogoSlotStatus? get logoSlotStatus => _logoSlotStatus;
   String? get esp32IpAddress => _esp32IpAddress;
   bool get isWifiProvisioning => _isWifiProvisioning;
+  FirmwareInfo? get firmwareInfo => _firmwareInfo;
+  CompatibilityResult? get compatibilityResult => _compatibilityResult;
 
   // ── 事件流（直接暴露 ResponseRouter 的流）──
   Stream<int> get knobDeltaStream => _router.knobDeltaStream;
@@ -627,6 +634,12 @@ class BluetoothProvider with ChangeNotifier {
         if (result['fan'] != null) _currentSpeed = result['fan'];
         if (result['wuhua'] != null) _wuhuaqiStatus = (result['wuhua'] == 1);
 
+        // ── 版本协商 ──
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (_bleService.isConnected) {
+          await _negotiateFirmwareVersion();
+        }
+
         await Future.delayed(const Duration(milliseconds: 100));
         if (!_bleService.isConnected) return true;
         await _cmd.queryCurrentPreset();
@@ -650,6 +663,33 @@ class BluetoothProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('❌ 硬件验证异常: $e');
       return false;
+    }
+  }
+
+  /// 版本协商：发送 GET:VERSION，解析响应，检查兼容性
+  Future<void> _negotiateFirmwareVersion() async {
+    try {
+      final response = await _cmd.sendWithRetry(
+        'GET:VERSION',
+        expectedPrefix: 'VERSION:',
+        timeout: const Duration(seconds: 2),
+        maxRetries: 1,
+      );
+
+      if (response != null) {
+        _firmwareInfo = FirmwareInfo.parse(response);
+        _compatibilityResult = FirmwareCompatibility.check(_firmwareInfo);
+        debugPrint('🔗 固件版本协商: $_firmwareInfo → ${_compatibilityResult!.status.name}');
+      } else {
+        // 旧固件不支持 GET:VERSION
+        _firmwareInfo = null;
+        _compatibilityResult = FirmwareCompatibility.check(null);
+        debugPrint('🔗 固件不支持版本协商（旧固件），按兼容模式运行');
+      }
+    } catch (e) {
+      debugPrint('⚠️ 版本协商异常: $e');
+      _firmwareInfo = null;
+      _compatibilityResult = FirmwareCompatibility.check(null);
     }
   }
 
