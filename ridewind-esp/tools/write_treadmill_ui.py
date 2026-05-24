@@ -1,93 +1,19 @@
-#include "ui_treadmill.h"
-#include "ui_common.h"
-#include "ui_images.h"
-#include "app_state.h"
-#include "ui_manager.h"
-#include "drv_lcd.h"
-#include "drv_encoder.h"
-#include "board_config.h"
-#include "ble_service.h"
-#include "esp_log.h"
-#include "font_8x16.h"
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
+"""Generate optimized ui_treadmill.c v6 - complete rewrite"""
+import os
+output = r"c:\Users\Klara\Desktop\4.8\ridewind-esp\main\ui\ui_treadmill.c"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846f
-#endif
+# Read the partial txt we already have and extend it
+base_dir = os.path.dirname(os.path.abspath(__file__))
+txt_path = os.path.join(base_dir, "treadmill_v6.txt")
 
-/**
- * @file ui_treadmill.c
- * @brief UI8 - Treadmill gauge v6 (optimized)
- */
+with open(txt_path, "r", encoding="utf-8") as f:
+    header = f.read()
 
-static const char *TAG = "UI_TREAD";
-
-/* == State == */
-static uint8_t  s_need_full_redraw = 1;
-static uint8_t  s_lut_built = 0;
-static int16_t  s_treadmill_speed = 0;
-static int16_t  s_cruise_speed = 0;
-static int16_t  s_last_drawn_speed = -1;
-static float    s_display_speed = 0.0f;
-static uint32_t s_last_tick = 0;
-static float    s_last_needle_rad = 0;
-
-/* == Config == */
-#define TREAD_ACCEL_MS      120
-#define TREAD_DECEL_MS      80
-#define TREAD_MAX_SPEED     20
-#define DISPLAY_MAX         200
-#define GEAR_MAX            8
-#define SMOOTH_FACTOR       0.25f
-
-/* == Colors (RGB565) == */
-#define COLOR_BG            0x0000
-#define COLOR_ARC_BG        0x1082
-#define COLOR_ARC_BORDER    0x2945
-#define COLOR_NEEDLE        0xF800
-#define COLOR_NEEDLE_TIP    0xFFFF
-#define COLOR_CENTER_DOT    0x4208
-#define COLOR_TICK_DIM      0x2945
-#define COLOR_LABEL_DIM     0x3186
-#define COLOR_WHITE         0xFFFF
-#define COLOR_GEAR_ACTIVE   0xFFFF
-#define COLOR_GEAR_DIM      0x2104
-
-/* == Arc Geometry (widened: 15px band + 2px border) == */
-#define ARC_CX              120
-#define ARC_CY              120
-#define ARC_R_OUTER         110
-#define ARC_R_BORDER        108
-#define ARC_R_INNER         93
-#define ARC_START_DEG       135.0f
-#define ARC_SWEEP_DEG       270.0f
-
-/* == Tick Geometry == */
-#define TICK_R_OUTER        (ARC_R_INNER - 2)
-#define TICK_R_INNER_SMALL  (TICK_R_OUTER - 6)
-#define TICK_R_INNER_BIG    (TICK_R_OUTER - 13)
-#define LABEL_R             (TICK_R_INNER_BIG - 12)
-
-/* == Needle == */
-#define NEEDLE_TIP_R        (ARC_R_INNER - 4)
-#define NEEDLE_BASE_R       10
-#define NEEDLE_BASE_HALF_W  3
-
-/* == Number position == */
-#define NUM_CENTER_Y        (ARC_CY + 15)
-
-/* == Gear position == */
-#define GEAR_CENTER_Y       (ARC_CY + 55)
-#define GEAR_BLOCK_W        8
-#define GEAR_BLOCK_H        4
-#define GEAR_BLOCK_GAP      4
-
+rest = '''
 /* ====== Arc LUT (precomputed) ====== */
-#define ARC_LUT_MAX     4000
+#define ARC_LUT_MAX     8000
 typedef struct { uint8_t x, y, pct; } arc_pixel_t;
-static arc_pixel_t *s_arc_lut = NULL;  /* Allocated in PSRAM on first use */
+static arc_pixel_t s_arc_lut[ARC_LUT_MAX];
 static uint16_t s_arc_lut_count = 0;
 
 #define ARC_ROW_COUNT   (ARC_R_OUTER * 2 + 1)
@@ -97,15 +23,6 @@ static uint8_t s_line_buf[480];
 
 static void build_arc_lut(void)
 {
-    /* Allocate LUT in PSRAM to save DRAM */
-    if (!s_arc_lut) {
-        s_arc_lut = (arc_pixel_t *)heap_caps_malloc(
-            ARC_LUT_MAX * sizeof(arc_pixel_t), MALLOC_CAP_SPIRAM);
-        if (!s_arc_lut) {
-            ESP_LOGE(TAG, "Failed to alloc arc LUT in PSRAM!");
-            return;
-        }
-    }
     s_arc_lut_count = 0;
     int32_t r_out_sq = (int32_t)ARC_R_BORDER * ARC_R_BORDER;
     int32_t r_in_sq  = (int32_t)ARC_R_INNER * ARC_R_INNER;
@@ -445,7 +362,7 @@ static void speed_process(void)
             if (s_treadmill_speed < TREAD_MAX_SPEED) {
                 s_treadmill_speed++;
                 char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
                 ble_service_notify_str(buf);
             }
         }
@@ -454,7 +371,7 @@ static void speed_process(void)
             s_last_tick = now;
             s_treadmill_speed--;
             char buf[32];
-            snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+            snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
             ble_service_notify_str(buf);
         }
     }
@@ -495,7 +412,7 @@ void ui_treadmill_update(void)
             if (!drv_encoder_button_pressed()) {
                 s_treadmill_speed = s_cruise_speed;
                 char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
+                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\\n", s_treadmill_speed);
                 ble_service_notify_str(buf);
             }
         }
@@ -529,3 +446,10 @@ void ui_treadmill_update(void)
         s_last_drawn_speed = visual_speed;
     }
 }
+'''
+
+with open(output, "w", encoding="utf-8") as f:
+    f.write(header + rest)
+
+print(f"Written {os.path.getsize(output)} bytes to {output}")
+

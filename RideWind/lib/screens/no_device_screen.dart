@@ -1,32 +1,92 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
+import 'package:provider/provider.dart';
 import 'device_scan_screen.dart';
 import 'main_pager_screen.dart';
 import 'device_list_screen.dart';
 import 'settings_screen.dart';
 import '../models/device_model.dart';
 import '../utils/responsive_utils.dart';
-import '../services/feedback_service.dart'; // ✅ 操作反馈服务
+import '../providers/bluetooth_provider.dart';
+import '../services/preference_service.dart';
+import '../core/service_locator.dart';
 
-/// 未连接设备页面（空状态）
-class NoDeviceScreen extends StatelessWidget {
+/// 未连接设备页面（空状态）+ 自动重连上次设备
+class NoDeviceScreen extends StatefulWidget {
   const NoDeviceScreen({super.key});
+
+  @override
+  State<NoDeviceScreen> createState() => _NoDeviceScreenState();
+}
+
+class _NoDeviceScreenState extends State<NoDeviceScreen> {
+  bool _isAutoConnecting = false;
+  String? _autoConnectDeviceName;
+
+  @override
+  void initState() {
+    super.initState();
+    _tryAutoConnect();
+  }
+
+  Future<void> _tryAutoConnect() async {
+    final prefs = sl<PreferenceService>();
+    final lastDevice = await prefs.getLastConnectedDevice();
+    if (lastDevice == null) return;
+
+    final deviceId = lastDevice['id']!;
+    final deviceName = lastDevice['name']!;
+
+    if (!mounted) return;
+    setState(() {
+      _isAutoConnecting = true;
+      _autoConnectDeviceName = deviceName;
+    });
+
+    try {
+      // Reconstruct BluetoothDevice from saved MAC address
+      final btDevice = fbp.BluetoothDevice.fromId(deviceId);
+      final deviceModel = DeviceModel(
+        id: deviceId,
+        name: deviceName,
+        rssi: -60,
+        bluetoothDevice: btDevice,
+      );
+
+      final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+      final success = await btProvider.connectToDevice(deviceModel);
+
+      if (!mounted) return;
+
+      if (success) {
+        // Navigate to control screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => MainPagerScreen(device: deviceModel),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Auto-connect failed: $e');
+    }
+
+    if (mounted) {
+      setState(() { _isAutoConnecting = false; });
+    }
+  }
 
   Future<void> _handleBackNavigation(BuildContext context) async {
     debugPrint('🔙 未连接页面-返回按钮被点击');
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      // 已经是导航栈底部，直接退出应用
       debugPrint('🚪 导航栈为空，退出应用');
       SystemNavigator.pop();
     }
   }
-
-
-
-  /// 显示排查建议对话框
   void _showTroubleshootingDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -386,6 +446,47 @@ class NoDeviceScreen extends StatelessWidget {
                 ),
               ),
             ),
+
+            // Auto-connecting overlay
+            if (_isAutoConnecting)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withAlpha(180),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 48, height: 48,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          '正在连接 ${_autoConnectDeviceName ?? ""}...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '正在尝试连接上次使用的设备',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: 13,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
