@@ -5,10 +5,60 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：主干整理完毕，准备新功能开发
+## 当前阶段：工程体系建设 + 稳定性优先
 
 所有实验性功能分支已暂存保留，工作区已切回 main 干净状态。
-可以开始下一个功能开发或继续体验打磨。
+**当前重心**：建立专业开发体系（500+用户，不能再小作坊模式）。
+
+### 本次新增：工程标准体系 + 项目健康审计 (2026-05-24)
+
+**工程标准**：创建 `.kiro/steering/engineering-standards.md` — 10 条不可违反的工程规则
+
+**项目健康审计结果**：
+- 🔴 iOS 构建完全不可用（Podfile 不存在，CI iOS job 是摆设）
+- 🔴 `flutter test` 全量运行崩溃（`enhanced_image_preprocessor_test.dart` 编码损坏）
+- 🟡 9 个死代码文件（~1500 行从未被 import）
+- 🟡 4 个无用依赖（camera/cupertino_icons/google_fonts/font_awesome_flutter）
+- 🟡 CRC32 代码重复 3 处
+- 🟡 18 个文件超 500 行（最大 running_mode_widget.dart 1414 行）
+- 🟡 `image: any` 版本未锁定
+- 🟢 协议测试 51/51 通过
+- 🟢 flutter analyze 0 error（201 info/warning）
+- 🟢 CI Android 构建+部署流程可用
+
+**修复优先级**：
+1. ~~清理垃圾（删死代码+无用依赖+修损坏测试+CI 跑全量测试）~~
+2. iOS 全自动化 — **代码已完成，待配置 Secrets 后验证**
+   - ✅ 创建 `ios/Podfile`（platform :ios, '13.0'）
+   - ✅ 创建 `ios/ExportOptions.plist`（app-store-connect 分发）
+   - ✅ CI iOS job 升级：自动签名 + 构建 IPA + 上传 TestFlight
+   - ✅ CI release job 依赖 build-ios（iOS 失败阻塞发版）
+   - ✅ CI 测试改为 `flutter test`（全量）
+   - ✅ Secrets 未配时 fallback 到 `--no-codesign`（不阻塞）
+   - ⏳ 配置 6 个 GitHub Secrets（APPLE_CERTIFICATE / PASSWORD / PROVISIONING_PROFILE / API_KEY_ID / ISSUER_ID / API_KEY）
+   - ⏳ push 后验证 CI iOS 构建通过
+3. 每次发版只改一件事（从 v1.2.3 开始）
+
+**未提交文件**：
+- `RideWind/ios/Podfile` — 新建
+- `RideWind/ios/ExportOptions.plist` — 新建
+- `.github/workflows/multi-platform-build.yml` — iOS 全自动签名+TestFlight + release 依赖双平台 + 测试全量化
+- `.kiro/steering/engineering-standards.md` — 新建
+- `RideWind/lib/widgets/app_update_dialog.dart` — iOS 升级路径：跳转 App Store/TestFlight（不再空 pop）
+- `RideWind/lib/services/app_update_service.dart` — 新增 `iosAppStoreUrl` 静态字段，从远程 JSON 读取
+
+**编译状态**：`flutter analyze` ✅ 修改文件 0 error 0 warning
+
+**待操作**：
+- 在 `app_version.json` 的 `ios_app_store_url` 填入 TestFlight 邀请链接
+- 配置 6 个 GitHub Secrets（Apple 证书 + App Store Connect API Key）
+- push 后验证 CI 双平台构建通过
+
+**核心决策**：
+- v1.2.1 → v1.2.2 升级路径断裂是已知限制，不修复
+- 从此以后，已发布契约（URL/字段名/协议格式）不可破坏
+- 一个版本只做一件事
+- iOS 必须在 v1.3.0 前跑通真机验证
 
 ## 本次新增：APP 升级弹窗前移 + 设备管理界面 (2026-05-24)
 
@@ -37,11 +87,12 @@
 
 ## Git 状态
 
-- **分支**：`main`（准备发布 v1.2.2）
-- **当前 tag**：`v1.2.1`（待推送 v1.2.2）
-- **远程**：origin/main
+- **分支**：`main`（v1.2.2 已发布，CI ✅ 全部通过）
+- **当前 tag**：`v1.2.2`（设备列表首页 + capability negotiation）
+- **远程**：origin/main 已同步（含 CI 自动更新的 app_version.json）
 - **规范**：见 `git-and-release.md`（唯一 git 规范文件）
-- **待执行**：`git add -A && git commit -m "release: APP v1.2.2" && git tag v1.2.2 && git push origin main --tags`
+- **CI 状态**：✅ 全部通过（analyze + protocol tests + iOS build + Android APK signed + deploy + app_version.json 自动更新）
+- **CI 修复记录**：本次修复了 4 个 CI 问题（paths 过滤 / secrets 在 if 中 / continue-on-error 重复 / keystore 路径），现在 CI 完全自动化可用
 
 ### 暂搁功能分支（保留不删，后续有空再开发）
 
@@ -77,7 +128,9 @@
 - v8: `ui_treadmill_update` 加 early return（速度没变就不画任何东西）— 解决 WDT
 - v8: 删除中心圆描边环（视觉杂碎）
 - v8: 挡位方块改为等宽6px + 高度递增（4→18px）+ 底部对齐 + 纯红渐变（浅→深）
-- 编译状态：✅ `.\build.ps1` 通过（2026-05-24，0 error，bin 3.04MB，余量 3%）
+- v9: `draw_speed_number` 加 early-return（数字没变就跳过 160×53 清除+位图重绘）
+- v9: 退出改为单击或双击都能退出（解决双击不灵敏）
+- 编译状态：✅ `.\build.ps1` 通过（2026-05-24）
 - 修复脚本：`ridewind-esp/tools/fix_v8.py`
 
 **APP 修复：重连自动切 UI 问题**：
@@ -287,6 +340,10 @@ DeviceListScreen 返回 → SystemNavigator.pop()（退出 APP）
 
 **待排查**：
 - 设备时不时重启（疑似 WDT，可能与自定义 SPEED_MAX 大数字 LCD 绘制有关，需串口日志确认）
+- ⚠️ **v1.2.1 → v1.2.2 无法自动升级（已知限制，非 bug）**：v1.2.1 的 AppUpdateService 是旧代码（单 URL 指向不存在的 `version.json`，JSON 只认 camelCase），后续重构为全新升级系统（双 URL + CDN fallback + 灰度）。升级路径从 v1.2.2 起才生效。v1.2.1 用户需手动安装 v1.2.2 APK。
+
+**下一步待执行**：
+- iOS 构建流程并入开发流程（按 IOS_BUILD_AUTOMATION.md 执行，需要 Apple Developer 账号）
 
 ## 本次新增：专业级 Capability Negotiation 系统 (2026-05-24)
 

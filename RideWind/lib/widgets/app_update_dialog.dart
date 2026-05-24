@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/app_update_service.dart';
 
 /// APP更新提示弹窗
@@ -30,10 +31,9 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   String? _error;
 
   void _startDownload() {
-    // iOS: 提示用户去 App Store 更新
+    // iOS: 跳转 App Store 或 TestFlight 更新
     if (Platform.isIOS) {
-      // TODO(ios): 上架后添加 url_launcher 跳转 App Store
-      Navigator.of(context).pop();
+      _openIOSUpdate();
       return;
     }
 
@@ -54,6 +54,44 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         if (mounted) setState(() { _error = e; _downloading = false; });
       },
     );
+  }
+
+  /// iOS 更新：跳转 App Store 或 TestFlight
+  Future<void> _openIOSUpdate() async {
+    // 优先使用 app_version.json 中配置的 App Store URL
+    // TestFlight 阶段使用 TestFlight 深链接
+    const testFlightUrl = 'https://testflight.apple.com/join/YOUR_CODE';
+    final appStoreUrl = AppUpdateService.iosAppStoreUrl;
+
+    final url = appStoreUrl.isNotEmpty ? appStoreUrl : testFlightUrl;
+
+    try {
+      // 使用系统 URL scheme 打开（不需要 url_launcher 依赖）
+      final uri = Uri.parse(url);
+      await SystemChannels.platform.invokeMethod('SystemNavigator.routeInformationUpdated');
+      // 通过 platform channel 打开 URL
+      const channel = MethodChannel('plugins.flutter.io/url_launcher_ios');
+      await channel.invokeMethod('launch', <String, Object>{
+        'url': uri.toString(),
+        'useSafariVC': false,
+        'useWebView': false,
+        'enableJavaScript': false,
+        'enableDomStorage': false,
+        'universalLinksOnly': false,
+        'headers': <String, String>{},
+      });
+    } catch (_) {
+      // fallback: 复制链接到剪贴板
+      if (mounted) {
+        await Clipboard.setData(ClipboardData(text: url));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新链接已复制，请在浏览器中打开')),
+          );
+          Navigator.of(context).pop();
+        }
+      }
+    }
   }
 
   @override

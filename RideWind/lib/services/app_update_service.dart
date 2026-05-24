@@ -95,6 +95,9 @@ class AppUpdateService {
   factory AppUpdateService() => _instance;
   AppUpdateService._();
 
+  /// iOS App Store URL（从 app_version.json 获取，上架后填入）
+  static String iosAppStoreUrl = '';
+
   /// 版本信息 URL（主）
   static const String _versionUrl =
       'https://raw.githubusercontent.com/SunnyKlara/Zcritical/main/RideWind/app_version.json';
@@ -134,6 +137,12 @@ class AppUpdateService {
 
       final remoteInfo = AppVersionInfo.fromJson(data);
       debugPrint('🌐 远程版本: ${remoteInfo.version}+${remoteInfo.buildNumber}, rollout: ${remoteInfo.rolloutPercentage}%');
+
+      // 存储 iOS App Store URL（供升级弹窗使用）
+      final storeUrl = data['ios_app_store_url'] as String? ?? '';
+      if (storeUrl.isNotEmpty) {
+        iosAppStoreUrl = storeUrl;
+      }
 
       // 版本比较
       if (remoteInfo.buildNumber <= currentBuild) {
