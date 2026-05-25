@@ -10,11 +10,13 @@ import 'dart:math';
 class SmokeDynamics {
   SmokeDynamics._();
 
-  /// 归一化速度 — 所有参数计算的基础
+  /// 归一化速度 — 所有参数计算的基础（公开版本供 FluidSimulation 使用）
   /// 反编译: scvtf d1, x1; fdiv d2, d1, d0(340.0); clamp(0, 1)
-  static double _normalizeSpeed(int windSpeed) {
+  static double normalizeSpeed(int windSpeed) {
     return (windSpeed / 340.0).clamp(0.0, 1.0);
   }
+
+  static double _normalizeSpeed(int windSpeed) => normalizeSpeed(windSpeed);
 
   /// 波动动画速度
   /// 反编译 @ 0x3cb970: fmov d1, #3.0; fmul; fmov d1, #0.5; fadd

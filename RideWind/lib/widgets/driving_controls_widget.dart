@@ -474,22 +474,22 @@ class _ControlPanelPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5.0);
 
-    // ═══ 刻度线（沿弧线向下延伸） ═══
+    // ═══ 刻度线（沿弧线向下延伸，无圆点） ═══
     final metrics = arcPath.computeMetrics().first;
     final totalLength = metrics.length;
-    const tickCount = 16; // 刻度数量
+    const tickCount = 16;
 
     for (int i = 0; i <= tickCount; i++) {
       final t = i / tickCount;
       final pos = metrics.getTangentForOffset(totalLength * t);
       if (pos == null) continue;
 
-      final isMajor = i % 4 == 0; // 每4个一个大刻度
+      final isMajor = i % 4 == 0;
       final tickLen = isMajor ? 10.0 : 5.0;
       final tickWidth = isMajor ? 1.8 : 0.8;
 
       // 刻度向下延伸（法线方向）
-      final normal = Offset(-pos.vector.dy, pos.vector.dx); // 垂直于切线
+      final normal = Offset(-pos.vector.dy, pos.vector.dx);
       final normalNorm = normal / normal.distance;
 
       final start = pos.position;
@@ -507,7 +507,7 @@ class _ControlPanelPainter extends CustomPainter {
       canvas.drawLine(start, end, Paint()
         ..color = tickColor
         ..strokeWidth = tickWidth
-        ..strokeCap = StrokeCap.round);
+        ..strokeCap = StrokeCap.butt); // butt = 方形末端，不产生圆点
     }
 
     // ═══ 转速进度发光（沿弧线） ═══
