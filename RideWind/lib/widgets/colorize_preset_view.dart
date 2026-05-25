@@ -20,6 +20,8 @@ class ColorizePresetView extends StatefulWidget {
   final bool debugMode;
   /// 🎨 点击调色盘按钮时的回调：导航到 RGB 面板（顶层 PageView 右侧页）
   final VoidCallback? onPaletteTap;
+  /// 🔒 内层胶囊滑动锁回调：true=正在滑胶囊，外层应锁定；false=释放
+  final ValueChanged<bool>? onInnerScrollLockChanged;
 
   const ColorizePresetView({
     super.key,
@@ -30,6 +32,7 @@ class ColorizePresetView extends StatefulWidget {
     required this.paletteButtonKey,
     this.debugMode = false,
     this.onPaletteTap,
+    this.onInnerScrollLockChanged,
   });
 
   @override
@@ -176,21 +179,34 @@ class _ColorizePresetViewState extends State<ColorizePresetView> {
             right: 0,
             child: SizedBox(
               height: capsuleHeight + 30,
-              child: PageView.builder(
-                key: widget.colorPageViewKey,
-                controller: widget.colorPageController,
-                padEnds: true,
-                physics: const BouncingScrollPhysics(),
-                onPageChanged: (index) {
-                  _colorize.setSelectedColorIndex(index);
-                  HapticFeedback.selectionClick();
-                  // 智能分发：preset → PRESET:n / custom → 4×LED:strip:r:g:b / plus → no-op
-                  _colorize.syncCapsuleToHardware(index);
-                  _colorize.saveColorPreset(index);
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification) {
+                    // 用户开始拖动内层胶囊 → 锁死外层
+                    widget.onInnerScrollLockChanged?.call(true);
+                  } else if (notification is ScrollEndNotification) {
+                    // 内层滚动结束 → 解锁外层
+                    widget.onInnerScrollLockChanged?.call(false);
+                  }
+                  // 不拦截通知，让 PageView 正常处理
+                  return false;
                 },
-                itemCount: _colorize.allCapsules.length,
-                itemBuilder: (context, index) =>
-                    _buildCapsuleItem(config, index, capsuleWidth, capsuleHeight),
+                child: PageView.builder(
+                  key: widget.colorPageViewKey,
+                  controller: widget.colorPageController,
+                  padEnds: true,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (index) {
+                    _colorize.setSelectedColorIndex(index);
+                    HapticFeedback.selectionClick();
+                    // 智能分发：preset → PRESET:n / custom → 4×LED:strip:r:g:b / plus → no-op
+                    _colorize.syncCapsuleToHardware(index);
+                    _colorize.saveColorPreset(index);
+                  },
+                  itemCount: _colorize.allCapsules.length,
+                  itemBuilder: (context, index) =>
+                      _buildCapsuleItem(config, index, capsuleWidth, capsuleHeight),
+                ),
               ),
             ),
           ),

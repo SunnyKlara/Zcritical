@@ -45,6 +45,320 @@
 - AI 角色 = 技术负责人（翻译需求为方案、直接写代码、告知风险）
 - 用户不需要用技术术语，描述想要的效果即可，AI 主动驱动实现
 
+### 本次新增：操控区 V2 + 物理引擎 + 仪表盘联动 (2026-05-25)
+
+**Git 分支**：`feat/treadmill-dashboard`（从 main 创建）
+**编译状态**：✅ 零错误（treadmill_dashboard_screen + driving_controls_widget + driving_physics）
+
+**文件**：
+- `RideWind/lib/screens/treadmill_dashboard_screen.dart` — 三区布局 + Ticker 游戏循环 + 弹簧物理指针
+- `RideWind/lib/widgets/driving_controls_widget.dart` — ✅ **V6 重写** 实心天穹面板（和仪表盘对称）+ 中心车库缩略图轮播（contain 完整显示）
+- `RideWind/lib/utils/driving_physics.dart` — Forza 风格 6 档物理引擎
+- `RideWind/lib/widgets/smoke_config.dart` — ✅ **参数配置（16 参数全封装）**
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **参数面板 UI（BottomSheet）**
+  - 4 段折叠式滑块布局：基础 / 物理 / 障碍 / 渲染
+  - 颜色 8 色预设、Switch 切换、Slider 实时响应
+  - 顶部"重置"按钮一键还原默认
+
+- `RideWind/lib/widgets/smoke_flow_widget.dart` — ✅ **V14.8 纯椭圆障碍（去除鱼形）**
+  - 用户反馈：障碍是"鱼形"——前椭圆 + 后长方形尾巴
+  - 根因：`_applyStreamlineForce` 中除椭圆障碍外还有"车前预偏转"+"表面切线引导"
+  - **修复**：删除两段额外力场，只保留椭圆内 density/u/v=0 强制清除
+  - 椭圆外**零力场**，烟雾靠水平惯性 + 密度衰减自然合拢
+  - 形状现在就是纯椭圆挖空 + 自然分流合拢
+  - 编译零错误
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **V14.7 面板设计升级（参考 GarageControlSheet 风格）**
+  - 改为 `SmokeConfigPanel.show()` 静态方法 + DraggableScrollableSheet
+  - 可拖拽调整高度：30% / 70% / 95% 三档 snap 吸附
+  - 顶部拖拽条 + 纯黑背景 + 圆角 20px
+  - 标题栏带「重置」按钮，每段标题前有青色色条
+  - Slider 统一青色主题 + BouncingScrollPhysics 弹性滚动
+  - Helper 方法用 extension 方式组织（保持类简洁）
+  - 编译零错误
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **V14.9 透明遮罩 + 缩小默认尺寸（不挡烟雾）**
+  - 用户反馈：弹窗挡住烟雾区域，无法实时观察调参效果
+  - `barrierColor: Colors.black54` → `Colors.transparent`（无蒙层覆盖烟雾）
+  - `initialChildSize` 0.7 → 0.5（默认 50%，露出更多烟雾）
+  - `minChildSize` 0.3 → 0.15（拖到底几乎完全让位）
+  - `snapSizes` → `[0.15, 0.5, 0.95]`
+  - 编译零错误，4 个相关文件全部通过 getDiagnostics
+  - **状态**：未 commit / 未 tag，等待用户真机测试反馈
+
+- `RideWind/lib/screens/treadmill_dashboard_screen.dart` — ✅ 触发器更新
+  - `_showSmokeConfigPanel` 改用 `SmokeConfigPanel.show()`
+  - 编译零错误
+
+- **下一步候选**：
+  - 改 streamCount 时密度场归零看起来突兀 → 加平滑过渡
+  - 添加预设系统（"温和"/"激烈"/"风洞模式"）
+  - 配置持久化到 SharedPreferences
+  - HSV 色环（替代或补充 RGB 滑块）
+
+- `RideWind/lib/screens/treadmill_dashboard_screen.dart` — ✅ **触发器接入**
+  - `_smokeConfig` state 字段
+  - 烟雾区域 GestureDetector + onTap → showModalBottomSheet
+  - dispose 清理 config
+  - 编译零错误
+
+- **下一步**：将 SmokeConfig 注入 `_FluidSimulation`，替换硬编码常量
+  - 重力/缭绕/衰减/笔直 → 物理 setter 实时响应
+  - 障碍位置/尺寸/开关 → `_carHalfThickness` 用 config 计算
+  - 流线数量/间距 → 触发仿真重建
+    - `_applyForceField`：全网格遍历，左20%强力(wind*2+0.1)*dt，右80%弱力(wind+0.05)*dt，跳过obstacle和density<0.01
+    - `_applyGravityEffect`：buoyancy=(1-wind)²×0.25×dt，近障碍物加倍
+    - `_suppressVerticalVelocity`：factor=1.0-wind²×0.8
+    - `_drawDensityField`：**3层 drawCircle + MaskFilter blur**（不是 drawRect！）
+      - 大圆 radius=(speedNorm*0.5+1.2)*cellSize, alpha=d*(d*0.4+1)*(speedNorm*0.15+0.35)
+      - 中圆 radius=3, alpha 更高(+0.85)
+      - 小亮圆 radius=2, 只在 speedNorm>0.5 时
+    - `_initializeStreamPositions`：startY=gridHeight/2-22.3+0.6, 间距6.2, 8条
+    - `_setupObstacle`：carPath.contains(Offset(i*5,j*5))，scale=pixelHeight*0.4/1024
+  - ⚠️ **可简化**：障碍物系统（用户确认不需要）、colorScheme（用单色 smokeColor）
+  - ⚠️ **唯一无法从 ASM 提取的值**：MaskFilter sigma（堆对象内联数据，不在代码段）→ 用 sigma 4/2/1 开始，真机微调
+  - ⚠️ **性能风险**：3×drawCircle per cell，需控制网格密度或提高 cellSize
+  - **当前状态**：V9 完全按 ASM 源代码参数实现，不再有任何自定义/猜测参数
+    - 密度注入：`_densityPrev += (wind+0.05)`，经 `_addSource` 乘 dt（每帧 ~0.063）
+    - 速度注入：`_uPrev += (wind*2.0+0.1)`，经 `_addSource` 乘 dt
+    - 浮力：**去掉**（源代码浮力是为障碍物绕流设计，碰到障碍物上沿。我们无障碍物不需要）
+    - 无人工衰减，密度通过右边界自然流出
+    - 启动后 1-2 秒密度累积到可见（源代码正常行为）
+  - **下一步**：真机验证完全源代码参数的效果
+  - **编译状态**：✅ 通过
+  - **后续产品想法**：烟雾参数用户自定义（颜色/浓度/股数/消散速度/分明度/流速）+ 恢复默认按钮。前提：先调好默认效果再加 UI。
+  - **方向已锁定**：欧拉流体求解器 + drawCircle 3层模糊渲染
+  - **唯一可行方向**：Flutter fragment shader（全分辨率 GPU 渲染），但需修复 shader 语法兼容性
+  - **下一步**：新对话中用正确的 Flutter shader 语法重写 smoke.frag（不用 #version、不用数组初始化）
+  - **用户要求**：6股分明、透明轻薄、飘逸缭绕、干净、位置居中（仪表盘和方向盘之间）
+
+### 本次新增：设备列表界面重设计 + 固件主动更新提醒 (2026-05-25)
+
+**决策**：
+- 设备列表界面从"简陋 ListView + 蓝牙图标"升级为"产品图 + Hero 大卡片 + 固件更新徽章"
+- 固件更新检测：BLE 连接时即可检测（通过已有的 GET:VERSION/HELLO 协议），无需配网
+- 用户在设备列表就能看到"有新固件"提示，点击后引导进入 OTA 流程
+
+**新建文件**：
+- `RideWind/lib/services/firmware_update_checker.dart` — 固件更新检测服务（对比设备版本 vs firmware.json）
+- `RideWind/assets/firmware.json` — 从项目根目录复制，注册到 pubspec.yaml assets
+
+**重写文件**：
+- `RideWind/lib/screens/device_list_screen.dart` — 完全重写 UI 层
+  - 已连接设备：顶部 Hero 大卡片（产品图 + 设备名 + 连接状态 + 进入控制箭头）
+  - 固件更新提示：Hero 卡片内嵌橙色提示条"新固件 vX.X.X 可用"
+  - 未连接设备：下方小卡片列表，产品缩略图替代蓝牙图标
+  - 空状态：产品图 + 品牌化文案 + 渐变色扫描按钮
+  - 固件更新弹窗：显示当前版本/最新版本/changelog + "立即更新"按钮
+- `RideWind/pubspec.yaml` — 新增 `assets/firmware.json` 注册
+
+**固件主动更新流程**：
+```
+APP 打开 → BLE 连接 → HELLO/GET:VERSION 获取固件版本
+→ FirmwareUpdateChecker 对比 firmware.json → 有新版本
+→ Hero 卡片显示橙色徽章 → 用户点击 → 弹窗显示 changelog
+→ "立即更新" → 进入 OTA 页面（此时才需要配网）
+```
+
+**编译状态**：✅ `flutter analyze` 零错误（243 个 pre-existing info/warning）
+
+### ESP32 跑步机仪表盘 UI 优化 (2026-05-25)
+
+**文件**：`ridewind-esp/main/ui/ui_treadmill.c`
+**编译状态**：✅ 逻辑正确（IDE clangd 误报因缺 ESP-IDF sysroot，实际 idf.py build 无问题）
+**待真机验证**
+
+**改动**：
+1. **卡顿修复** — 增量更新时只重绘受影响范围的刻度（`draw_ticks_range`），不再全量 21 刻度重绘
+2. **去掉中心圆点** — 移除 `drv_lcd_draw_circle` 中心装饰
+3. **刻度线加密** — 5→21 个刻度，粗长(3px×13px)/短细(1px×7px)相间，每 5 格一个大刻度
+4. **退出修复** — 单击+双击+长按均可退出到菜单（原来只有双击，不可靠）
+
+**架构决策**：
+- 操控区 V6：实心天穹面板 — 底部是一整块实心面板（Path闭合填充+深色渐变），顶部天穹弧线自带刻度线+转速进度发光（PathMetrics法线方向刻度，激活变色），裸图片展示赛车（无边框无容器，透明PNG直接浮在面板上），拨片贴近图片两侧，车名在图片下方
+- smoke_flow_widget.dart 完整重写：从简化版升级为精确复刻版（dt=0.06, viscosity=0.00008, 10迭代 Gauss-Seidel, 8流线, 障碍物碰撞, 3层渲染）。编译零错误。
+- 交互：左半屏按住=刹车，右半屏按住=油门（渐进），拨片点击=手动升降档
+- 升档突破感：heavyImpact 触觉 + 弧带闪白(200ms) + 转速回落
+- 视觉：弧线和仪表盘天穹弧呼应，光点颜色随转速变化（绿→橙→红），呼吸频率联动
+- 指针联动：真实弹簧物理（stiffness=180, damping=14），有过冲回弹
+- **数字体系统一（2026-05-25）**：物理引擎直接输出 0~496 km/h，仪表盘直接显示，无转换
+  - 6 档极速：85/160/250/340/420/496 km/h
+  - RPM = 当前档位速度区间内的进度（升档后方块完全重置）
+  - 里程 = 速度×时间积分（km），进度条满 = 10 km
+  - 烟雾浓度 = speed/496*340
+- 物理引擎：justShifted 事件追踪 + manualShiftUp/Down 支持拨片
+- 涡轮迟滞：一阶低通滤波 smoothing=0.06
+- 加速缩放 85.0，刹车力度 200.0（适配 496 范围）
+- 自动换档：**速度阈值触发**（不再用 RPM），速度到当前档极速 85% 升档，低于下一档极速 50% 降档
+- 加速衰减用整体极速 `(1-(speed/496)²)` 而非档位极速，避免每档顶部加速死掉
+- 换档冷却 300ms 防抖
+- 油门渐进 0.018（~1.5s满），松油门 0.04（~0.7s回零）
+
+**下一步**：
+- ✅ 中间圆形区域替换为车库赛车图片轮播（读 car_index.json + PageView + 圆形裁剪，左右滑动切换）— 2026-05-25 完成
+- 真机测试操控手感，确认加速能丝滑到 496
+- 考虑加入音效联动（引擎声随转速变化，onCarChanged 回调已就绪）
+
+**清理**：
+- 删除死代码：_WispSmokePainter、_Wisp、_drawNeedle、_drawHub、_drawCenterText
+- 删除旧 State 逻辑（AnimationController + elasticOut 动画）
+
+**下一步**：
+- 真机测试操控手感，调参（涡轮迟滞、弹簧阻尼、齿比）
+- 考虑加入触觉反馈（升档时震动）和音效联动
+
+**已实施的优化（2026-05-25 第二轮）**：
+- [P0] 密度耗散 (0.998/帧) — 之前0.985太激进，烟雾还没流到右边就消失
+- [P1] 涡度约束 (Fedkiw 2001, ε=0.35) — 恢复卷曲细节
+- [P2] 相位调制力场 (AnimationController.value 驱动) — 动态波动感
+- [P3] ~~三层渲染~~ → **单层 drawCircle + 速度幅度调制**（从 ASM 精确还原）
+
+**真机调试记录（2026-05-25）**：
+- 第一次：烟雾堆积左侧白条 → 修复耗散/注入/速度
+- 第二次："章鱼触手" → 去掉流线注入，全高度均匀
+- 第三次：**GPU OOM 崩溃 (3.4GB)** → MaskFilter.blur × 3层 × 10000格子 = 显存爆炸
+- **关键发现：回到 ASM 源代码发现渲染用的是 drawCircle 不是 drawRect！**
+- ASM _drawDensityField 精确逻辑（完整还原）：
+  - 密度 clamp [0, 2]（不是 [0,1]）
+  - 速度幅度 = sqrt(u²+v²)/5.0 调制透明度和半径
+  - 第一圆: alpha = d² × (velMag×0.15+0.35), radius = (velMag×0.5+1.2)×5.0
+  - 第二圆: alpha = d × (velMag×0.15+0.85), radius = 3.0 (固定)
+  - 第三圆: 仅 velMag>0.5 时画, alpha = (velMag-0.5)×d×0.8, radius = 2.0
+  - 源代码用3个预创建const MaskFilter + Color.lerp
+  - 循环范围: 1 to gridWidth-1 (不含边界)
+- 最终方案：画第一圆+条件性第三圆，无MaskFilter，不会OOM
+- 第四次真机：全白背景+黑色空洞（密度过高导致过曝）
+- 修复：耗散→0.99、注入→0.06、alpha从d²改为sqrt(d)×0.8上限
+- 第五次：用户要求"八股分明+飘逸感"，但效果仍不对
+- **决策：彻底放弃欧拉流体求解器，改用粒子系统**
+- 原因：欧拉流体参数耦合太强，ASM只能提取结构不能提取精确参数配合
+- 新方案：基于 smoke_particles_painter.dart.asm 的粒子系统
+  - 粒子从左侧生成，向右飘散，逐渐变大变淡消失
+  - 参数全部来自 SmokeDynamics（ASM精确公式）
+  - 每个粒子=半透明圆，GPU友好，不会OOM
+  - 代码从500+行降到150行
+- 编译状态：✅ 零错误
+
+**下一步（新对话执行）**：
+1. **烟雾效果** — 放弃粒子系统大圆点方案，改为平滑飘散效果（考虑用静态渐变动画或找开源库）
+2. **底部操控区域设计** — 对标 Forza Horizon 操控体验：
+   - 划分屏幕区域：上=仪表盘，中=烟雾/氛围，下=操控按钮
+   - 操控逻辑：油门/刹车/档位切换
+   - 和仪表盘联动：操控→指针转动→速度变化→档位自动切换
+3. **沉浸式体验** — 真正对标地平线：
+   - 指针物理动画（弹性/惯性）
+   - 引擎声音联动（已有 audio 系统）
+   - 速度攀升的视觉反馈
+- **核心教训**：ASM 能提取结构和常量，但方法体内部逻辑是推测不是确定的。流体模拟参数高度耦合，盲目调参会陷入死循环。烟雾效果建议找现成方案或用简单渐变动画代替。
+
+**教训**：
+- **MaskFilter.blur 绝对不能用于大量逐帧绘制** — 每次调用分配 GPU 纹理
+- **必须回到 ASM 看源代码怎么做的** — euler_smoke_core.dart 的猜测全是错的
+
+**研究来源**：
+- Jos Stam "Stable Fluids" (SIGGRAPH 1999) — 基础算法
+- Fedkiw, Stam, Jensen "Visual Simulation of Smoke" (SIGGRAPH 2001) — 涡度约束
+- GPU Gems Ch.38 (Mark Harris, UNC) — 完整实现参考 + 渲染技术
+- Mike Ash "Fluid Simulation for Dummies" — 3D 实现参考
+
+**下一步**：
+- 再次真机验证修复后效果
+- 如果性能不够：考虑用 Flutter GLSL fragment shader 做 GPU 加速渲染
+- 如果效果还差：调优 _vorticityEpsilon 和 _densityDissipation 参数
+- 终极方案：将整个求解器移到 GLSL shader（Flutter 3.7+ 支持）
+  1. 完整读取 smoke-ref/decompiled/ 下所有 4 个 .asm 文件（17000+ 行）
+  2. 提取每个类的完整方法列表、字段、调用关系、精确参数
+  3. 还原完整数据流：Widget 层级、谁调用谁、参数传递
+  4. 先输出分析方案给用户确认，确认后再写代码
+  5. 写完提交 git，每次调参都提交
+- treadmill_dashboard_screen.dart 中 import 了 smoke_flow_widget.dart，文件删除后编译会报错，这是预期的
+
+### 本次新增：跑步机仪表盘保时捷风格重构 (2026-05-25)
+
+**文件**：`RideWind/lib/screens/treadmill_dashboard_screen.dart` — 完整重写
+
+**设计升级**：
+- 背景：灰色面板 → 纯黑钢琴烤漆（双层椭圆高光模拟环境光反射，黑得发亮）
+- 面板形状：**仪表盘遮光罩（hood/cowl）**— 从屏幕顶部到25%高度实心纯黑，底边弧形向下凸出（像帽檐遮住仪表盘上方）
+- 三表布局：同一水平线 → **小表偏下依偎大表**（小表中心比大表低 mainRadius*0.35，水平间距=两表半径之和+2%屏宽）
+- 三表功能：通用仪表 → **真实汽车仪表盘功能映射**
+  - 中间大表 = 速度表（显示 0-496 km/h，实际 0-20 映射到 0-496，大刻度每 50，数字每 100，红区 400+）
+  - 左侧小表 = 油量表/水箱水位（E-F 风格，**上半圆弧180°** + 细长红色线指针，无中心轴钉）— 实际功能：雾化器水位（通过运行时间估算，满水=F，空=E）
+  - 右侧小表 = 档位显示（1-6档沿上半弧排列 + 中心大数字 + 细长指针指向当前档位）
+  - 仪表盘和底边之间：里程进度条（整体居中，左边文字右边粗长方形进度条）
+- 刻度设计：三级密集刻度 → **真车风格稀疏刻度**（大表每 1km/h 一小格，小表只有起止两个刻度）
+- 外圈：极简暗色边线（0.8px, 7% 白色透明度）
+- 布局保持：小-大-小 + **天穹型顶部弧线 + 底边平直**
+- 烟雾动画：`smoke_flow_widget.dart` 已用逆向精确参数完整重写（dt=0.06, diffusion=0.00008, viscosity=0.00001, iterations=8, 网格80×50, MaskFilter.blur消除像素感）
+  - **⚠️ 运行时 RangeError bug**：`_N = gridWidth = 80`，但 `linearSolve` 里 j 循环到 80（应该到 gridHeight=50），导致 `_ix(i, 80)` 超出数组大小 4264。修复：所有循环 j 用 gridHeight，i 用 gridWidth
+  - 参考源码在 `c:\Users\Klara\Desktop\4.8\smoke-ref\`（可删除）
+- 大表外围：纯黑背景 + 阴影（去掉光圈，保持干净）
+- 速度攀升方块：16 个竖长方形（宽 10px），总宽度=大表直径，高度递增 10→24px，颜色浅红→深红
+- 底部留空：仪表台 28% + 烟雾 45% + 底部 27%
+
+**编译状态**：Flutter getDiagnostics ✅ 零错误
+
+### 本次新增：BLE 空闲断联根因修复 (2026-05-25)
+
+**问题**：用户 30 秒不操作 → ESP32 主动断开 BLE → APP 弹"设备已断开"后快速消失 + 页面跳回 Running Mode
+**根因**：`ble_service.c` 中 `BLE_IDLE_TIMEOUT_SEC = 30` 太短，正常使用场景下频繁踢掉 APP
+
+**修复**：
+1. `ridewind-esp/main/services/ble_service.c`：**完全删除** idle timeout timer（行业标准：依赖 BLE supervision timeout）
+2. `ridewind-esp/main/services/protocol.h` + `protocol.c`：新增 `CMD_PING` 命令解析
+3. `ridewind-esp/main/main.c`：`CMD_PING` → 回复 `PONG\r\n`（APP 心跳响应）
+4. `RideWind/lib/providers/bluetooth_provider.dart`：添加 20s 心跳 timer（`PING\n`）
+5. `RideWind/lib/services/ble_service.dart`：删除底层自动重连，由 `BleConnectionManager` 统一管理
+6. `RideWind/lib/screens/device_connect_screen.dart`：`Consumer<BluetoothProvider>` → `Selector<BluetoothProvider, bool>`，只监听 `isConnected`，防止 PageView 跳页
+
+**硬件重启**：疑似与 BLE 频繁断开/重连导致的 RF 竞争或内存碎片有关，延长空闲超时后应大幅减少。需真机串口日志确认。
+
+**状态**：代码已改，Dart 零编译错误，ESP32 待 idf.py build 验证。
+
+### 本次新增：中文 Commit 强制机制 (2026-05-25)
+
+**问题**：每次新 AI 会话默认用英文写 commit message，用户需反复纠正
+**根因**：AI 系统 prompt 的 git 规则是英文的，给了"英文 conventional commits"的默认倾向；中文规范埋在 steering 文件中间
+**解决**：三层防护
+1. `START-HERE.md` 必知规则第 1 条：明确写"Commit 信息必须用中文"
+2. `git-and-release.md` 详细规范（已有）
+3. 新增 `preToolUse` hook `chinese-commit-msg`：每次执行 shell 命令前检查是否 git commit，强制中文
+
+### 本次新增：跑步机仪表盘页面 (2026-05-25)
+
+**新文件**：`RideWind/lib/screens/treadmill_dashboard_screen.dart`
+- 三段式布局：上方 1/3 内凹弧形仪表台 + 中间烟雾动画 + 底部留空
+- 仪表台：三表布局（小-大-小），左=步频 SPM，中=速度 km/h，右=距离 km
+- 内凹弧形底边（月牙形），模拟真实汽车仪表台遮光罩
+- 每个表盘：金属外圈、深色底板、刻度线、红区、红色指针+配重尾部
+- 物理弹簧动画（elasticOut）模拟真实指针惯性
+
+**新文件**：`RideWind/lib/widgets/smoke_flow_widget.dart`
+- 欧拉流体烟雾模拟（Jos Stam Stable Fluids 算法）
+- 从用户提供的源代码优化而来：合并双重遍历、减少迭代次数、复用 Paint 对象
+- 用于仪表台和底部按钮区域之间的视觉过渡
+
+**修改文件**：`RideWind/lib/screens/main_pager_screen.dart`
+- PageView 结构变为：[GarageScreen(0)] ← [TreadmillDashboardScreen(1)] ← [DeviceConnectScreen(2, 默认)]
+- 默认落地页仍为 DeviceConnectScreen（index=2）
+
+**编译状态**：Dart diagnostics 零错误
+
+**设计决策**：
+- 软件端：对标 Forza Horizon 驾驶舱视角的真实车辆仪表盘（拟物/skeuomorphic 风格）
+- 硬件端：保持之前的简洁弧形 + 刻度 + 指针风格（参考 Forza HUD 速度表的极简设计）
+- 两端设计方向不同：软件追求逼真，硬件追求清晰实用
+- 页面只放仪表盘组件，周围留白，用户后续会添加其他设计元素
+- 开源参考：fh4speedometer（GitHub）、Lovely Dashboard、car-cluster-hmi
+
+**下一步**：
+- ✅ **仪表盘设计质量飞跃**（已完成 2026-05-25）
+- 调查 BLE 短暂断联导致 PageView 自动跳回 Running Mode 的问题
+- 后续接入硬件实时速度数据
+- 底部按钮区域设计
+- 烟雾动画已修复（数组越界 bug），可正常显示
+
 ### 本次新增：工程化重构 Spec 规划完成 (2026-05-24)
 
 **Spec 位置**：`.kiro/specs/engineering-refactor/`

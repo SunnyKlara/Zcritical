@@ -24,12 +24,13 @@ inclusion: auto
 
 ## 必知规则
 
-1. **唯一协议真值源** → `.kiro/steering/specs/protocol-contract.md`，代码中的协议实现必须与此文件一致
-2. **改代码必须同步文档** — 改了协议/引脚/架构 → 更新对应 steering 文件
-3. **对话结束更新 handoff** — 更新 `CONTINUATION_GUIDE.md` 的当前状态和下一步
-4. **有担忧就说** — 对用户方案有疑虑时必须提出，最多争论 2 轮，用户坚持后记录分歧并执行
-5. **ESP 固件分层不可破** — drivers/ 不调 services/，services/ 不调 ui/，所有状态走 AppState
-6. **不创建 spec 文件** — 不要在 `.kiro/specs/` 下创建任何文件。设计在对话中讨论，不走形式化流程。详见 `guides/dev-workflow.md`
+1. **Commit 信息必须用中文** — 格式 `类型: 中文描述`，如 `fix: 修复断连后内存泄漏`。绝对不用英文。详见 `git-and-release.md`
+2. **唯一协议真值源** → `.kiro/steering/specs/protocol-contract.md`，代码中的协议实现必须与此文件一致
+3. **改代码必须同步文档** — 改了协议/引脚/架构 → 更新对应 steering 文件
+4. **对话结束更新 handoff** — 更新 `CONTINUATION_GUIDE.md` 的当前状态和下一步
+5. **有担忧就说** — 对用户方案有疑虑时必须提出，最多争论 2 轮，用户坚持后记录分歧并执行
+6. **ESP 固件分层不可破** — drivers/ 不调 services/，services/ 不调 ui/，所有状态走 AppState
+7. **不创建 spec 文件** — 不要在 `.kiro/specs/` 下创建任何文件。设计在对话中讨论，不走形式化流程。详见 `guides/dev-workflow.md`
 
 ## 项目结构
 

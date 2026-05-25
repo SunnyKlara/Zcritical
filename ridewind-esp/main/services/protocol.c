@@ -421,6 +421,12 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         return true;
     }
 
+    /* ── PING — APP heartbeat keep-alive ── */
+    if (strcmp(buf, "PING") == 0) {
+        out->type = CMD_PING;
+        return true;
+    }
+
     return false;  /* unrecognized command */
 }
 

@@ -59,3 +59,6 @@ __pycache__/
 
 # ESP32 clangd cache
 ridewind-esp/.cache/
+
+# Smoke ASM 反编译参考资料（本地嵌套仓库）
+smoke-ref/

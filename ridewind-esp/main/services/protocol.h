@@ -51,6 +51,7 @@ typedef enum {
     CMD_FAN_RANGE,      /* FAN_RANGE:min,max — set fan PWM range */
     CMD_GET_VERSION,    /* GET:VERSION — query firmware/protocol version */
     CMD_HELLO,          /* HELLO:app_ver:proto_ver:platform — handshake */
+    CMD_PING,           /* PING — APP heartbeat keep-alive */
 } cmd_type_t;
 
 typedef struct {
