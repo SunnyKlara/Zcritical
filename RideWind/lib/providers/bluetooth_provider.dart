@@ -131,8 +131,18 @@ class BluetoothProvider with ChangeNotifier {
   // ── 数据缓冲区（原始数据调试用）──
   String _dataBuffer = '';
 
+  // ── BLE 心跳 timer ──
+  Timer? _heartbeatTimer;
+
   /// 设置所有流监听器（由构造函数调用）
   void _setupListeners() {
+    // ── BLE 心跳 keep-alive（每 20 秒发送 PING，防止某些 Android 厂商杀后台连接）──
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (isConnected) {
+        _cmd.sendRawCommand('PING\n');
+      }
+    });
+
     // 将 BLE 原始数据喂给 ResponseRouter
     _bleService.rxDataStream.listen((data) {
       // 同时维护原始数据流（调试用）
@@ -736,6 +746,7 @@ class BluetoothProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
     _wifiErrorCtrl.close();
     _wifiIpCtrl.close();
     _audioReadyCtrl.close();
