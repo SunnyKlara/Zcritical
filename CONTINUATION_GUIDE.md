@@ -5,19 +5,37 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：v1.3.0 已发版，进入用户验证期
+## 当前阶段：v1.3.0 + 固件 v1.2.0 已发版，工作区干净
 
-**最近一次发版（2026-05-26）**：`v1.3.0` 已合并 main 并推送，CI 自动构建中。
-工作区干净，分支 `feat/treadmill-dashboard` 已合并（可删除）。
+**最近一次发版（2026-05-26）**：
+- `v1.3.0` APP 已合并 main 并推送，CI 自动构建中
+- `fw-v1.2.0` 固件已 commit + tag + push（远端 `89402b4`）
+- ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
+- 本地与远端对齐（`origin/main` = HEAD），工作区干净
 
-### v1.3.0 包含的四大新功能
+**已完成（2026-05-26）**：
+- ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
+- ✅ 固件版本升 1.1.1 → 1.2.0
+- ✅ ESP-IDF 编译验证（build.ps1 -Full 通过）
+- ✅ firmware.json size 字段决策：选项 1（接受远端估算 3053696，0.03% 差异忽略）
+
+### v1.3.0 / fw-v1.2.0 包含的功能
 1. 跑步机仪表盘 + Forza 风格 6 档物理引擎
 2. Eulerian 流体烟雾系统 V14.9（ASM 反编译还原）+ 16 参数实时面板
 3. 设备列表 Hero 大卡片 + 固件更新主动提醒
 4. ESP32 数字滚轮 UI + BLE 心跳保活协议（CMD_PING/PONG）
+5. 死代码清理（55 行删除：未引用的字段/方法/import）
 
 **协议变化**：新增 CMD_PING，向后兼容（旧固件忽略，APP 超时静默兼容）。
-**固件烧录**：用户已实机烧录验证。如需 OTA 推送，需另走 `fw-vX.Y.Z` 发版流程。
+**固件烧录**：用户已实机验证。OTA 推送需手工上传 .bin 到 GitHub Release fw-v1.2.0。
+
+### ESP-IDF 编译环境（验证可用）
+```powershell
+cd ridewind-esp
+powershell -ExecutionPolicy Bypass -File build.ps1 -Full   # 改 sdkconfig.defaults 用 -Full
+powershell -ExecutionPolicy Bypass -File build.ps1         # 增量编译（~2s）
+```
+详细：`.kiro/steering/build-environment.md`
 
 ### 阶段 1 四件事（2026-05-24 确认）
 
@@ -26,21 +44,21 @@
 | 1 | OTA 能用 | ✅ WiFi OTA 已实现，效果好。速度优化在 `feat/ota-speed-boost` 分支 | 速度优化待合并（非阻塞） |
 | 2 | CI/CD 能跑 | ✅ Android + iOS 全自动 | iOS TestFlight 上传成功（rc4），App Store Connect API 自动签名 + macos-26 runner |
 | 3 | 关键路径有测试 | 🟡 协议 51/51，BLE 连接无测试 | BLE 状态机单元测试 |
-| 4 | 代码可维护 | 🟡 34 文件超 400 行 | 死代码清除 + 每次改功能时顺手拆文件 |
+| 4 | 代码可维护 | 🟡 33 文件超 400 行（已清理 1 个 unused 字段批次） | 死代码清除继续 + 拆文件 |
 
-**当前无 P0 阻塞项。** v1.3.0 已发版。
+**当前无 P0 阻塞项。** v1.3.0 + fw-v1.2.0 已发版。
 
 **遗留 P1（仍未关闭）**：
 - **真机调试** — DEBUG_PLAN 5 轮全部"待开始"，设备偶发重启未定位
 - 用户痛点：BLE 连接不稳定 + 设备偶发重启（疑似 WDT）— v1.3.0 的 PING 心跳协议是缓解措施，但根因未定位
 
 **下一步行动（按顺序）**：
-1. 等待 CI 构建完成，验证 GitHub Release + 阿里云 APK 上传成功
-2. 真机验证 v1.3.0 用户可见功能（仪表盘 / 烟雾面板 / 设备列表 / 固件更新提醒）
-3. 真机调试 DEBUG_PLAN 第 1-2 轮（设备重启根因定位）
-4. 死代码清除（低风险，半天）
+1. 上传 fw-v1.2.0.bin 到 GitHub Release fw-v1.2.0 触发 OTA 分发
+   .bin 路径：`ridewind-esp/build/ridewind-esp.bin`
+2. 等待 v1.3.0 CI 构建完成，验证 GitHub Release + 阿里云 APK 上传成功
+3. 真机验证 v1.3.0 用户可见功能（仪表盘 / 烟雾面板 / 设备列表 / 固件更新提醒）
+4. 真机调试 DEBUG_PLAN 第 1-2 轮（设备重启根因定位）
 5. iOS 上架准备
-6. 死代码清除（低风险，半天）
 7. iOS 上架准备
 
 **阶段路线图**：
