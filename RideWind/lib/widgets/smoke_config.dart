@@ -6,13 +6,9 @@
 ///   SmokeFlowWidget(config: config, ...);
 ///   config.gravityStrength = 1.5; // widget 自动 rebuild
 
-import 'package:flutter/material.dart';
+library;
 
-/// 重建模式：哪些参数改了需要重建仿真，哪些只需要重绘
-enum _RebuildMode {
-  none,    // 只 repaint
-  rebuild, // 重建 _FluidSimulation
-}
+import 'package:flutter/material.dart';
 
 class SmokeConfig extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════════

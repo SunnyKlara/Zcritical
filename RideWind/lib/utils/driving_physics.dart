@@ -54,11 +54,6 @@ class DrivingPhysics {
     496.0, // 6档
   ];
 
-  // 升档转速阈值
-  static const double _upshiftRpm = 0.85;
-  // 降档转速阈值
-  static const double _downshiftRpm = 0.25;
-
   // 阻力系数 — 适配 0~496 范围
   static const double _dragCoeff = 0.0003; // 风阻（极小，高速才有感觉）
   static const double _rollingResistance = 2.0; // 滚动阻力（恒定小值）
@@ -115,7 +110,6 @@ class DrivingPhysics {
     // 2. 计算加速度
     final gearIdx = (gear - 1).clamp(0, 5);
     final ratio = _gearRatios[gearIdx];
-    final gearMax = _gearMaxSpeeds[gearIdx];
 
     // 扭矩 = 油门 × 齿比 × 扭矩曲线
     // 扭矩曲线：中转速最大（模拟涡轮增压特性）

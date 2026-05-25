@@ -11,8 +11,9 @@
 /// - _suppressVerticalVelocity 在无障碍物时对全场生效
 /// - Painter 使用 Color.lerp 混合速度色
 
+library;
+
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'smoke_config.dart';
 
@@ -48,7 +49,8 @@ class _FluidSimulation {
   final double cellSize;
 
   // ASM 精确参数（从构造函数提取）
-  static const double _viscosity = 0.00008; // field_47
+  // ignore: unused_field
+  static const double _viscosity = 0.00008; // field_47（保留供后续 _velocityStep 扩展）
   static const double _diffusion = 0.00001; // field_4f
   static const double _dt = 0.06;           // field_57
   static const int _iterations = 8;         // ASM field_5f（构造函数值）
@@ -438,6 +440,7 @@ class _FluidSimulation {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // _addSource: x[i][j] += dt * s[i][j]
+  // ignore: unused_element
   void _addSource(List<List<double>> x, List<List<double>> s) {
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {

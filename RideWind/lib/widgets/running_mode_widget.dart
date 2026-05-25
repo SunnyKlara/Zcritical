@@ -1,5 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:math'; // 🚀 用于乱序加速
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart'; // ✅ 导入音频插件
@@ -7,7 +6,6 @@ import '../utils/responsive_utils.dart'; // ✅ 添加响应式工具类
 import '../utils/throttle_accelerator.dart'; // 🚀 乱序加速器
 import '../utils/speed_bounce_animation.dart'; // 🎯 弹跳动画
 import '../models/speed_report.dart'; // 🏎️ 速度报告模型
-import 'volume_overlay.dart'; // 🔊 悬浮音量条
 import 'garage_control_sheet.dart'; // 🚗 车库联动控制弹窗
 
 /// 📱 响应式布局配置类
@@ -217,8 +215,6 @@ class RunningModeWidgetState extends State<RunningModeWidget>
 
   // 🎯 弹跳动画控制器
   late AnimationController _bounceController;
-  late Animation<double> _bounceScale;
-  late Animation<double> _bounceOffset;
 
   // 🔊 音频播放器
   final AudioPlayer _enginePlayer = AudioPlayer();
@@ -286,8 +282,6 @@ class RunningModeWidgetState extends State<RunningModeWidget>
     
     // 🎯 初始化弹跳动画控制器
     _bounceController = SpeedBounceAnimation.createBounceController(this);
-    _bounceScale = SpeedBounceAnimation.createScaleAnimation(_bounceController);
-    _bounceOffset = SpeedBounceAnimation.createOffsetAnimation(_bounceController);
     
     // 🔧 使用 WidgetsBinding.instance.addPostFrameCallback 延迟调用 setState
     WidgetsBinding.instance.addPostFrameCallback((_) {

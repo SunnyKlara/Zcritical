@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/guide_models.dart';
-import 'ripple_effect_painter.dart';
 import 'finger_pointer_widget.dart';
-import 'gesture_validator_widget.dart';
 import 'guide_overlay.dart' show HighlightMaskPainter;
 import 'guide_tooltip_styles.dart';
 
