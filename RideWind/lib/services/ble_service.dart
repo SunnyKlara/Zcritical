@@ -316,39 +316,8 @@ class BLEService {
     _device = wasDevice; // 保留设备引用供上层重连使用
   }
 
-  void _scheduleReconnect() {
-    if (_reconnectAttempt >= _maxReconnectAttempts) {
-      print('🔴 重连次数耗尽 ($_maxReconnectAttempts 次)');
-      _device = null;
-      return;
-    }
-
-    // 如果设备被其他手机占用，不再自动重试
-    if (lastConnectionError == 'device_busy') {
-      print('🔴 设备已被其他手机连接，停止自动重连');
-      return;
-    }
-
-    final delay = Duration(seconds: 1 << _reconnectAttempt);
-    _reconnectAttempt++;
-    print('🔄 ${delay.inSeconds}s 后第 $_reconnectAttempt 次重连...');
-
-    _setState(BleConnectionState.reconnecting);
-
-    _reconnectTimer = Timer(delay, () async {
-      if (_device == null || _userDisconnected) return;
-
-      final ok = await _connectInternal(_device!);
-      if (!ok && !_userDisconnected) {
-        // 如果连接失败且原因是设备忙，停止重试
-        if (lastConnectionError == 'device_busy') {
-          print('🔴 设备已被其他手机连接，停止自动重连');
-          return;
-        }
-        _scheduleReconnect();
-      }
-    });
-  }
+  // 注：_scheduleReconnect 已废弃（重连由上层 BleConnectionManager 统一管理）。
+  // 仅保留 _cancelReconnect 用于 Timer 清理。
 
   void _cancelReconnect() {
     _reconnectTimer?.cancel();
