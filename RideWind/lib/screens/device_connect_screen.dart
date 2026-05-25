@@ -83,6 +83,9 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
     }
   }
 
+  /// 内层胶囊 PageView 正在活跃滑动时为 true，锁死外层面板切换
+  bool _innerCapsuleScrolling = false;
+
   static const bool _debugMode = false;
 
   @override
@@ -475,7 +478,9 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
   Widget _buildModeContentArea(_DeviceConnectConfig config) {
     return PageView(
       controller: _modePageController,
-      physics: const PageScrollPhysics(),
+      physics: _innerCapsuleScrolling
+          ? const NeverScrollableScrollPhysics()
+          : const PageScrollPhysics(),
       onPageChanged: (index) {
         HapticFeedback.selectionClick();
         _session.setModeIndex(index);
@@ -515,8 +520,14 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
 
   Widget _buildRunningModeContent(_DeviceConnectConfig config) {
     try {
-      return Consumer<BluetoothProvider>(
-        builder: (context, btProvider, child) {
+      // 使用 Selector 替代 Consumer，只在 isConnected 真正变化时重建，
+      // 避免 BLE 短暂断联触发 notifyListeners() 导致整个 widget 重建
+      // 从而引起 PageView 跳回 page 0 的问题。
+      // Stream 参数直接从 Provider 获取引用（stream 对象本身不变，不触发重建）。
+      final btProvider = Provider.of<BluetoothProvider>(context, listen: false);
+      return Selector<BluetoothProvider, bool>(
+        selector: (_, bt) => bt.isConnected,
+        builder: (context, isConnected, child) {
           return RunningModeWidget(
             key: _runningModeStateKey,
             initialSpeed: _session.currentSpeed,
@@ -526,7 +537,7 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
             externalThrottleStream: btProvider.throttleReportStream,
             externalUnitStream: btProvider.unitReportStream,
             connectionStream: btProvider.connectionStream,
-            isConnected: btProvider.isConnected,
+            isConnected: isConnected,
             onKeysReady: (keys) { setState(() { _runningModeKeys = keys; }); },
             onSpeedChanged: (speed) => _session.setSpeed(speed),
             onUnitChanged: (isMetric) => _session.setSpeedUnit(isMetric),
@@ -560,6 +571,11 @@ class _DeviceConnectScreenState extends State<DeviceConnectScreen>
           _modePageController.animateToPage(2,
             duration: const Duration(milliseconds: 280),
             curve: Curves.easeInOut);
+        },
+        onInnerScrollLockChanged: (locked) {
+          if (_innerCapsuleScrolling != locked) {
+            setState(() { _innerCapsuleScrolling = locked; });
+          }
         },
       );
     } catch (e) {

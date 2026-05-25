@@ -4,23 +4,24 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/device_model.dart';
+import '../providers/bluetooth_provider.dart';
 import '../services/ble_connection_manager.dart';
+import '../services/firmware_update_checker.dart';
 import '../core/service_locator.dart';
 import '../widgets/app_update_dialog.dart';
 import 'main_pager_screen.dart';
 import 'device_scan_screen.dart';
 import 'device_management_screen.dart';
+import 'ota_upgrade_screen.dart';
 import 'settings_screen.dart';
 
 /// 设备列表首页 — APP 栈底页面
 ///
-/// 功能：
-/// - 显示已保存设备列表（卡片式）
-/// - 自动连接最近使用的设备
-/// - 点击设备卡片连接并进入控制页面
-/// - 长按设备卡片弹出操作菜单（重命名/删除）
-/// - "+" 按钮进入扫描页面添加新设备
-/// - 返回键退出 APP
+/// 视觉设计：
+/// - 已连接设备：顶部 Hero 大卡片（产品图 + 状态 + 进入控制）
+/// - 未连接设备：下方小卡片列表
+/// - 产品图替代蓝牙图标
+/// - 固件升级徽章（有新版本时显示）
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
 
@@ -57,7 +58,6 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 回到前台时刷新设备列表（可能在扫描页添加了新设备）
       _loadSavedDevices();
     }
   }
@@ -99,19 +99,40 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     }
   }
 
+  // ========== 固件更新检测 ==========
+
+  FirmwareUpdateStatus _firmwareUpdateStatus = FirmwareUpdateStatus.unknown;
+  FirmwareUpdateDetail? _firmwareUpdateDetail;
+
+  Future<void> _checkFirmwareUpdate() async {
+    final btProvider = sl<BluetoothProvider>();
+    final fwVersion = btProvider.firmwareInfo?.version;
+    if (fwVersion == null) return;
+
+    final checker = FirmwareUpdateChecker.instance;
+    final status = await checker.checkForUpdate(fwVersion);
+    final detail = await checker.getUpdateDetail(fwVersion);
+
+    if (mounted) {
+      setState(() {
+        _firmwareUpdateStatus = status;
+        _firmwareUpdateDetail = detail;
+      });
+    }
+  }
+
   // ========== BLE 连接 ==========
 
   void _onBleStateChanged() {
     if (!mounted) return;
     if (_bleMgr.state == BleState.connected && _bleMgr.device != null) {
-      // 连接成功 → 记录设备并进入控制页面
       DeviceManagementScreen.recordDevice(
           _bleMgr.device!.id, _bleMgr.device!.name);
       setState(() {
         _connectingDeviceId = null;
       });
-      // 刷新列表后 push 控制页面
       _loadSavedDevices();
+      _checkFirmwareUpdate();
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => MainPagerScreen(device: _bleMgr.device!),
@@ -142,12 +163,8 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     final success = await _bleMgr.connectToDevice(deviceModel);
     if (!mounted) return;
 
-    if (success) {
-      // _onBleStateChanged 会处理导航
-      return;
-    }
+    if (success) return; // _onBleStateChanged handles navigation
 
-    // 连接失败
     setState(() => _connectingDeviceId = null);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,8 +173,8 @@ class _DeviceListScreenState extends State<DeviceListScreen>
           backgroundColor: Colors.orange.withAlpha(200),
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -170,7 +187,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: const Color(0xFF1C1C1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('重命名设备', style: TextStyle(color: Colors.white)),
         content: TextField(
@@ -195,7 +212,8 @@ class _DeviceListScreenState extends State<DeviceListScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child:
+                const Text('取消', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
@@ -209,7 +227,9 @@ class _DeviceListScreenState extends State<DeviceListScreen>
       ),
     );
 
-    if (newName != null && newName.isNotEmpty && newName != device.customName) {
+    if (newName != null &&
+        newName.isNotEmpty &&
+        newName != device.customName) {
       setState(() => device.customName = newName);
       await _saveToPersistence();
     }
@@ -219,7 +239,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: const Color(0xFF1C1C1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('移除设备', style: TextStyle(color: Colors.white)),
         content: Text(
@@ -229,7 +249,8 @@ class _DeviceListScreenState extends State<DeviceListScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消', style: TextStyle(color: Colors.white54)),
+            child:
+                const Text('取消', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -252,7 +273,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   void _showDeviceOptions(SavedDeviceInfo device) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: const Color(0xFF1C1C1E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -261,8 +282,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               margin: const EdgeInsets.only(top: 12, bottom: 16),
               decoration: BoxDecoration(
                 color: Colors.white24,
@@ -271,26 +291,112 @@ class _DeviceListScreenState extends State<DeviceListScreen>
             ),
             ListTile(
               leading: const Icon(Icons.edit, color: Colors.white70),
-              title:
-                  const Text('重命名', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _renameDevice(device);
-              },
+              title: const Text('重命名',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); _renameDevice(device); },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title:
-                  const Text('移除设备', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _removeDevice(device);
-              },
+              leading:
+                  const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('移除设备',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () { Navigator.pop(ctx); _removeDevice(device); },
             ),
             const SizedBox(height: 8),
           ],
         ),
       ),
+    );
+  }
+
+  // ========== 固件更新弹窗 ==========
+
+  void _showFirmwareUpdateDialog() {
+    if (_firmwareUpdateDetail == null) return;
+    final detail = _firmwareUpdateDetail!;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00FF94).withAlpha(30),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.system_update,
+                  color: Color(0xFF00FF94), size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text('固件更新可用',
+                style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildVersionRow('当前版本', detail.currentVersion),
+            const SizedBox(height: 8),
+            _buildVersionRow('最新版本', detail.latestVersion),
+            const SizedBox(height: 16),
+            const Text('更新内容：',
+                style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                detail.changelog,
+                style: const TextStyle(
+                    color: Colors.white60, fontSize: 12, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('稍后', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _navigateToOta();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF94),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('立即更新'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionRow(String label, String version) {
+    return Row(
+      children: [
+        Text(label,
+            style: const TextStyle(color: Colors.white54, fontSize: 13)),
+        const Spacer(),
+        Text('v$version',
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
@@ -305,6 +411,12 @@ class _DeviceListScreenState extends State<DeviceListScreen>
   void _navigateToSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
+
+  void _navigateToOta() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OtaUpgradeScreen()),
     );
   }
 
@@ -328,32 +440,79 @@ class _DeviceListScreenState extends State<DeviceListScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop) {
-          // 栈底，退出 APP
           SystemNavigator.pop();
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF0A0A0A),
         body: _isLoading
             ? const Center(
-                child: CircularProgressIndicator(color: Colors.white))
+                child: CircularProgressIndicator(color: Color(0xFF00FF94)))
             : _buildBody(),
       ),
     );
   }
 
   Widget _buildBody() {
+    final connectedId = _bleMgr.device?.id;
+    final connectedDevice = _bleMgr.state == BleState.connected
+        ? _savedDevices
+            .where((d) => d.id == connectedId)
+            .firstOrNull
+        : null;
+    final otherDevices = _savedDevices
+        .where((d) => d.id != connectedId || connectedDevice == null)
+        .toList();
+
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _savedDevices.isEmpty
-                ? _buildEmptyState()
-                : _buildDeviceList(),
-          ),
+      child: CustomScrollView(
+        slivers: [
+          // Header
+          SliverToBoxAdapter(child: _buildHeader()),
+          // 已连接设备 Hero 卡片
+          if (connectedDevice != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: _buildConnectedHeroCard(connectedDevice),
+              ),
+            ),
+          // 其他设备标题
+          if (otherDevices.isNotEmpty && connectedDevice != null)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 24, 20, 8),
+                child: Text('其他设备',
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ),
+          // 其他设备列表
+          if (otherDevices.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final device = otherDevices[index];
+                    final isConnecting =
+                        _connectingDeviceId == device.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildDeviceCard(device, isConnecting),
+                    );
+                  },
+                  childCount: otherDevices.length,
+                ),
+              ),
+            ),
+          // 空状态
+          if (_savedDevices.isEmpty)
+            SliverFillRemaining(child: _buildEmptyState()),
+          // 底部留白
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
     );
@@ -361,7 +520,7 @@ class _DeviceListScreenState extends State<DeviceListScreen>
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
       child: Row(
         children: [
           const Text(
@@ -370,52 +529,25 @@ class _DeviceListScreenState extends State<DeviceListScreen>
               color: Colors.white,
               fontSize: 28,
               fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
             ),
           ),
           const Spacer(),
-          // 设置按钮
           IconButton(
             onPressed: _navigateToSettings,
             icon: const Icon(Icons.settings_outlined,
-                color: Colors.white70, size: 24),
-            tooltip: '设置',
+                color: Colors.white54, size: 22),
           ),
-          // 添加设备按钮
-          IconButton(
-            onPressed: _navigateToScan,
-            icon: const Icon(Icons.add_circle_outline,
-                color: Color(0xFF00FF94), size: 28),
-            tooltip: '添加设备',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.devices, color: Colors.white24, size: 64),
-          const SizedBox(height: 16),
-          const Text(
-            '暂无已保存的设备',
-            style: TextStyle(color: Colors.white54, fontSize: 16),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _navigateToScan,
-            icon: const Icon(Icons.search, size: 20),
-            label: const Text('扫描添加设备'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF94),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+          GestureDetector(
+            onTap: _navigateToScan,
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00FF94).withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: const Icon(Icons.add,
+                  color: Color(0xFF00FF94), size: 20),
             ),
           ),
         ],
@@ -423,98 +555,197 @@ class _DeviceListScreenState extends State<DeviceListScreen>
     );
   }
 
-  Widget _buildDeviceList() {
-    final connectedId = _bleMgr.device?.id;
+  /// 已连接设备 — Hero 大卡片
+  Widget _buildConnectedHeroCard(SavedDeviceInfo device) {
+    final hasUpdate =
+        _firmwareUpdateStatus == FirmwareUpdateStatus.updateAvailable;
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _savedDevices.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final device = _savedDevices[index];
-        final isConnected =
-            _bleMgr.state == BleState.connected && connectedId == device.id;
-        final isConnecting = _connectingDeviceId == device.id;
-
-        return _buildDeviceCard(device, isConnected, isConnecting);
-      },
-    );
-  }
-
-  Widget _buildDeviceCard(
-    SavedDeviceInfo device,
-    bool isConnected,
-    bool isConnecting,
-  ) {
     return GestureDetector(
-      onTap: isConnecting
-          ? null
-          : () {
-              if (isConnected && _bleMgr.device != null) {
-                // 已连接，直接进入控制页面
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MainPagerScreen(device: _bleMgr.device!),
-                  ),
-                );
-              } else {
-                // 未连接，发起连接
-                _connectToDevice(device);
-              }
-            },
+      onTap: () {
+        if (_bleMgr.device != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MainPagerScreen(device: _bleMgr.device!),
+            ),
+          );
+        }
+      },
       onLongPress: () => _showDeviceOptions(device),
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isConnected
-              ? const Color(0xFF00FF94).withAlpha(20)
-              : const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF1A2A1F),
+              const Color(0xFF0F1A12),
+            ],
+          ),
           border: Border.all(
-            color: isConnected
-                ? const Color(0xFF00FF94).withAlpha(100)
-                : Colors.white10,
+            color: const Color(0xFF00FF94).withAlpha(60),
             width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00FF94).withAlpha(15),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
         ),
-        child: Row(
+        child: Column(
           children: [
-            // 设备图标 + 状态指示
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isConnected
-                    ? const Color(0xFF00FF94).withAlpha(40)
-                    : Colors.white.withAlpha(10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
+            // 产品图区域
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.bluetooth,
-                    color: isConnected
-                        ? const Color(0xFF00FF94)
-                        : Colors.white54,
-                    size: 24,
-                  ),
-                  Positioned(
-                    bottom: 6,
-                    right: 6,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: isConnected
-                            ? const Color(0xFF00FF94)
-                            : Colors.white24,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 1.5),
+                  // 产品图
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/images/device_product.png',
+                      width: 80, height: 50,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 80, height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(10),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.devices,
+                            color: Colors.white38, size: 28),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  // 设备信息
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          device.customName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8, height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF00FF94),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text('已连接',
+                                style: TextStyle(
+                                    color: Color(0xFF00FF94),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 进入控制箭头
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00FF94).withAlpha(30),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.arrow_forward_ios,
+                        color: Color(0xFF00FF94), size: 16),
+                  ),
                 ],
+              ),
+            ),
+
+            // 固件更新提示条
+            if (hasUpdate) ...[
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: _showFirmwareUpdateDialog,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: Colors.orange.withAlpha(60), width: 0.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.system_update,
+                          color: Colors.orange, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '新固件 v${_firmwareUpdateDetail?.latestVersion ?? ""} 可用',
+                          style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      const Text('查看',
+                          style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.chevron_right,
+                          color: Colors.orange, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 未连接设备 — 小卡片
+  Widget _buildDeviceCard(SavedDeviceInfo device, bool isConnecting) {
+    return GestureDetector(
+      onTap: isConnecting ? null : () => _connectToDevice(device),
+      onLongPress: () => _showDeviceOptions(device),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161616),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withAlpha(10), width: 0.5),
+        ),
+        child: Row(
+          children: [
+            // 产品缩略图
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 48, height: 48,
+                color: Colors.white.withAlpha(6),
+                child: Image.asset(
+                  'assets/images/device_product.png',
+                  width: 48, height: 48,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                      Icons.devices, color: Colors.white24, size: 22),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -525,57 +756,117 @@ class _DeviceListScreenState extends State<DeviceListScreen>
                 children: [
                   Text(
                     device.customName,
-                    style: TextStyle(
-                      color: isConnected
-                          ? const Color(0xFF00FF94)
-                          : Colors.white,
-                      fontSize: 16,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
-                    isConnected
-                        ? '已连接'
-                        : '上次连接: ${_formatLastConnected(device.lastConnectedAt)}',
-                    style: TextStyle(
-                      color: isConnected
-                          ? const Color(0xFF00FF94).withAlpha(180)
-                          : Colors.white38,
-                      fontSize: 12,
-                    ),
+                    _formatLastConnected(device.lastConnectedAt),
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 12),
                   ),
-                  if (device.customName != device.originalName)
-                    Text(
-                      device.originalName,
-                      style: const TextStyle(
-                          color: Colors.white24, fontSize: 11),
-                    ),
                 ],
               ),
             ),
-            // 操作区域
+            // 连接状态/操作
             if (isConnecting)
               const SizedBox(
-                width: 24,
-                height: 24,
+                width: 22, height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white54,
+                  color: Color(0xFF00FF94),
                 ),
               )
-            else if (isConnected)
-              const Icon(Icons.check_circle,
-                  color: Color(0xFF00FF94), size: 24)
             else
-              const Icon(Icons.chevron_right,
-                  color: Colors.white24, size: 24),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('连接',
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500)),
+              ),
           ],
         ),
       ),
     );
   }
 
+  /// 空状态
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 产品图作为空状态插画
+          Opacity(
+            opacity: 0.4,
+            child: Image.asset(
+              'assets/images/device_product.png',
+              width: 120,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                  Icons.devices, color: Colors.white24, size: 64),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '还没有设备',
+            style: TextStyle(
+                color: Colors.white70,
+                fontSize: 17,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '添加你的第一台 RideWind',
+            style: TextStyle(color: Colors.white38, fontSize: 14),
+          ),
+          const SizedBox(height: 28),
+          GestureDetector(
+            onTap: _navigateToScan,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00FF94), Color(0xFF00CC76)],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00FF94).withAlpha(40),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search, color: Colors.black, size: 18),
+                  SizedBox(width: 8),
+                  Text('扫描添加设备',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

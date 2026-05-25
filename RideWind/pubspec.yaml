@@ -107,6 +107,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  shaders:
+    - shaders/smoke.frag
+
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
@@ -121,6 +124,7 @@ flutter:
     - assets/car_thumbnails/car_scale_map.json
     - assets/car_thumbnails/engine_sound_map.json
     - assets/car_thumbnails/car_stories.json
+    - assets/firmware.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
