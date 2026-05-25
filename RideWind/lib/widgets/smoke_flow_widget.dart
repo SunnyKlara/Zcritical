@@ -266,6 +266,12 @@ class _FluidSimulation {
     // _suppressVerticalVelocity（无障碍物 = no-op）
     _suppressVerticalVelocity();
 
+    // 重力下坠趋势（只在 wind 弱时明显，wind 强时被水平风盖过）
+    // 公式：v += gravity * (1 - wind) * dt
+    // - speed=0:  v += 0.5 * dt（明显下坠）
+    // - speed=max: v += 0（无重力，全水平流动）
+    _applyGravity();
+
     // _applyObstacleBoundary: 无障碍物 = 空操作
 
     // ★ 关键修正：不要清零 uPrev/vPrev — ASM 中 _addSource 写入 live 数组
@@ -286,6 +292,23 @@ class _FluidSimulation {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // 重力下坠趋势（用户需求：speed=0 时明显下坠，speed=max 时被风盖过）
+  // 只在有密度的格子施加，不影响空气格子
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _applyGravity() {
+    final double g = 0.5 * (1.0 - _windStrength) * _dt;
+    if (g <= 0.001) return; // 高速时直接跳过
+
+    for (int i = 1; i < gridWidth - 1; i++) {
+      for (int j = 1; j < gridHeight - 1; j++) {
+        if (_density[i][j] > 0.01) {
+          _v[i][j] += g;
+        }
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ASM _densityStep (addr 0x3e41b0)
   // ★ 关键修正：
   // - 不调用 _addSource（density 已经在 _injectStreamSources 中直接写入 live 数组）
@@ -302,8 +325,11 @@ class _FluidSimulation {
     _swap2D(_density, _densityPrev);
     _advect(0, _density, _densityPrev, _u, _v);
 
-    // ★ 关键修正：密度衰减（防止累积爆炸）
-    final double decay = 0.99 - _windStrength * 0.01;
+    // 密度衰减：速度越大衰减越快，让高速时流线尾部更早断开
+    // 防止高速时 8 股因为 advect 拉伸而互相融合
+    // speed=0:   decay = 0.99（缓慢衰减，密度场维持）
+    // speed=max: decay = 0.94（快速衰减，流线尾部断开）
+    final double decay = 0.99 - _windStrength * 0.05;
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
         _density[i][j] *= decay;

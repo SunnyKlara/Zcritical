@@ -54,12 +54,15 @@
 - `RideWind/lib/screens/treadmill_dashboard_screen.dart` — 三区布局 + Ticker 游戏循环 + 弹簧物理指针
 - `RideWind/lib/widgets/driving_controls_widget.dart` — ✅ **V6 重写** 实心天穹面板（和仪表盘对称）+ 中心车库缩略图轮播（contain 完整显示）
 - `RideWind/lib/utils/driving_physics.dart` — Forza 风格 6 档物理引擎
-- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.1 视觉效果到位但卡顿（性能优化中）**
-  - ✅ 视觉效果接近源代码：连续、有体积感的烟雾，不再是离散条纹
-  - 🔴 真机卡顿严重 — 网格 72×82 × 3 层 drawCircle + MaskFilter blur = 每帧 ~17000 次 GPU shader
-  - 性能优化（V11.1）：blur sigma 16/8/4 → 4/2，删除 Layer 3，编译零错误
-  - **下一步**：如仍卡，需考虑跳过低密度区域、降低 grid 分辨率、或用 Shader 一次性绘制整个密度场
-  - 7 处系统性 ASM 修复保留：_addSource 写 live 数组 + u=0.5/v=0/density=fmax(weight*1.3) + dy 步长 0.25 + suppress=no-op + 密度衰减 + 不清零 prev
+- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.3 重力下坠（待真机验证）**
+  - 基于 V11.1 锚点（tag `smoke-v11.1-visual-complete`）
+  - **唯一新增**：独立 `_applyGravity()` 方法，在 _velocityStep 末尾调用
+  - 公式：`v += 0.5 * (1.0 - wind) * dt`，仅对密度>0.01 的格子
+  - speed=0 明显下坠，speed=max 完全无重力（被水平风盖过）
+  - early-out 优化：高速时跳过整个循环（性能无影响）
+  - **不改注入公式，不改任何 V11.1 已验证的逻辑**
+  - 密度衰减保持 V11.2: `0.99 - wind*0.05`（防高速融合）
+  - 编译零错误
     - `_applyForceField`：全网格遍历，左20%强力(wind*2+0.1)*dt，右80%弱力(wind+0.05)*dt，跳过obstacle和density<0.01
     - `_applyGravityEffect`：buoyancy=(1-wind)²×0.25×dt，近障碍物加倍
     - `_suppressVerticalVelocity`：factor=1.0-wind²×0.8
