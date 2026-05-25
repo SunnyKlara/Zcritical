@@ -54,7 +54,67 @@
 - `RideWind/lib/screens/treadmill_dashboard_screen.dart` — 三区布局 + Ticker 游戏循环 + 弹簧物理指针
 - `RideWind/lib/widgets/driving_controls_widget.dart` — ✅ **V6 重写** 实心天穹面板（和仪表盘对称）+ 中心车库缩略图轮播（contain 完整显示）
 - `RideWind/lib/utils/driving_physics.dart` — Forza 风格 6 档物理引擎
-- `RideWind/lib/widgets/smoke_flow_widget.dart` — ✅ **V3 完整重写** 基于 Stam GDC2003 + Fedkiw 涡度约束（文献研究后重写，编译零错误）
+- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.1 视觉效果到位但卡顿（性能优化中）**
+  - ✅ 视觉效果接近源代码：连续、有体积感的烟雾，不再是离散条纹
+  - 🔴 真机卡顿严重 — 网格 72×82 × 3 层 drawCircle + MaskFilter blur = 每帧 ~17000 次 GPU shader
+  - 性能优化（V11.1）：blur sigma 16/8/4 → 4/2，删除 Layer 3，编译零错误
+  - **下一步**：如仍卡，需考虑跳过低密度区域、降低 grid 分辨率、或用 Shader 一次性绘制整个密度场
+  - 7 处系统性 ASM 修复保留：_addSource 写 live 数组 + u=0.5/v=0/density=fmax(weight*1.3) + dy 步长 0.25 + suppress=no-op + 密度衰减 + 不清零 prev
+    - `_applyForceField`：全网格遍历，左20%强力(wind*2+0.1)*dt，右80%弱力(wind+0.05)*dt，跳过obstacle和density<0.01
+    - `_applyGravityEffect`：buoyancy=(1-wind)²×0.25×dt，近障碍物加倍
+    - `_suppressVerticalVelocity`：factor=1.0-wind²×0.8
+    - `_drawDensityField`：**3层 drawCircle + MaskFilter blur**（不是 drawRect！）
+      - 大圆 radius=(speedNorm*0.5+1.2)*cellSize, alpha=d*(d*0.4+1)*(speedNorm*0.15+0.35)
+      - 中圆 radius=3, alpha 更高(+0.85)
+      - 小亮圆 radius=2, 只在 speedNorm>0.5 时
+    - `_initializeStreamPositions`：startY=gridHeight/2-22.3+0.6, 间距6.2, 8条
+    - `_setupObstacle`：carPath.contains(Offset(i*5,j*5))，scale=pixelHeight*0.4/1024
+  - ⚠️ **可简化**：障碍物系统（用户确认不需要）、colorScheme（用单色 smokeColor）
+  - ⚠️ **唯一无法从 ASM 提取的值**：MaskFilter sigma（堆对象内联数据，不在代码段）→ 用 sigma 4/2/1 开始，真机微调
+  - ⚠️ **性能风险**：3×drawCircle per cell，需控制网格密度或提高 cellSize
+  - **当前状态**：V9 完全按 ASM 源代码参数实现，不再有任何自定义/猜测参数
+    - 密度注入：`_densityPrev += (wind+0.05)`，经 `_addSource` 乘 dt（每帧 ~0.063）
+    - 速度注入：`_uPrev += (wind*2.0+0.1)`，经 `_addSource` 乘 dt
+    - 浮力：**去掉**（源代码浮力是为障碍物绕流设计，碰到障碍物上沿。我们无障碍物不需要）
+    - 无人工衰减，密度通过右边界自然流出
+    - 启动后 1-2 秒密度累积到可见（源代码正常行为）
+  - **下一步**：真机验证完全源代码参数的效果
+  - **编译状态**：✅ 通过
+  - **后续产品想法**：烟雾参数用户自定义（颜色/浓度/股数/消散速度/分明度/流速）+ 恢复默认按钮。前提：先调好默认效果再加 UI。
+  - **方向已锁定**：欧拉流体求解器 + drawCircle 3层模糊渲染
+  - **唯一可行方向**：Flutter fragment shader（全分辨率 GPU 渲染），但需修复 shader 语法兼容性
+  - **下一步**：新对话中用正确的 Flutter shader 语法重写 smoke.frag（不用 #version、不用数组初始化）
+  - **用户要求**：6股分明、透明轻薄、飘逸缭绕、干净、位置居中（仪表盘和方向盘之间）
+
+### 本次新增：设备列表界面重设计 + 固件主动更新提醒 (2026-05-25)
+
+**决策**：
+- 设备列表界面从"简陋 ListView + 蓝牙图标"升级为"产品图 + Hero 大卡片 + 固件更新徽章"
+- 固件更新检测：BLE 连接时即可检测（通过已有的 GET:VERSION/HELLO 协议），无需配网
+- 用户在设备列表就能看到"有新固件"提示，点击后引导进入 OTA 流程
+
+**新建文件**：
+- `RideWind/lib/services/firmware_update_checker.dart` — 固件更新检测服务（对比设备版本 vs firmware.json）
+- `RideWind/assets/firmware.json` — 从项目根目录复制，注册到 pubspec.yaml assets
+
+**重写文件**：
+- `RideWind/lib/screens/device_list_screen.dart` — 完全重写 UI 层
+  - 已连接设备：顶部 Hero 大卡片（产品图 + 设备名 + 连接状态 + 进入控制箭头）
+  - 固件更新提示：Hero 卡片内嵌橙色提示条"新固件 vX.X.X 可用"
+  - 未连接设备：下方小卡片列表，产品缩略图替代蓝牙图标
+  - 空状态：产品图 + 品牌化文案 + 渐变色扫描按钮
+  - 固件更新弹窗：显示当前版本/最新版本/changelog + "立即更新"按钮
+- `RideWind/pubspec.yaml` — 新增 `assets/firmware.json` 注册
+
+**固件主动更新流程**：
+```
+APP 打开 → BLE 连接 → HELLO/GET:VERSION 获取固件版本
+→ FirmwareUpdateChecker 对比 firmware.json → 有新版本
+→ Hero 卡片显示橙色徽章 → 用户点击 → 弹窗显示 changelog
+→ "立即更新" → 进入 OTA 页面（此时才需要配网）
+```
+
+**编译状态**：✅ `flutter analyze` 零错误（243 个 pre-existing info/warning）
 
 ### ESP32 跑步机仪表盘 UI 优化 (2026-05-25)
 
