@@ -188,12 +188,20 @@ class _DrivingControlsWidgetState extends State<DrivingControlsWidget>
 
   void _shiftUp() {
     HapticFeedback.mediumImpact();
-    widget.onGearChanged?.call('+');
+    // 单击右拨片 = 下一张车
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _shiftDown() {
     HapticFeedback.mediumImpact();
-    widget.onGearChanged?.call('-');
+    // 单击左拨片 = 上一张车
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _onCarPageChanged(int index) {
@@ -286,10 +294,10 @@ class _DrivingControlsWidgetState extends State<DrivingControlsWidget>
                   ),
                 ),
 
-              // 左拨片触控区（贴近图片）
+              // 左拨片触控区（中心和图片中心对齐）
               Positioned(
                 left: w / 2 - imgWidth / 2 - 40,
-                top: imgCenterY - 30,
+                top: imgCenterY - 20,
                 width: 40,
                 height: 60,
                 child: GestureDetector(
@@ -298,10 +306,10 @@ class _DrivingControlsWidgetState extends State<DrivingControlsWidget>
                   child: const SizedBox.expand(),
                 ),
               ),
-              // 右拨片触控区（贴近图片）
+              // 右拨片触控区（中心和图片中心对齐）
               Positioned(
                 right: w / 2 - imgWidth / 2 - 40,
-                top: imgCenterY - 30,
+                top: imgCenterY - 20,
                 width: 40,
                 height: 60,
                 child: GestureDetector(
@@ -383,10 +391,11 @@ class _ControlPanelPainter extends CustomPainter {
     // ═══ 2. 弧线高光 + 刻度 + 转速进度（集成在天穹弧线上） ═══
     _drawArcWithTicks(canvas, w, h, arcEdgeY);
 
-    // ═══ 3. 拨片（贴近图片两侧） ═══
+    // ═══ 3. 拨片（中心和图片中心对齐） ═══
     final imgHalfW = w * 0.55 / 2;
-    _drawPaddle(canvas, w / 2 - imgHalfW - 28, arcEdgeY + (h - arcEdgeY) * 0.36, true);
-    _drawPaddle(canvas, w / 2 + imgHalfW + 28, arcEdgeY + (h - arcEdgeY) * 0.36, false);
+    final imgCY = arcEdgeY + (h - arcEdgeY) * 0.36;
+    _drawPaddle(canvas, w / 2 - imgHalfW - 28, imgCY + 10, true);
+    _drawPaddle(canvas, w / 2 + imgHalfW + 28, imgCY + 10, false);
 
     // ═══ 4. 操作提示 ═══
     if (throttle < 0.01 && brake < 0.01) {
