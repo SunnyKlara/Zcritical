@@ -1,20 +1,22 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import '../widgets/smoke_flow_widget.dart';
+import '../widgets/driving_controls_widget.dart';
+import '../utils/driving_physics.dart';
 
 /// 🏎️ 跑步机仪表盘页面 — 真实汽车仪表盘风格
 ///
-/// 三表功能映射（对标真实汽车仪表台）：
-/// - 中间大表 = 速度表（0-20 km/h，像真车速度表：大数字、宽间距、红区）
-/// - 左侧小表 = 时间表（0-60 min，像真车油量表：极简弧线 + 指针）
-/// - 右侧小表 = 距离表（0-10 km，像真车温度表：极简弧线 + 指针）
+/// 三区布局：
+/// - 上区 (32%) = 仪表盘（天穹弧线 + 三表）
+/// - 中区 (38%) = 烟雾氛围（渐变椭圆飘散）
+/// - 下区 (30%) = 操控按钮（油门/刹车/档位）
 ///
-/// 设计原则：
-/// - 纯黑钢琴烤漆背景
-/// - 天穹型面板（顶部外凸拱形 + 底边平直）
-/// - 中间烟雾动画
-/// - 底部留空给按钮
+/// 物理引擎驱动：
+/// - 操控 → 物理计算 → 指针转动(弹性) → 速度变化 → 档位自动切换
+/// - 对标 Forza Horizon 操控手感（涡轮迟滞、惯性滑行、发动机制动）
 class TreadmillDashboardScreen extends StatefulWidget {
   const TreadmillDashboardScreen({super.key});
 
@@ -25,49 +27,84 @@ class TreadmillDashboardScreen extends StatefulWidget {
 
 class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
     with SingleTickerProviderStateMixin {
-  double _currentSpeed = 0.0;
-  double _currentCadence = 0.0;
-  double _currentDistance = 0.0;
+  // 物理引擎
+  final DrivingPhysics _physics = DrivingPhysics();
 
-  late AnimationController _needleController;
-  late Animation<double> _needleAnimation;
-  double _targetSpeed = 0.0;
-  double _previousSpeed = 0.0;
+  // 显示用状态（弹簧驱动，有过冲）
+  double _displaySpeed = 0.0;
+  double _displayRpm = 0.0;
+  double _totalDistance = 0.0;
+
+  // 弹簧速度（用于过冲效果）
+  double _speedVelocity = 0.0;
+  double _rpmVelocity = 0.0;
+
+  // 换档追踪
+  int _lastGear = 1;
+
+  // 游戏循环
+  late Ticker _ticker;
+  Duration _lastTick = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _needleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _needleAnimation = CurvedAnimation(
-      parent: _needleController,
-      curve: Curves.elasticOut,
-    );
-    _needleController.addListener(() {
-      setState(() {
-        _currentSpeed = _previousSpeed +
-            (_targetSpeed - _previousSpeed) * _needleAnimation.value;
-        _currentCadence = _currentSpeed * 8.5;
-        _currentDistance += _currentSpeed * 0.0001;
-      });
-    });
-
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) _animateToSpeed(8.5);
-    });
+    _ticker = createTicker(_onTick);
+    _ticker.start();
   }
 
-  void _animateToSpeed(double speed) {
-    _previousSpeed = _currentSpeed;
-    _targetSpeed = speed.clamp(0.0, 20.0);
-    _needleController.forward(from: 0.0);
+  void _onTick(Duration elapsed) {
+    final dt = _lastTick == Duration.zero
+        ? 0.016
+        : (elapsed - _lastTick).inMicroseconds / 1000000.0;
+    _lastTick = elapsed;
+
+    // 限制 dt 防止跳帧
+    final clampedDt = dt.clamp(0.001, 0.05);
+
+    // 物理更新
+    _physics.update(clampedDt);
+
+    // 弹簧物理驱动指针（有过冲 overshoot，像真实指针的惯性）
+    // F = -stiffness * displacement - damping * velocity
+    const stiffness = 180.0; // 刚度（越大响应越快）
+    const damping = 14.0; // 阻尼（越小过冲越大）
+
+    // 速度指针弹簧
+    final speedDisplacement = _displaySpeed - _physics.speed;
+    final speedForce = -stiffness * speedDisplacement - damping * _speedVelocity;
+    _speedVelocity += speedForce * clampedDt;
+    _displaySpeed += _speedVelocity * clampedDt;
+
+    // 死区：速度极小时直接归零，避免 0/-0 跳动
+    if (_displaySpeed.abs() < 0.5 && _physics.speed.abs() < 0.5) {
+      _displaySpeed = 0.0;
+      _speedVelocity = 0.0;
+    }
+
+    // 转速指针弹簧（更快响应）
+    const rpmStiffness = 280.0;
+    const rpmDamping = 16.0;
+    final rpmDisplacement = _displayRpm - _physics.rpm;
+    final rpmForce = -rpmStiffness * rpmDisplacement - rpmDamping * _rpmVelocity;
+    _rpmVelocity += rpmForce * clampedDt;
+    _displayRpm += _rpmVelocity * clampedDt;
+
+    // 距离累积
+    _totalDistance += _physics.getDistanceDelta(clampedDt);
+
+    // 换档检测 → 触觉反馈
+    if (_physics.gear != _lastGear) {
+      _lastGear = _physics.gear;
+      HapticFeedback.heavyImpact(); // 升档突破感
+    }
+
+    setState(() {});
   }
 
   @override
   void dispose() {
-    _needleController.dispose();
+    _ticker.dispose();
     super.dispose();
   }
 
@@ -76,29 +113,35 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
+    // 三区高度分配
     final instrumentHeight = screenHeight * 0.32;
-    final smokeHeight = screenHeight * 0.45;
+    final smokeHeight = screenHeight * 0.38;
+    final controlsHeight = screenHeight * 0.30 - bottomPadding;
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // 背景
           Positioned.fill(
             child: CustomPaint(painter: _PianoBlackPainter()),
           ),
+
+          // 中区：烟雾氛围
           Positioned(
-            top: instrumentHeight,
+            top: instrumentHeight - 20,
             left: 0,
             right: 0,
-            height: smokeHeight,
-            child: const SmokeFlowWidget(
-              windSpeed: 3.0,
-              smokeIntensity: 0.4,
-              smokeColor: Color(0xFFBBBBBB),
-              showObstacle: false,
+            height: smokeHeight + 40,
+            child: SmokeFlowWidget(
+              smokeColor: const Color(0xFFBBBBBB),
+              speed: (_displaySpeed / 496.0 * 340).round().clamp(0, 340),
             ),
           ),
+
+          // 上区：仪表盘
           Positioned(
             top: 0,
             left: 0,
@@ -107,13 +150,40 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
             child: CustomPaint(
               size: Size(screenWidth, instrumentHeight + 40),
               painter: _DashboardPainter(
-                speed: _currentSpeed,
+                speed: _displaySpeed,
                 maxSpeed: 496.0,
-                cadence: _currentCadence,
+                cadence: _displayRpm * 200.0, // rpm 映射到步频显示
                 maxCadence: 200.0,
-                distance: _currentDistance,
+                distance: _totalDistance,
                 topPadding: topPadding,
               ),
+            ),
+          ),
+
+          // 下区：操控按钮
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: bottomPadding,
+            height: controlsHeight,
+            child: DrivingControlsWidget(
+              currentGear: _physics.gear,
+              driveMode: _physics.driveMode,
+              currentRpm: _displayRpm,
+              justShifted: _physics.justShifted,
+              onThrottleChanged: (v) => _physics.setThrottle(v),
+              onBrakeChanged: (v) => _physics.setBrake(v),
+              onGearChanged: (cmd) {
+                setState(() {
+                  if (cmd == '+') {
+                    _physics.manualShiftUp();
+                  } else if (cmd == '-') {
+                    _physics.manualShiftDown();
+                  } else {
+                    _physics.setDriveMode(cmd);
+                  }
+                });
+              },
             ),
           ),
         ],
@@ -145,51 +215,6 @@ class _PianoBlackPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 轻盈烟雾效果 — 渐变椭圆模拟一缕飘散的烟
-// ═══════════════════════════════════════════════════════════════
-
-class _WispSmokePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 一缕从左侧飘出、逐渐发散的烟雾
-    // 源点在左侧中间，往右飘散时越来越宽越来越淡
-
-    final sourceX = size.width * 0.05;
-    final sourceY = size.height * 0.5;
-
-    // 用多个逐渐变大的模糊圆点模拟发散效果
-    const puffs = 12;
-    for (int i = 0; i < puffs; i++) {
-      final t = i / (puffs - 1); // 0 到 1
-      // X 位置：从左到右
-      final x = sourceX + (size.width * 0.85) * t;
-      // Y 位置：轻微 S 形飘动
-      final y = sourceY + sin(t * 3.5) * size.height * 0.12;
-      // 大小：从小到大（发散）
-      final radius = 8.0 + t * 45.0;
-      // 透明度：从浓到淡
-      final opacity = 0.25 * (1.0 - t * 0.7);
-
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()
-          ..color = Colors.white.withOpacity(opacity)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8 + t * 25),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _Wisp {
-  final double x, y, width, height, opacity;
-  const _Wisp(this.x, this.y, this.width, this.height, this.opacity);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -245,20 +270,22 @@ class _DashboardPainter extends CustomPainter {
   }
 
   /// 速度攀升方块 — 宽度等于大表直径，更多更粗的方块
+  /// 转速攀升方块 — 代表当前档位内的转速进度
+  /// 转速攀升→方块逐个亮→全亮=红区→升档→方块重置→重新攀升
   void _drawSpeedBars(Canvas canvas, Size size, double w) {
     const barCount = 16;
-    // 宽度等于大表直径（mainR = w * 0.24，直径 = w * 0.48）
     final totalWidth = w * 0.48;
-    final singleBarWidth = 10.0; // 更粗
+    final singleBarWidth = 10.0;
     final barGap = (totalWidth - barCount * singleBarWidth) / (barCount - 1);
     final startX = (w - totalWidth) / 2;
     final barBottom = size.height - 55;
 
-    // 高度平缓递增
     final minH = 10.0;
     final maxH = 24.0;
 
-    final activeCount = ((speed / 20.0) * barCount).ceil().clamp(0, barCount);
+    // 用 cadence/maxCadence 作为当前档位内的转速比例 (0~1)
+    final rpmRatio = (cadence / maxCadence).clamp(0.0, 1.0);
+    final activeCount = (rpmRatio * barCount).ceil().clamp(0, barCount);
 
     for (int i = 0; i < barCount; i++) {
       final x = startX + i * (singleBarWidth + barGap);
@@ -272,6 +299,7 @@ class _DashboardPainter extends CustomPainter {
       if (!isActive) {
         barColor = Colors.white.withOpacity(0.07);
       } else {
+        // 红色深浅变化：从浅红到深红
         barColor = Color.lerp(
           const Color(0xFFFF6060),
           const Color(0xFFCC1010),
@@ -347,50 +375,63 @@ class _DashboardPainter extends CustomPainter {
     ));
   }
 
-  // ═══ 天穹型面板背景 ═══
+  // ═══ 仪表盘天穹型弧线 — 顶部外凸拱形，底边平直 ═══
   void _drawPanelBackground(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, size.height)
-      ..lineTo(0, size.height * 0.35)
-      ..quadraticBezierTo(size.width * 0.5, -size.height * 0.08, size.width, size.height * 0.35)
-      ..lineTo(size.width, size.height)
-      ..close();
+    // 天穹型：顶部是一条大的外凸弧线（向上拱出），底边平直
+    final panelPath = Path()
+      ..moveTo(0, size.height) // 左下角
+      ..lineTo(0, size.height * 0.45) // 左侧边
+      // 顶部天穹弧线：从左上角向上拱到中间最高点，再回到右上角
+      ..quadraticBezierTo(
+        size.width * 0.5, // 控制点 X = 中间
+        -size.height * 0.15, // 控制点 Y = 超出顶部（让弧线更饱满）
+        size.width, // 终点 X = 右端
+        size.height * 0.45, // 终点 Y = 和左端同高
+      )
+      ..lineTo(size.width, size.height) // 右下角
+      ..close(); // 底边平直（自动连接回左下角）
 
-    canvas.drawPath(path, Paint()..color = Colors.black);
+    // 面板用深色渐变填充 — 底部渐变到纯黑，和背景无缝衔接
+    canvas.drawPath(panelPath, Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(size.width / 2, 0),
+        Offset(size.width / 2, size.height),
+        [
+          const Color(0xFF0D0D0D), // 顶部稍亮
+          const Color(0xFF080808), // 中间
+          const Color(0xFF030303), // 下部
+          const Color(0xFF000000), // 底边纯黑（和背景完全融合）
+        ],
+        [0.0, 0.3, 0.7, 1.0],
+      ));
 
-    // 穹顶微光
-    canvas.save();
-    canvas.clipPath(path);
-    final gc = Offset(size.width * 0.45, size.height * 0.2);
-    canvas.drawOval(
-      Rect.fromCenter(center: gc, width: size.width * 0.7, height: size.height * 0.3),
-      Paint()
-        ..shader = ui.Gradient.radial(gc, size.width * 0.35, [
-          Colors.white.withOpacity(0.025),
-          Colors.white.withOpacity(0.008),
-          Colors.transparent,
-        ], [0.0, 0.4, 1.0]),
-    );
-    canvas.restore();
-
-    // 穹顶边线
-    final dome = Path()
-      ..moveTo(0, size.height * 0.35)
-      ..quadraticBezierTo(size.width * 0.5, -size.height * 0.08, size.width, size.height * 0.35);
-    canvas.drawPath(dome, Paint()
-      ..color = Colors.white.withOpacity(0.06)
+    // 天穹弧线顶部高光（关键的立体感来源）
+    final arcPath = Path()
+      ..moveTo(0, size.height * 0.45)
+      ..quadraticBezierTo(
+        size.width * 0.5,
+        -size.height * 0.15,
+        size.width,
+        size.height * 0.45,
+      );
+    canvas.drawPath(arcPath, Paint()
+      ..color = Colors.white.withOpacity(0.10)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0);
+      ..strokeWidth = 1.5);
 
-    // 穹顶阴影（向下投射，隐隐约约的笼罩感）
-    final domeShadow = Path()
-      ..moveTo(0, size.height * 0.35 + 4)
-      ..quadraticBezierTo(size.width * 0.5, -size.height * 0.08 + 8, size.width, size.height * 0.35 + 4);
-    canvas.drawPath(domeShadow, Paint()
-      ..color = Colors.black.withOpacity(0.5)
+    // 弧线内侧柔和光泽带
+    final innerArcPath = Path()
+      ..moveTo(0, size.height * 0.47)
+      ..quadraticBezierTo(
+        size.width * 0.5,
+        -size.height * 0.12,
+        size.width,
+        size.height * 0.47,
+      );
+    canvas.drawPath(innerArcPath, Paint()
+      ..color = Colors.white.withOpacity(0.03)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 12.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+      ..strokeWidth = 6.0);
   }
 
 
@@ -507,7 +548,7 @@ class _DashboardPainter extends CustomPainter {
     }
 
     // ── 指针（细长线，无中心轴钉） ──
-    final displaySpeed = (speed / 20.0) * maxVal;
+    final displaySpeed = speed; // speed 已经是 0~496
     _drawThinNeedle(canvas, c, r, displaySpeed / maxVal, startDeg, sweepDeg);
 
     // ── 数值显示（下移+放大，km/h 紧贴数字右下方） ──
@@ -852,11 +893,11 @@ class _DashboardPainter extends CustomPainter {
   /// 速度转档位（模拟 6 档变速）
   int _speedToGear(double spd) {
     if (spd <= 0) return 1;
-    if (spd < 3.5) return 1;
-    if (spd < 6.5) return 2;
-    if (spd < 9.5) return 3;
-    if (spd < 12.5) return 4;
-    if (spd < 16.0) return 5;
+    if (spd < 85.0) return 1;
+    if (spd < 160.0) return 2;
+    if (spd < 250.0) return 3;
+    if (spd < 340.0) return 4;
+    if (spd < 420.0) return 5;
     return 6;
   }
 
@@ -864,114 +905,6 @@ class _DashboardPainter extends CustomPainter {
   // ═══════════════════════════════════════════════════════════════
   // 共用组件
   // ═══════════════════════════════════════════════════════════════
-
-  /// 指针 — 锥形红色，带阴影和配重
-  void _drawNeedle(Canvas canvas, Offset c, double r,
-      double ratio, double startDeg, double sweepDeg, bool isMain) {
-    final angle = _rad(startDeg + sweepDeg * ratio.clamp(0.0, 1.0));
-    final tipR = r * (isMain ? 0.84 : 0.74);
-    final tailR = r * 0.15;
-    final perp = angle + pi / 2;
-
-    final tip = Offset(c.dx + tipR * cos(angle), c.dy + tipR * sin(angle));
-    final tail = Offset(c.dx - tailR * cos(angle), c.dy - tailR * sin(angle));
-
-    // 阴影
-    canvas.drawLine(
-      tip + const Offset(1, 2), tail + const Offset(1, 2),
-      Paint()
-        ..color = Colors.black.withOpacity(0.6)
-        ..strokeWidth = isMain ? 4.0 : 3.0
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
-
-    // 前半段（红色锥形）
-    final tipW = isMain ? 1.2 : 0.8;
-    final baseW = isMain ? 3.5 : 2.2;
-    final front = Path()
-      ..moveTo(tip.dx + tipW * cos(perp), tip.dy + tipW * sin(perp))
-      ..lineTo(tip.dx - tipW * cos(perp), tip.dy - tipW * sin(perp))
-      ..lineTo(c.dx - baseW * cos(perp), c.dy - baseW * sin(perp))
-      ..lineTo(c.dx + baseW * cos(perp), c.dy + baseW * sin(perp))
-      ..close();
-
-    canvas.drawPath(front, Paint()
-      ..shader = ui.Gradient.linear(c, tip, [
-        const Color(0xFFAA1010),
-        const Color(0xFFEE2020),
-      ], [0.0, 1.0]));
-
-    // 后半段（配重）
-    final tailW = isMain ? 5.5 : 3.5;
-    final back = Path()
-      ..moveTo(c.dx + baseW * cos(perp), c.dy + baseW * sin(perp))
-      ..lineTo(c.dx - baseW * cos(perp), c.dy - baseW * sin(perp))
-      ..lineTo(tail.dx - tailW * cos(perp), tail.dy - tailW * sin(perp))
-      ..lineTo(tail.dx + tailW * cos(perp), tail.dy + tailW * sin(perp))
-      ..close();
-
-    canvas.drawPath(back, Paint()..color = const Color(0xFF1A1A1A));
-  }
-
-  /// 中心轴心
-  void _drawHub(Canvas canvas, Offset c, double capR) {
-    canvas.drawCircle(c, capR, Paint()
-      ..shader = ui.Gradient.radial(
-        Offset(c.dx - capR * 0.3, c.dy - capR * 0.3), capR * 2,
-        [const Color(0xFF707070), const Color(0xFF3A3A3A), const Color(0xFF1A1A1A)],
-        [0.0, 0.5, 1.0],
-      ));
-    canvas.drawCircle(c, capR * 0.5, Paint()..color = const Color(0xFF080808));
-    canvas.drawCircle(
-      Offset(c.dx - capR * 0.2, c.dy - capR * 0.2),
-      capR * 0.15,
-      Paint()..color = Colors.white.withOpacity(0.3),
-    );
-  }
-
-  /// 中心数值文字 + 单位
-  void _drawCenterText(Canvas canvas, Offset c, double r,
-      String value, String unit, {String? labelAbove}) {
-    // 功能标签（小表上方显示"时间"/"距离"）
-    if (labelAbove != null) {
-      final ltp = TextPainter(
-        text: TextSpan(text: labelAbove, style: TextStyle(
-          color: Colors.white.withOpacity(0.3),
-          fontSize: r * 0.11,
-          fontWeight: FontWeight.w400,
-          letterSpacing: 2.0,
-        )),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      ltp.paint(canvas, Offset(c.dx - ltp.width / 2, c.dy - r * 0.05));
-    }
-
-    // 数值
-    final vtp = TextPainter(
-      text: TextSpan(text: value, style: TextStyle(
-        color: Colors.white.withOpacity(0.92),
-        fontSize: r * 0.22,
-        fontWeight: FontWeight.w300,
-        letterSpacing: -0.5,
-        height: 1.0,
-      )),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    vtp.paint(canvas, Offset(c.dx - vtp.width / 2, c.dy + r * 0.18));
-
-    // 单位
-    final utp = TextPainter(
-      text: TextSpan(text: unit, style: TextStyle(
-        color: Colors.white.withOpacity(0.3),
-        fontSize: r * 0.08,
-        fontWeight: FontWeight.w400,
-        letterSpacing: 1.5,
-      )),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    utp.paint(canvas, Offset(c.dx - utp.width / 2, c.dy + r * 0.35));
-  }
 
   /// 玻璃反光
   void _drawGlass(Canvas canvas, Offset c, double r) {
