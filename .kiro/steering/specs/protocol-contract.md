@@ -56,16 +56,20 @@ fileMatchPattern: "**/protocol.c,**/protocol.h,**/protocol_parser.dart,**/comman
 | 极速上限 | `SPEED_MAX:xxx\n` | 50-500 | `OK:SPEED_MAX:xxx\r\n` |
 | 风力范围 | `FAN_RANGE:min,max\n` | min=0-100, max=0-100 | `OK:FAN_RANGE:min,max\r\n` |
 
-### 握手
+### 握手与心跳
 
 | 命令 | 格式 | 响应 |
 |------|------|------|
 | 握手 | `HELLO:app_ver:proto_ver:platform\n` | `HELLO_OK:fw_ver:proto_ver:hw_model\r\n` |
+| 心跳 | `PING\n` | `PONG\r\n` |
 
 APP 连接后发送握手命令，告知自身版本信息。固件回复自身版本，双方据此判断兼容性。
 - `app_ver`：APP 版本号（如 `1.2.1`）
 - `proto_ver`：APP 支持的协议版本（整数，如 `1`）
 - `platform`：平台标识（`android` / `ios` / `windows` / `macos`）
+
+APP 每 20 秒发送 `PING\n` 保持连接活跃。固件回复 `PONG\r\n`。
+BLE 连接生命周期依赖 BLE supervision timeout（4-6s）+ APP 心跳，固件不主动断开空闲连接。
 
 ### 状态查询
 

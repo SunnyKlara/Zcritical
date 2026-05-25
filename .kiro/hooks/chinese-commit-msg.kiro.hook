@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "中文 Commit 强制检查",
+  "description": "在执行 shell 命令前检查是否是 git commit，如果是则提醒必须使用中文 commit message（格式：类型: 中文描述）",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "shell"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检查：如果你即将执行的命令包含 git commit，确认 commit message 是否为中文。本项目强制要求 commit message 格式为「类型: 中文描述」（如 fix: 修复断连后内存泄漏）。绝对不允许英文 commit message。如果你的 commit message 是英文的，立即改为中文再执行。"
+  }
+}

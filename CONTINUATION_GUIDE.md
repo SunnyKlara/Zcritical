@@ -54,15 +54,59 @@
 - `RideWind/lib/screens/treadmill_dashboard_screen.dart` — 三区布局 + Ticker 游戏循环 + 弹簧物理指针
 - `RideWind/lib/widgets/driving_controls_widget.dart` — ✅ **V6 重写** 实心天穹面板（和仪表盘对称）+ 中心车库缩略图轮播（contain 完整显示）
 - `RideWind/lib/utils/driving_physics.dart` — Forza 风格 6 档物理引擎
-- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.6 高速保持笔直（待真机验证）**
-  - 基于 V11.3 锚点 + V11.4 推力衰减
-  - **改动 1**：注入参数恢复 ±0.7 / sigma²=0.1225 / weight*1.3（烟雾量充足，无断层）
-  - **改动 2**：`_suppressVerticalVelocity` 改为轻度 v 压制
-    - speed<0.1：跳过（保留低速重力下坠）
-    - speed=max：v 每帧衰减 15%（让流线笔直，不偏移聚拢）
-    - 只对密度>0.01 格子施加，避免破坏空气
-    - 比 V10 的 80% 衰减温和得多（V10 是条纹元凶）
+- `RideWind/lib/widgets/smoke_config.dart` — ✅ **参数配置（16 参数全封装）**
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **参数面板 UI（BottomSheet）**
+  - 4 段折叠式滑块布局：基础 / 物理 / 障碍 / 渲染
+  - 颜色 8 色预设、Switch 切换、Slider 实时响应
+  - 顶部"重置"按钮一键还原默认
+
+- `RideWind/lib/widgets/smoke_flow_widget.dart` — ✅ **V14.8 纯椭圆障碍（去除鱼形）**
+  - 用户反馈：障碍是"鱼形"——前椭圆 + 后长方形尾巴
+  - 根因：`_applyStreamlineForce` 中除椭圆障碍外还有"车前预偏转"+"表面切线引导"
+  - **修复**：删除两段额外力场，只保留椭圆内 density/u/v=0 强制清除
+  - 椭圆外**零力场**，烟雾靠水平惯性 + 密度衰减自然合拢
+  - 形状现在就是纯椭圆挖空 + 自然分流合拢
   - 编译零错误
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **V14.7 面板设计升级（参考 GarageControlSheet 风格）**
+  - 改为 `SmokeConfigPanel.show()` 静态方法 + DraggableScrollableSheet
+  - 可拖拽调整高度：30% / 70% / 95% 三档 snap 吸附
+  - 顶部拖拽条 + 纯黑背景 + 圆角 20px
+  - 标题栏带「重置」按钮，每段标题前有青色色条
+  - Slider 统一青色主题 + BouncingScrollPhysics 弹性滚动
+  - Helper 方法用 extension 方式组织（保持类简洁）
+  - 编译零错误
+
+- `RideWind/lib/widgets/smoke_config_panel.dart` — ✅ **V14.9 透明遮罩 + 缩小默认尺寸（不挡烟雾）**
+  - 用户反馈：弹窗挡住烟雾区域，无法实时观察调参效果
+  - `barrierColor: Colors.black54` → `Colors.transparent`（无蒙层覆盖烟雾）
+  - `initialChildSize` 0.7 → 0.5（默认 50%，露出更多烟雾）
+  - `minChildSize` 0.3 → 0.15（拖到底几乎完全让位）
+  - `snapSizes` → `[0.15, 0.5, 0.95]`
+  - 编译零错误，4 个相关文件全部通过 getDiagnostics
+  - **状态**：未 commit / 未 tag，等待用户真机测试反馈
+
+- `RideWind/lib/screens/treadmill_dashboard_screen.dart` — ✅ 触发器更新
+  - `_showSmokeConfigPanel` 改用 `SmokeConfigPanel.show()`
+  - 编译零错误
+
+- **下一步候选**：
+  - 改 streamCount 时密度场归零看起来突兀 → 加平滑过渡
+  - 添加预设系统（"温和"/"激烈"/"风洞模式"）
+  - 配置持久化到 SharedPreferences
+  - HSV 色环（替代或补充 RGB 滑块）
+
+- `RideWind/lib/screens/treadmill_dashboard_screen.dart` — ✅ **触发器接入**
+  - `_smokeConfig` state 字段
+  - 烟雾区域 GestureDetector + onTap → showModalBottomSheet
+  - dispose 清理 config
+  - 编译零错误
+
+- **下一步**：将 SmokeConfig 注入 `_FluidSimulation`，替换硬编码常量
+  - 重力/缭绕/衰减/笔直 → 物理 setter 实时响应
+  - 障碍位置/尺寸/开关 → `_carHalfThickness` 用 config 计算
+  - 流线数量/间距 → 触发仿真重建
     - `_applyForceField`：全网格遍历，左20%强力(wind*2+0.1)*dt，右80%弱力(wind+0.05)*dt，跳过obstacle和density<0.01
     - `_applyGravityEffect`：buoyancy=(1-wind)²×0.25×dt，近障碍物加倍
     - `_suppressVerticalVelocity`：factor=1.0-wind²×0.8
