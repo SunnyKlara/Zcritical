@@ -4,16 +4,14 @@ import '../models/device_model.dart';
 import '../providers/bluetooth_provider.dart';
 import '../services/firmware_compatibility.dart';
 import 'garage_screen.dart';
+import 'treadmill_dashboard_screen.dart';
 import 'device_connect_screen.dart';
 
 /// 🏠 全屏 PageView 容器
 ///
-/// 结构：[GarageScreen (index=0)] ← [DeviceConnectScreen (index=1, 默认)]
+/// 结构：[GarageScreen (index=0)] ← [TreadmillDashboardScreen (index=1)] ← [DeviceConnectScreen (index=2, 默认)]
 ///
-/// 用户从 DeviceConnectScreen 往左滑（即向 index=0 方向），
-/// 整个屏幕切换到车库页面。
-///
-/// 不修改 DeviceConnectScreen 内部任何代码。
+/// 用户从 DeviceConnectScreen 往左滑进入仪表盘页面，再滑进入车库。
 class MainPagerScreen extends StatefulWidget {
   final DeviceModel device;
 
@@ -29,8 +27,8 @@ class _MainPagerScreenState extends State<MainPagerScreen> {
   @override
   void initState() {
     super.initState();
-    // 默认显示 DeviceConnectScreen（index=1）
-    _pageController = PageController(initialPage: 1);
+    // 默认显示 DeviceConnectScreen（index=2）
+    _pageController = PageController(initialPage: 2);
     // 延迟检查固件兼容性（等连接初始化完成）
     Future.delayed(const Duration(seconds: 2), _checkFirmwareCompatibility);
   }
@@ -60,7 +58,9 @@ class _MainPagerScreenState extends State<MainPagerScreen> {
         children: [
           // index=0: 车库页面
           const GarageScreen(),
-          // index=1: 设备控制页面（默认）
+          // index=1: 跑步机仪表盘页面
+          const TreadmillDashboardScreen(),
+          // index=2: 设备控制页面（默认）
           DeviceConnectScreen(device: widget.device),
         ],
       ),

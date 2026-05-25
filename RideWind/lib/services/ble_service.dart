@@ -311,10 +311,9 @@ class BLEService {
     }
     _draining = false;
 
-    if (!_userDisconnected && wasDevice != null) {
-      _device = wasDevice; // 保留设备引用用于重连
-      _scheduleReconnect();
-    }
+    // 不再在底层自动重连 — 由上层 BleConnectionManager 统一管理重连策略。
+    // 这避免了两层重连逻辑冲突导致的 RF 竞争和连接失败。
+    _device = wasDevice; // 保留设备引用供上层重连使用
   }
 
   void _scheduleReconnect() {
