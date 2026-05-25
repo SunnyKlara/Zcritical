@@ -1,8 +1,8 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "size": 3037152,
-  "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/v1.1.1/zcritical-fw-v1.1.1.bin",
-  "changelog": "固件 v1.1.1 维护更新\n- 新增产测自检功能（开机时长按编码器进入）\n- 隐藏跑步机菜单，恢复音量调节菜单\n- 修复音量软件增益未生效的问题\n- 默认 LED 颜色设为白色，默认静音\n- 修复存储默认值不同步的问题",
+  "download_url": "https://github.com/SunnyKlara/Zcritical/releases/download/fw-v1.2.0/zcritical-fw-v1.2.0.bin",
+  "changelog": "固件 v1.2.0 配合 APP v1.3.0\n- 新增跑步机模式数字滚轮 HUD 动画（小米仪表风格）\n- 新增 BLE 心跳保活协议（CMD_PING/PONG）防假连接\n- 协议向后兼容，旧 APP 无影响",
   "protocol_version": 1,
   "hw_model": "T1",
   "min_app_version": "1.0.0"
