@@ -14,6 +14,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'smoke_config.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SmokeDynamics（向后兼容，静态工具类）
@@ -62,13 +63,22 @@ class _FluidSimulation {
   // ASM field_7b: 相位（每帧 +0.05）
   double _phase = 0.0;
 
-  _FluidSimulation(double pixelWidth, double pixelHeight, this.cellSize)
+  /// 配置引用（可空，提供时实时读取参数；为空时使用 ASM 默认值）
+  SmokeConfig? config;
+
+  _FluidSimulation(double pixelWidth, double pixelHeight, this.cellSize,
+      {this.config, int streamCount = 8, double streamSpacing = 6.2})
       // ASM: gridWidth = ceil(width/5) + 2（不要 ×2，那会让网格 4 倍开销卡爆）
       : gridWidth = (pixelWidth / 5.0).ceil() + 2,
         gridHeight = (pixelHeight / 5.0).ceil() + 2 {
+    _streamCount = streamCount;
+    _streamSpacing = streamSpacing;
     _initializeFields();
     _initializeStreamPositions();
   }
+
+  late int _streamCount;
+  late double _streamSpacing;
 
   // ASM _initializeFields: 创建所有 2D 网格数组，初始化为 0.0
   void _initializeFields() {
@@ -82,10 +92,12 @@ class _FluidSimulation {
   }
 
   // ASM _initializeStreamPositions:
-  // startY = gridHeight/2 - 22.3 + 0.6, 间距 6.2, 8 条流线
+  // 流线居中，使用 config 提供的 streamCount + streamSpacing
   void _initializeStreamPositions() {
-    final double startY = gridHeight / 2.0 - 22.3 + 0.6;
-    _streamYPositions = List<double>.generate(8, (i) => startY + i * 6.2);
+    final double totalSpan = (_streamCount - 1) * _streamSpacing;
+    final double startY = gridHeight / 2.0 - totalSpan / 2.0;
+    _streamYPositions =
+        List<double>.generate(_streamCount, (i) => startY + i * _streamSpacing);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -142,7 +154,8 @@ class _FluidSimulation {
         // sinArg = phase * (s * 0.2 + 1.0) + s * PI / 3.0
         final double freq = s * 0.2 + 1.0;
         final double sinArg = _phase * freq + s * pi / 3.0;
-        final double centerY = _streamYPositions[s] + sin(sinArg) * 0.3;
+        final double swayAmp = config?.swayStrength ?? 0.3;
+        final double centerY = _streamYPositions[s] + sin(sinArg) * swayAmp;
 
         // ASM 步长是 0.25（不是 0.1）— 范围 -0.7 到 0.7
         for (double dy = -0.7; dy <= 0.7; dy += 0.25) {
@@ -158,8 +171,8 @@ class _FluidSimulation {
           _u[col][targetY] = 0.5;
           // v 硬设 0
           _v[col][targetY] = 0.0;
-          // density 用 fmax，注入值是 weight * 1.3
-          final double densityVal = weight * 1.3;
+          // density 用 fmax，注入值是 weight * 1.3 * densityScale
+          final double densityVal = weight * 1.3 * (config?.densityScale ?? 1.0);
           if (densityVal > _density[col][targetY]) {
             _density[col][targetY] = densityVal;
           }
@@ -274,6 +287,10 @@ class _FluidSimulation {
     // - speed=max: v += 0（无重力，全水平流动）
     _applyGravity();
 
+    // 流线型由车身障碍 + Painter 视觉叠加共同实现
+    // 车身障碍清除密度，烟雾真正绕过；车形剖面在 Painter 上层显示
+    _applyStreamlineForce();
+
     // _applyObstacleBoundary: 无障碍物 = 空操作
 
     // ★ 关键修正：不要清零 uPrev/vPrev — ASM 中 _addSource 写入 live 数组
@@ -296,7 +313,8 @@ class _FluidSimulation {
     // 注意：之前 V10 用 0.8 是导致条纹的元凶，这里只压制 0.15
     if (_windStrength < 0.1) return; // 低速直接跳过
 
-    final double factor = 1.0 - _windStrength * 0.15;
+    final double strength = config?.straightnessStrength ?? 0.15;
+    final double factor = 1.0 - _windStrength * strength;
     for (int i = 1; i < gridWidth - 1; i++) {
       for (int j = 1; j < gridHeight - 1; j++) {
         if (_density[i][j] > 0.01) {
@@ -311,8 +329,9 @@ class _FluidSimulation {
   // 只在有密度的格子施加，不影响空气格子
   // ═══════════════════════════════════════════════════════════════════════════
   void _applyGravity() {
-    final double g = 0.5 * (1.0 - _windStrength) * _dt;
-    if (g <= 0.001) return; // 高速时直接跳过
+    final double gStrength = config?.gravityStrength ?? 0.5;
+    final double g = gStrength * (1.0 - _windStrength) * _dt;
+    if (g <= 0.001) return;
 
     for (int i = 1; i < gridWidth - 1; i++) {
       for (int j = 1; j < gridHeight - 1; j++) {
@@ -322,6 +341,69 @@ class _FluidSimulation {
       }
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 流线型设计 V2：赛车剖面 + 尾流合拢
+  //
+  // 赛车几何（侧视图，归一化坐标）：
+  //   x: 0.20 ~ 0.55（车身长度 35%）
+  //   厚度沿 x 变化（前低 → 中高 → 后低 → 尾翼）：
+  //     - 前鼻锥 (x=0.20): 半厚 0.05
+  //     - 前轮 (x=0.27): 半厚 0.10
+  //     - 驾驶舱 (x=0.38): 半厚 0.13（最高）
+  //     - 后轮 (x=0.48): 半厚 0.10
+  //     - 尾翼 (x=0.55): 半厚 0.07
+  //
+  // 力场设计：
+  //   - 车身轮廓内：强排斥力（垂直推开）
+  //   - 车身上方/下方近邻：贴合力（沿轮廓滑过）
+  //   - 车身后方（x > 0.55）：合拢力（v 向中心回归，模拟尾流闭合）
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// 椭圆障碍：使用 config 配置的位置和大小
+  /// （流线型设计后续优化，先用椭圆做基础）
+  double _carHalfThickness(double xNorm) {
+    if (config != null && !config!.obstacleEnabled) return 0.0;
+
+    final double cx = config?.obstacleX ?? 0.40;
+    final double rx = config?.obstacleRx ?? 0.15;
+    final double ry = config?.obstacleRy ?? 0.12;
+
+    final double dx = xNorm - cx;
+    if (dx.abs() > rx) return 0.0;
+
+    // 椭圆上半厚度 = ry * sqrt(1 - (dx/rx)²)
+    final double t = dx / rx;
+    return ry * sqrt(1 - t * t);
+  }
+
+  void _applyStreamlineForce() {
+    if (_windStrength < 0.3) return;
+    if (config != null && !config!.obstacleEnabled) return;
+
+    final double cy = gridHeight * 0.5;
+
+    // 纯椭圆障碍：仅清除椭圆内部的密度和速度
+    // 烟雾在椭圆前自然被挡分流，过了椭圆后靠水平惯性 + 密度衰减自然合拢
+    // 不加预偏转、不加切线引导、不加尾流推力 → 形状就是纯椭圆
+    for (int i = 1; i < gridWidth - 1; i++) {
+      final double xNorm = i / gridWidth;
+      final double halfThick = _carHalfThickness(xNorm);
+      if (halfThick <= 0.001) continue;
+
+      final double obstHalfPx = halfThick * gridHeight;
+      for (int j = 1; j < gridHeight - 1; j++) {
+        final double dy = (j - cy).abs();
+        if (dy < obstHalfPx) {
+          // 强制清除椭圆内部的密度和速度
+          _density[i][j] = 0.0;
+          _u[i][j] = 0.0;
+          _v[i][j] = 0.0;
+        }
+      }
+    }
+  }
+
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ASM _densityStep (addr 0x3e41b0)
@@ -341,9 +423,9 @@ class _FluidSimulation {
     _advect(0, _density, _densityPrev, _u, _v);
 
     // 密度衰减：speed 越大衰减越快，但保持平滑（不要太陡导致断续）
-    // speed=0:   decay = 0.99（缓慢衰减）
-    // speed=max: decay = 0.97（中等衰减，避免断续）
-    final double decay = 0.99 - _windStrength * 0.02;
+    // 用 config.decayRate 控制速度衰减系数
+    final double decayCoef = config?.decayRate ?? 0.02;
+    final double decay = 0.99 - _windStrength * decayCoef;
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
         _density[i][j] *= decay;
@@ -509,10 +591,16 @@ class _FluidSimulation {
 class SmokeFlowWidget extends StatefulWidget {
   final Color smokeColor;
   final int speed;
+
+  /// 可选的参数配置。如果传入，widget 会监听其变化并实时响应。
+  /// 不传则使用默认配置（行为完全等同于 V14.2）。
+  final SmokeConfig? config;
+
   const SmokeFlowWidget({
     super.key,
     this.smokeColor = const Color(0xFFCCCCCC),
     this.speed = 200,
+    this.config,
   });
   @override
   State<SmokeFlowWidget> createState() => _SmokeFlowWidgetState();
@@ -526,17 +614,56 @@ class _SmokeFlowWidgetState extends State<SmokeFlowWidget>
   _FluidSimulation? _sim;
   Size _lastSize = Size.zero;
 
+  /// 实际生效的配置：优先用 widget.config，否则用内置默认值
+  late SmokeConfig _effectiveConfig;
+  bool _ownsConfig = false;
+
   @override
   void initState() {
     super.initState();
+    _setupConfig();
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(seconds: 1))
       ..addListener(_tick)
       ..repeat();
   }
 
+  void _setupConfig() {
+    if (widget.config != null) {
+      _effectiveConfig = widget.config!;
+      _ownsConfig = false;
+    } else {
+      _effectiveConfig = SmokeConfig(smokeColor: widget.smokeColor);
+      _ownsConfig = true;
+    }
+    _effectiveConfig.addListener(_onConfigChanged);
+  }
+
+  void _onConfigChanged() {
+    // 检查是否需要重建仿真（仅 streamCount/streamSpacing 改变时）
+    // 颜色/blur/opacity 等参数只 repaint，不重建 sim
+    if (_effectiveConfig.consumeRebuildFlag()) {
+      // 标记 _lastSize 为零会让下一帧 LayoutBuilder 重建 sim
+      _lastSize = Size.zero;
+      _sim = null;
+    }
+    setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(SmokeFlowWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.config != oldWidget.config) {
+      _effectiveConfig.removeListener(_onConfigChanged);
+      if (_ownsConfig) _effectiveConfig.dispose();
+      _setupConfig();
+    }
+  }
+
   @override
   void dispose() {
+    _effectiveConfig.removeListener(_onConfigChanged);
+    if (_ownsConfig) _effectiveConfig.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -550,18 +677,34 @@ class _SmokeFlowWidgetState extends State<SmokeFlowWidget>
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (ctx, box) {
       final w = box.maxWidth, h = box.maxHeight;
-      if (w != _lastSize.width || h != _lastSize.height) {
+      // 仅在第一次或尺寸大幅变化(>20px)时重建仿真，避免面板弹出导致密度场归零
+      final bool needRebuild = _sim == null ||
+          (w - _lastSize.width).abs() > 20 ||
+          (h - _lastSize.height).abs() > 20;
+      if (needRebuild) {
         _lastSize = Size(w, h);
-        _sim = _FluidSimulation(w, h, 5.0);
+        _sim = _FluidSimulation(
+          w,
+          h,
+          5.0,
+          config: _effectiveConfig,
+          streamCount: _effectiveConfig.streamCount,
+          streamSpacing: _effectiveConfig.streamSpacing,
+        );
       }
+      // 保持 sim.config 为最新引用（容易遗漏）
+      _sim?.config = _effectiveConfig;
       if (_sim == null) return const SizedBox.shrink();
       return RepaintBoundary(
         child: CustomPaint(
           size: Size(w, h),
           painter: _FluidPainter(
             sim: _sim!,
-            smokeColor: widget.smokeColor,
+            smokeColor: _effectiveConfig.smokeColor,
             cellSize: 5.0,
+            blur1Sigma: _effectiveConfig.blur1Sigma,
+            blur2Sigma: _effectiveConfig.blur2Sigma,
+            opacityScale: _effectiveConfig.opacityScale,
           ),
           isComplex: true,
           willChange: true,
@@ -593,16 +736,17 @@ class _FluidPainter extends CustomPainter {
   final _FluidSimulation sim;
   final Color smokeColor;
   final double cellSize;
-
-  // 性能优化：blur sigma 降低（之前 16/8/4 太大导致 GPU shader 严重卡顿）
-  // 网格已经有自然的连续密度场，不需要靠超大 blur 融合
-  static final MaskFilter _blur1 = MaskFilter.blur(BlurStyle.normal, 4.0);
-  static final MaskFilter _blur2 = MaskFilter.blur(BlurStyle.normal, 2.0);
+  final double blur1Sigma;
+  final double blur2Sigma;
+  final double opacityScale;
 
   _FluidPainter({
     required this.sim,
     required this.smokeColor,
     required this.cellSize,
+    this.blur1Sigma = 4.0,
+    this.blur2Sigma = 2.0,
+    this.opacityScale = 1.0,
   });
 
   @override
@@ -612,6 +756,12 @@ class _FluidPainter extends CustomPainter {
     final int r = smokeColor.red;
     final int g = smokeColor.green;
     final int b = smokeColor.blue;
+
+    // 根据 config 动态创建 MaskFilter
+    final MaskFilter blur1 =
+        MaskFilter.blur(BlurStyle.normal, blur1Sigma);
+    final MaskFilter blur2 =
+        MaskFilter.blur(BlurStyle.normal, blur2Sigma);
 
     final paint1 = Paint()..style = PaintingStyle.fill;
     final paint2 = Paint()..style = PaintingStyle.fill;
@@ -643,23 +793,60 @@ class _FluidPainter extends CustomPainter {
         // Layer 1: 大圆（外层柔和光晕）
         // 源代码效果：烟雾厚实明亮，opacity 需要更高
         final double radius1 = (speedNorm * 0.5 + 1.2) * cellSize;
-        final double opacity1 = alphaBase * (speedNorm * 0.2 + 0.5);
+        final double opacity1 = alphaBase * (speedNorm * 0.2 + 0.5) * opacityScale;
         paint1.color = Color.fromRGBO(lr, lg, lb, opacity1.clamp(0.0, 1.0));
-        paint1.maskFilter = _blur1;
+        paint1.maskFilter = blur1;
         canvas.drawCircle(Offset(px, py), radius1, paint1);
 
         // Layer 2: 中圆（核心密度）
         // 源代码效果：核心区域非常亮
         final double opacity2 =
-            alphaBase * (speedNorm * 0.2 + 0.7);
+            alphaBase * (speedNorm * 0.2 + 0.7) * opacityScale;
         paint2.color = Color.fromRGBO(lr, lg, lb, opacity2.clamp(0.0, 1.0));
-        paint2.maskFilter = _blur2;
+        paint2.maskFilter = blur2;
         canvas.drawCircle(Offset(px, py), 3.5, paint2);
 
         // Layer 3: 已移除（性能优化）
         // 之前每帧 ~5000 次额外 drawCircle + blur 是卡顿主因之一
       }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 流线型叠加层（独立于流体仿真，纯视觉效果）
+    // 用静态贝塞尔曲线画车形剖面 + 周围流线，速度越大越明显
+    // ═══════════════════════════════════════════════════════════════════════
+    _drawStreamlineOverlay(canvas, size);
+  }
+
+  /// 绘制流线型叠加层
+  /// - speed=0: 完全不画
+  /// - speed=max: 画车形剖面 + 6 条流线
+  void _drawStreamlineOverlay(Canvas canvas, Size size) {
+    final double wind = sim._windStrength;
+    if (wind < 0.2) return; // 低速不画
+
+    final double w = size.width;
+    final double h = size.height;
+    final double cy = h * 0.5;
+
+    // 椭圆障碍剖面（与 _carHalfThickness 中定义的椭圆保持一致）
+    // 中心 (0.40, 0.50)，半轴 0.15 × 0.12（归一化坐标）
+    final double cx = w * 0.40;
+    final double rxPx = w * 0.15;
+    final double ryPx = h * 0.12;
+
+    final Rect ellipseRect = Rect.fromCenter(
+      center: Offset(cx, cy),
+      width: rxPx * 2,
+      height: ryPx * 2,
+    );
+
+    // 用背景色填充椭圆（"挖空"烟雾视觉效果）
+    final Paint ellipseFill = Paint()
+      ..color = Colors.black.withOpacity(0.85 * wind)
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+    canvas.drawOval(ellipseRect, ellipseFill);
   }
 
   @override

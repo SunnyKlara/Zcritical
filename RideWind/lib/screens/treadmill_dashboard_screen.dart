@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../widgets/smoke_flow_widget.dart';
+import '../widgets/smoke_config.dart';
+import '../widgets/smoke_config_panel.dart';
 import '../widgets/driving_controls_widget.dart';
 import '../utils/driving_physics.dart';
 
@@ -29,6 +31,11 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
     with SingleTickerProviderStateMixin {
   // 物理引擎
   final DrivingPhysics _physics = DrivingPhysics();
+
+  // 烟雾参数配置（持久化在 state，重建 widget 也保留）
+  final SmokeConfig _smokeConfig = SmokeConfig(
+    smokeColor: const Color(0xFFBBBBBB),
+  );
 
   // 显示用状态（弹簧驱动，有过冲）
   double _displaySpeed = 0.0;
@@ -105,7 +112,13 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
   @override
   void dispose() {
     _ticker.dispose();
+    _smokeConfig.dispose();
     super.dispose();
+  }
+
+  /// 弹出烟雾参数面板
+  void _showSmokeConfigPanel(BuildContext context) {
+    SmokeConfigPanel.show(context, config: _smokeConfig);
   }
 
   @override
@@ -129,15 +142,19 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
             child: CustomPaint(painter: _PianoBlackPainter()),
           ),
 
-          // 中区：烟雾氛围
+          // 中区：烟雾氛围（单击弹出参数面板）
           Positioned(
             top: instrumentHeight - 20,
             left: 0,
             right: 0,
             height: smokeHeight + 40,
-            child: SmokeFlowWidget(
-              smokeColor: const Color(0xFFBBBBBB),
-              speed: (_displaySpeed / 496.0 * 340).round().clamp(0, 340),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _showSmokeConfigPanel(context),
+              child: SmokeFlowWidget(
+                config: _smokeConfig,
+                speed: (_displaySpeed / 496.0 * 340).round().clamp(0, 340),
+              ),
             ),
           ),
 
