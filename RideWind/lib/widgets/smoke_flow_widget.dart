@@ -180,7 +180,9 @@ class _FluidSimulation {
   void _applyForceField() {
     final int forceEndCol = (gridWidth * 0.2).round();
     final int wakeStartCol = (gridWidth * 0.8).round();
-    final double forceLeft = (_windStrength * 2.0 + 0.1) * _dt;
+    // 减弱左侧推力系数，避免高速时密度被强行推压聚拢中心
+    // 之前：(wind * 2.0 + 0.1)，现在：(wind * 0.8 + 0.1)
+    final double forceLeft = (_windStrength * 0.8 + 0.1) * _dt;
     final double forceRight = (_windStrength + 0.05) * _dt;
 
     for (int i = 1; i < gridWidth - 1; i++) {
@@ -288,7 +290,20 @@ class _FluidSimulation {
   // 用户确认障碍物在源代码里实际无效果，所以此方法在无障碍物场景下不应执行
   // 之前对全场压制 v 是导致 8 条离散条纹的直接原因
   void _suppressVerticalVelocity() {
-    // No-op: 无障碍物场景下不压制垂直速度，让烟雾自然扩散
+    // 轻度压制 v：speed 越大压制越强，让高速时烟雾保持笔直流动
+    // speed=0:   factor = 1.0（不压制，重力下坠正常）
+    // speed=max: factor = 0.85（每帧 v 衰减 15%，保持流线笔直）
+    // 注意：之前 V10 用 0.8 是导致条纹的元凶，这里只压制 0.15
+    if (_windStrength < 0.1) return; // 低速直接跳过
+
+    final double factor = 1.0 - _windStrength * 0.15;
+    for (int i = 1; i < gridWidth - 1; i++) {
+      for (int j = 1; j < gridHeight - 1; j++) {
+        if (_density[i][j] > 0.01) {
+          _v[i][j] *= factor;
+        }
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -325,11 +340,10 @@ class _FluidSimulation {
     _swap2D(_density, _densityPrev);
     _advect(0, _density, _densityPrev, _u, _v);
 
-    // 密度衰减：速度越大衰减越快，让高速时流线尾部更早断开
-    // 防止高速时 8 股因为 advect 拉伸而互相融合
-    // speed=0:   decay = 0.99（缓慢衰减，密度场维持）
-    // speed=max: decay = 0.94（快速衰减，流线尾部断开）
-    final double decay = 0.99 - _windStrength * 0.05;
+    // 密度衰减：speed 越大衰减越快，但保持平滑（不要太陡导致断续）
+    // speed=0:   decay = 0.99（缓慢衰减）
+    // speed=max: decay = 0.97（中等衰减，避免断续）
+    final double decay = 0.99 - _windStrength * 0.02;
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
         _density[i][j] *= decay;

@@ -54,14 +54,14 @@
 - `RideWind/lib/screens/treadmill_dashboard_screen.dart` — 三区布局 + Ticker 游戏循环 + 弹簧物理指针
 - `RideWind/lib/widgets/driving_controls_widget.dart` — ✅ **V6 重写** 实心天穹面板（和仪表盘对称）+ 中心车库缩略图轮播（contain 完整显示）
 - `RideWind/lib/utils/driving_physics.dart` — Forza 风格 6 档物理引擎
-- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.3 重力下坠（待真机验证）**
-  - 基于 V11.1 锚点（tag `smoke-v11.1-visual-complete`）
-  - **唯一新增**：独立 `_applyGravity()` 方法，在 _velocityStep 末尾调用
-  - 公式：`v += 0.5 * (1.0 - wind) * dt`，仅对密度>0.01 的格子
-  - speed=0 明显下坠，speed=max 完全无重力（被水平风盖过）
-  - early-out 优化：高速时跳过整个循环（性能无影响）
-  - **不改注入公式，不改任何 V11.1 已验证的逻辑**
-  - 密度衰减保持 V11.2: `0.99 - wind*0.05`（防高速融合）
+- `RideWind/lib/widgets/smoke_flow_widget.dart` — 🟡 **V11.6 高速保持笔直（待真机验证）**
+  - 基于 V11.3 锚点 + V11.4 推力衰减
+  - **改动 1**：注入参数恢复 ±0.7 / sigma²=0.1225 / weight*1.3（烟雾量充足，无断层）
+  - **改动 2**：`_suppressVerticalVelocity` 改为轻度 v 压制
+    - speed<0.1：跳过（保留低速重力下坠）
+    - speed=max：v 每帧衰减 15%（让流线笔直，不偏移聚拢）
+    - 只对密度>0.01 格子施加，避免破坏空气
+    - 比 V10 的 80% 衰减温和得多（V10 是条纹元凶）
   - 编译零错误
     - `_applyForceField`：全网格遍历，左20%强力(wind*2+0.1)*dt，右80%弱力(wind+0.05)*dt，跳过obstacle和density<0.01
     - `_applyGravityEffect`：buoyancy=(1-wind)²×0.25×dt，近障碍物加倍
