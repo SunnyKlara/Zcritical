@@ -879,6 +879,11 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
         break;
     }
 
+    /* ── PING — APP heartbeat, reply PONG immediately ── */
+    case CMD_PING:
+        ble_service_notify_str("PONG\r\n");
+        break;
+
     // ═══ SECTION: WiFi 音频命令 (WIFI/WIFI_SCAN) ═══
 
     /* ── WIFI:ssid:password ── */

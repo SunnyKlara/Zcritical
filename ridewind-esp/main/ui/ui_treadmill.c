@@ -212,31 +212,56 @@ static void update_arc_fast(uint8_t old_pct, uint8_t new_pct)
     }
 }
 
-/* ====== Tick Marks (5 major only, thick) ====== */
-static void draw_ticks(uint8_t fill_pct)
+/* ====== Tick Marks (major + minor alternating) ====== */
+#define TICK_TOTAL          21   /* 0,10,20,...200 → 21 positions */
+#define TICK_MAJOR_EVERY    5    /* Every 5th tick is major (0,50,100,150,200) */
+#define TICK_R_MINOR_INNER  (TICK_R_OUTER - 7)   /* Short thin tick */
+
+static void draw_single_tick(int i, uint8_t fill_pct)
 {
-    int labels[] = {0, 50, 100, 150, 200};
-    for (int i = 0; i < 5; i++) {
-        float t = (float)labels[i] / DISPLAY_MAX;
-        float deg = ARC_START_DEG + ARC_SWEEP_DEG * t;
-        float rad = deg * (float)M_PI / 180.0f;
+    float t = (float)i / (TICK_TOTAL - 1);
+    float deg = ARC_START_DEG + ARC_SWEEP_DEG * t;
+    float rad = deg * (float)M_PI / 180.0f;
 
-        uint16_t color;
-        uint8_t tick_pct = (uint8_t)(t * 100);
-        color = (tick_pct <= fill_pct) ? arc_color(tick_pct) : COLOR_TICK_DIM;
+    uint8_t tick_pct = (uint8_t)(t * 100);
+    uint16_t color = (tick_pct <= fill_pct) ? arc_color(tick_pct) : COLOR_TICK_DIM;
 
-        int16_t x0 = ARC_CX + (int16_t)(TICK_R_OUTER * cosf(rad));
-        int16_t y0 = ARC_CY + (int16_t)(TICK_R_OUTER * sinf(rad));
-        int16_t x1 = ARC_CX + (int16_t)(TICK_R_INNER_BIG * cosf(rad));
-        int16_t y1 = ARC_CY + (int16_t)(TICK_R_INNER_BIG * sinf(rad));
+    uint8_t is_major = (i % TICK_MAJOR_EVERY == 0);
+    int16_t r_inner = is_major ? TICK_R_INNER_BIG : TICK_R_MINOR_INNER;
 
-        /* Draw 3px wide tick */
-        drv_lcd_draw_line(x0, y0, x1, y1, color);
+    float cos_r = cosf(rad);
+    float sin_r = sinf(rad);
+    int16_t x0 = ARC_CX + (int16_t)(TICK_R_OUTER * cos_r);
+    int16_t y0 = ARC_CY + (int16_t)(TICK_R_OUTER * sin_r);
+    int16_t x1 = ARC_CX + (int16_t)(r_inner * cos_r);
+    int16_t y1 = ARC_CY + (int16_t)(r_inner * sin_r);
+
+    drv_lcd_draw_line(x0, y0, x1, y1, color);
+
+    if (is_major) {
         float perp = rad + (float)M_PI / 2.0f;
         int16_t ox = (int16_t)(1.0f * cosf(perp));
         int16_t oy = (int16_t)(1.0f * sinf(perp));
         drv_lcd_draw_line(x0 + ox, y0 + oy, x1 + ox, y1 + oy, color);
         drv_lcd_draw_line(x0 - ox, y0 - oy, x1 - ox, y1 - oy, color);
+    }
+}
+
+static void draw_ticks(uint8_t fill_pct)
+{
+    for (int i = 0; i < TICK_TOTAL; i++) {
+        draw_single_tick(i, fill_pct);
+    }
+}
+
+/* Only redraw ticks whose pct falls within [lo, hi] range */
+static void draw_ticks_range(uint8_t lo, uint8_t hi, uint8_t fill_pct)
+{
+    for (int i = 0; i < TICK_TOTAL; i++) {
+        uint8_t tick_pct = (uint8_t)((float)i / (TICK_TOTAL - 1) * 100);
+        if (tick_pct >= lo && tick_pct <= hi) {
+            draw_single_tick(i, fill_pct);
+        }
     }
 }
 
@@ -283,7 +308,6 @@ static void update_needle_smooth(void)
 
     draw_needle_wedge(s_last_needle_rad, COLOR_BG, COLOR_BG);
     draw_needle_wedge(new_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
-    drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
 
     s_last_needle_rad = new_rad;
 }
@@ -385,7 +409,6 @@ static void draw_full_screen(void)
     float deg = ARC_START_DEG + ARC_SWEEP_DEG * (float)s_treadmill_speed / TREAD_MAX_SPEED;
     s_last_needle_rad = deg * (float)M_PI / 180.0f;
     draw_needle_wedge(s_last_needle_rad, COLOR_NEEDLE, COLOR_NEEDLE_TIP);
-    drv_lcd_draw_circle(ARC_CX, ARC_CY, 5, COLOR_CENTER_DOT, true);
 
     draw_speed_number();
     draw_gear_blocks();
@@ -443,7 +466,8 @@ void ui_treadmill_update(void)
 
     encoder_event_t evt;
     while (drv_encoder_poll(&evt)) {
-        if (evt.type == ENC_EVT_DOUBLE_CLICK || evt.type == ENC_EVT_CLICK) {
+        if (evt.type == ENC_EVT_CLICK || evt.type == ENC_EVT_DOUBLE_CLICK ||
+            evt.type == ENC_EVT_LONG_PRESS) {
             ui_manager_set_ui(5);
             return;
         }
@@ -478,7 +502,10 @@ void ui_treadmill_update(void)
 
     if (new_pct != s_last_drawn_pct) {
         update_arc_fast(s_last_drawn_pct, new_pct);
-        draw_ticks(new_pct);
+        /* Only redraw ticks that cross the old/new boundary */
+        uint8_t lo = (new_pct > s_last_drawn_pct) ? s_last_drawn_pct : new_pct;
+        uint8_t hi = (new_pct > s_last_drawn_pct) ? new_pct : s_last_drawn_pct;
+        draw_ticks_range(lo, hi, new_pct);
         s_last_drawn_pct = new_pct;
     }
 

@@ -25,6 +25,7 @@ idf_component_register(
         "ui/ui_volume.c"
         "ui/ui_treadmill.c"
         "ui/ui_common.c"
+        "ui/ui_digit_roller.c"
         "app/app_state.c"
         "app/led_effects.c"
         "app/encoder_handler.c"
