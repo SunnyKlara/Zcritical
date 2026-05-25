@@ -201,20 +201,45 @@ chore: 更新配置             ← 更新了什么配置？为什么？
 - `DEPLOY_HOST` — 阿里云服务器 IP（47.107.143.4）
 - `DEPLOY_SSH_KEY` — SSH 私钥（apk.pem 的内容）
 
-### 固件发版
+### 固件发版（自动化流程）
+
+固件发版与 APP 一样，CI 自动构建 + 创建 Release + 上传 .bin + 更新 firmware.json。
+触发方式：推 `fw-vX.Y.Z` tag 即可。
 
 ```
-□ idf.py build — 零 error 零 warning
-□ idf.py size — flash 余量 >10%
-□ 更新 sdkconfig.defaults 中 CONFIG_APP_PROJECT_VER
+□ idf.py build — 本地验证（可选，CI 会重跑）
+□ idf.py size — flash 余量 >10%（CI 也会跑）
+□ 更新 sdkconfig.defaults 中 CONFIG_APP_PROJECT_VER（必须与 tag 版本一致）
+□ 更新 firmware.json 的 changelog 字段（size/sha256/download_url 由 CI 自动填）
 □ 更新 CHANGELOG.md
+□ git add -A
 □ git commit -m "release: 固件 vX.Y.Z"
 □ git tag fw-vX.Y.Z
-□ 烧录实机验证核心功能
-□ 上传 .bin 到 GitHub Release（OTA 分发）
-□ 更新 firmware.json
-□ git push && git push --tags
+□ git push origin main --tags
 ```
+
+**CI 自动完成**（无需手工）：
+- ✅ ESP-IDF Docker 镜像构建（`espressif/idf:release-v5.3`，缓存 managed_components + ccache）
+- ✅ 校验 tag 版本号与 sdkconfig.defaults 一致（不一致直接 fail）
+- ✅ 重命名 `ridewind-esp.bin` → `zcritical-fw-vX.Y.Z.bin`
+- ✅ 创建 GitHub Release + 上传 .bin（OTA 端点可用）
+- ✅ 自动用 jq 把准确 size / sha256 / download_url 写回 `firmware.json` 与 `RideWind/assets/firmware.json`
+- ✅ 推送 firmware.json 更新回 main（commit message 带 `[skip ci]`）
+- ✅ Telegram + 企业微信通知
+
+**配置要求**（一次性）：
+- 默认权限够用：`permissions: contents: write` 已在 workflow 里
+- 可选：`RELEASE_BOT_TOKEN`（PAT），如果默认 GITHUB_TOKEN 推 main 受 branch protection 阻拦再加
+
+**烧录验证**（CI 之外）：
+- 用户从 Release 下载 .bin 烧录到实机，或等 OTA 自动推送
+- 验证后回到工作流标记 release 状态
+
+---
+
+### 固件发版（旧的手工流程，已废弃）
+
+> ⚠️ 仅在 CI 出问题时作为备用：
 
 ---
 

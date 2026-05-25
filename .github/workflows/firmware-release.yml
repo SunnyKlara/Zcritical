@@ -1,0 +1,289 @@
+name: Firmware Build & Release
+
+on:
+  push:
+    tags: ['fw-v*']
+  pull_request:
+    branches: [main]
+    paths: ['ridewind-esp/**']
+  workflow_dispatch:
+    inputs:
+      tag_override:
+        description: '用 fw-v* 命名的 tag 模拟发版（不会真的创建 Release）'
+        required: false
+        default: ''
+
+jobs:
+  # ---------------------------------------------------------------
+  #  Build firmware in ESP-IDF Docker image
+  # ---------------------------------------------------------------
+  build:
+    name: Build ESP32-S3 Firmware
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:release-v5.3
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Release job 需要 commit 回主干，所以用 PAT（仅在 tag 触发时启用）
+          token: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      # 缓存 managed_components（IDF Component Manager 拉取，避免每次重下）
+      - name: Cache managed_components
+        uses: actions/cache@v4
+        with:
+          path: ridewind-esp/managed_components
+          key: idf-components-${{ hashFiles('ridewind-esp/main/idf_component.yml') }}
+          restore-keys: idf-components-
+
+      # 缓存 ccache（增量编译加速）
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-fw-${{ github.sha }}
+          restore-keys: ccache-fw-
+
+      - name: Show IDF version
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py --version
+
+      - name: Build firmware
+        working-directory: ridewind-esp
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py build
+
+      - name: Show firmware size
+        working-directory: ridewind-esp
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py size
+
+      - name: Verify project version matches tag
+        if: startsWith(github.ref, 'refs/tags/fw-v')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG#fw-v}"
+          CONFIG_VERSION=$(grep '^CONFIG_APP_PROJECT_VER=' ridewind-esp/sdkconfig.defaults | sed 's/CONFIG_APP_PROJECT_VER="\(.*\)"/\1/')
+          if [ "$TAG_VERSION" != "$CONFIG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does NOT match sdkconfig.defaults CONFIG_APP_PROJECT_VER ($CONFIG_VERSION). 升 tag 之前必须先升 sdkconfig.defaults。"
+            exit 1
+          fi
+          echo "✅ Tag $TAG matches sdkconfig version $CONFIG_VERSION"
+
+      - name: Compute artifact metadata
+        id: meta
+        if: startsWith(github.ref, 'refs/tags/fw-v')
+        working-directory: ridewind-esp
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#fw-v}"
+          BIN_PATH="build/ridewind-esp.bin"
+          BIN_SIZE=$(stat -c%s "$BIN_PATH")
+          BIN_SHA256=$(sha256sum "$BIN_PATH" | cut -d' ' -f1)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "BIN_SIZE=$BIN_SIZE" >> $GITHUB_OUTPUT
+          echo "BIN_SHA256=$BIN_SHA256" >> $GITHUB_OUTPUT
+          echo "Firmware size: $BIN_SIZE bytes"
+          echo "Firmware sha256: $BIN_SHA256"
+
+      - name: Rename binary for release
+        if: startsWith(github.ref, 'refs/tags/fw-v')
+        working-directory: ridewind-esp
+        run: |
+          cp build/ridewind-esp.bin build/zcritical-fw-v${{ steps.meta.outputs.VERSION }}.bin
+
+      - name: Upload firmware artifact (always, for PR builds too)
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-bin
+          path: |
+            ridewind-esp/build/ridewind-esp.bin
+            ridewind-esp/build/bootloader/bootloader.bin
+            ridewind-esp/build/partition_table/partition-table.bin
+          retention-days: 30
+
+      # 把 metadata 传给 release job
+      - name: Save release metadata
+        if: startsWith(github.ref, 'refs/tags/fw-v')
+        run: |
+          mkdir -p release-meta
+          cat > release-meta/info.json <<EOF
+          {
+            "version": "${{ steps.meta.outputs.VERSION }}",
+            "tag": "${{ steps.meta.outputs.TAG }}",
+            "size": ${{ steps.meta.outputs.BIN_SIZE }},
+            "sha256": "${{ steps.meta.outputs.BIN_SHA256 }}"
+          }
+          EOF
+
+      - name: Upload release metadata artifact
+        if: startsWith(github.ref, 'refs/tags/fw-v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-release-meta
+          path: |
+            release-meta/info.json
+            ridewind-esp/build/zcritical-fw-v*.bin
+          retention-days: 7
+
+  # ---------------------------------------------------------------
+  #  Release: GitHub Release + firmware.json auto-update
+  # ---------------------------------------------------------------
+  release:
+    name: Create Firmware Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/fw-v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Download firmware metadata + bin
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-release-meta
+          path: ./fw-artifacts/
+
+      - name: Parse metadata
+        id: meta
+        run: |
+          INFO=./fw-artifacts/release-meta/info.json
+          echo "VERSION=$(jq -r .version $INFO)" >> $GITHUB_OUTPUT
+          echo "TAG=$(jq -r .tag $INFO)" >> $GITHUB_OUTPUT
+          echo "BIN_SIZE=$(jq -r .size $INFO)" >> $GITHUB_OUTPUT
+          echo "BIN_SHA256=$(jq -r .sha256 $INFO)" >> $GITHUB_OUTPUT
+
+      - name: Locate renamed binary
+        id: bin
+        run: |
+          BIN=$(find ./fw-artifacts -name 'zcritical-fw-v*.bin' | head -1)
+          echo "BIN_PATH=$BIN" >> $GITHUB_OUTPUT
+          ls -la "$BIN"
+
+      - name: Read changelog from firmware.json
+        id: changelog
+        run: |
+          CHANGELOG=$(jq -r .changelog firmware.json)
+          # 转义换行用于 release notes
+          {
+            echo "BODY<<EOF"
+            echo "$CHANGELOG"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Size**: ${{ steps.meta.outputs.BIN_SIZE }} bytes"
+            echo "**SHA256**: \`${{ steps.meta.outputs.BIN_SHA256 }}\`"
+            echo "**ESP-IDF**: v5.3.5"
+            echo "**Target**: ESP32-S3"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "固件 v${{ steps.meta.outputs.VERSION }}"
+          tag_name: ${{ steps.meta.outputs.TAG }}
+          body: ${{ steps.changelog.outputs.BODY }}
+          files: ${{ steps.bin.outputs.BIN_PATH }}
+
+      - name: Update firmware.json + commit back to main
+        run: |
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.TAG }}/zcritical-fw-v${{ steps.meta.outputs.VERSION }}.bin"
+
+          # tag 触发时 HEAD 是 detached，先切到 main 再改文件
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main || echo "main 已是最新"
+
+          # 在 main 上原子更新 size + download_url + sha256
+          for FILE in firmware.json RideWind/assets/firmware.json; do
+            jq --arg url "$DOWNLOAD_URL" \
+               --arg sha "${{ steps.meta.outputs.BIN_SHA256 }}" \
+               --argjson size ${{ steps.meta.outputs.BIN_SIZE }} \
+               '.size = $size | .download_url = $url | .sha256 = $sha' \
+               "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+            echo "Updated: $FILE"
+          done
+
+          git add firmware.json RideWind/assets/firmware.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit (firmware.json already up to date)"
+          else
+            git commit -m "chore(release): 同步固件 ${{ steps.meta.outputs.TAG }} 准确 size + sha256 [skip ci]"
+            git push origin main || echo "::warning::firmware.json 自动更新推送失败"
+          fi
+
+  # ---------------------------------------------------------------
+  #  Notification
+  # ---------------------------------------------------------------
+  notify:
+    name: Notify Firmware Release
+    needs: release
+    runs-on: ubuntu-latest
+    if: always() && startsWith(github.ref, 'refs/tags/fw-v')
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#fw-v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Notify Telegram
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets not configured, skipping"
+            exit 0
+          fi
+          STATUS="${{ needs.release.result }}"
+          if [ "$STATUS" = "success" ]; then
+            EMOJI="✅"
+            TEXT="$EMOJI *固件 v${{ steps.version.outputs.VERSION }}* 发布成功 (OTA 已分发)\n\n📦 [GitHub Release](https://github.com/SunnyKlara/Zcritical/releases/tag/${GITHUB_REF#refs/tags/})"
+          else
+            EMOJI="❌"
+            TEXT="$EMOJI *固件 v${{ steps.version.outputs.VERSION }}* 发布失败\n\n🔗 [查看日志](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          fi
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${{ secrets.TELEGRAM_CHAT_ID }}\",\"text\":\"$TEXT\",\"parse_mode\":\"Markdown\"}" \
+            --connect-timeout 10 --max-time 30 || true
+
+      - name: Notify 企业微信
+        continue-on-error: true
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WECOM_WEBHOOK_URL" ]; then
+            echo "WeCom webhook not configured, skipping"
+            exit 0
+          fi
+          STATUS="${{ needs.release.result }}"
+          if [ "$STATUS" = "success" ]; then
+            CONTENT="✅ 固件 v${{ steps.version.outputs.VERSION }} 发布成功 (OTA 已分发)\n\n📦 https://github.com/SunnyKlara/Zcritical/releases/tag/${GITHUB_REF#refs/tags/}"
+          else
+            CONTENT="❌ 固件 v${{ steps.version.outputs.VERSION }} 发布失败\n\n🔗 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -s -X POST \
+            "${{ secrets.WECOM_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"$CONTENT\"}}" \
+            --connect-timeout 10 --max-time 30 || true
