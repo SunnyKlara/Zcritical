@@ -354,8 +354,23 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "./artifacts/zcritical-t1-v${{ steps.version.outputs.VERSION }}-arm64-v8a.apk"
           target: "/www/wwwroot/sunnyklara.com/releases/"
-          strip_components: 1
+          strip_components: 2
           overwrite: true
+
+      - name: Cleanup misplaced artifacts directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            # 清理之前因 strip_components 错配置导致 APK 落到 artifacts 子目录的历史问题
+            if [ -d /www/wwwroot/sunnyklara.com/releases/artifacts ]; then
+              echo "==== Found misplaced artifacts dir, moving APK out ===="
+              mv /www/wwwroot/sunnyklara.com/releases/artifacts/*.apk /www/wwwroot/sunnyklara.com/releases/ 2>/dev/null || true
+              rmdir /www/wwwroot/sunnyklara.com/releases/artifacts 2>/dev/null || true
+            fi
+            ls -la /www/wwwroot/sunnyklara.com/releases/ | grep -i 'zcritical\|ridewind' | head -10
 
       - name: Verify file actually landed on server
         uses: appleboy/ssh-action@v1.0.3
