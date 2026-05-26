@@ -5,42 +5,39 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：v1.3.0 已发版 — ⚠️ 国内 APK 镜像 404
+## 当前阶段：v1.3.0 已发版 — ⚠️ 国内 APK 镜像 404（修复中）
 
 **最终成果**（2026-05-26）：
 - ✅ v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64，每个 130+ MB）已上传
 - ✅ iOS：已上传 TestFlight
 - ✅ app_version.json 已同步到 v1.3.0+9（手工补，CI auto-update 因 base 不一致被拒）
-- ❌ **阿里云国内镜像 sunnyklara.com 上 APK 返回 404**（CI 报 warning 但未 fail）
-- 远端 main：`00cac99`，工作区干净
+- ❌ **阿里云国内镜像 sunnyklara.com 上 APK 返回 404**
+- 远端 main：`7e61911`，工作区干净
 
 **⚠️ 阻塞项：阿里云国内 APK 镜像未部署成功**
 
-CI 步骤 `Deploy arm64 APK to China server` 用 `appleboy/scp-action@v0.1.7` exit 0，但下一步 `Verify China server deployment` HTTP 404。
-- URL：`https://sunnyklara.com/releases/zcritical-t1-v1.3.0-arm64-v8a.apk` → 404
-- 可能原因：
-  1. SCP `strip_components: 1` 配置导致目录结构错乱
-  2. 服务器 `/www/wwwroot/sunnyklara.com/releases/` 路径不存在或权限不足
-  3. nginx 配置缺该目录的 location
+诊断结果（2026-05-26）：
+- 验证 `/releases/` 下的 v1.2.3 / v1.2.4 / v1.3.0 全部 **404** — 不是 v1.3.0 单独问题
+- CI SCP 步骤报 success（"Successfully executed transfer data to all host"）
+- 但 drone-scp 在执行前先 `create folder /www/wwwroot/sunnyklara.com/releases/` —— 说明这个目录之前不存在
+- **结论**：nginx 真实 webroot 不在 `/www/wwwroot/sunnyklara.com/`，SCP 把文件传到了错的目录
 
-**对用户的影响**：
-- APP 内自动检查更新会先去 sunnyklara.com 下 → 404 → fallback 到 GitHub Release（国内访问慢但可用）
-- 不影响功能，只影响国内下载速度
-
-**修复需要**：用户登 SSH 到阿里云服务器排查（我无 SSH 凭据）：
-```bash
-ls -la /www/wwwroot/sunnyklara.com/releases/
-# 看有没有 zcritical-t1-v1.3.0-arm64-v8a.apk
-# 如果没有，看 v1.2.4 之前的 APK 在哪个路径，对照修 yml DEPLOY 步骤的 target
-```
+**修复进行中（commit `7e61911`）**：
+- yml 加了两个 `appleboy/ssh-action` 诊断步骤：
+  1. **Probe nginx webroot**：从 nginx 配置提取真实 root 路径
+  2. **Verify file actually landed**：SCP 后 find APK + 列 nginx config
+- 已 force push 把 v1.3.0 tag 重指向新 commit
+- 已手动触发 CI run `26442736920`（https://github.com/SunnyKlara/Zcritical/actions/runs/26442736920）
+- **下一步**：CI 跑完（~12 分钟），看诊断日志确认真实 webroot，下次发版按真实路径改 yml target
 
 **完整流程概要（2026-05-26）**：
 1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
 2. force push main + 全部 35 个 tag（仓库 600MB → 161MB）
 3. 手工触发 v1.3.0 CI（workflow_dispatch --ref v1.3.0）
-4. CI 跑通：Flutter Analyze ✅ → Build Android APK ✅ → Build iOS & TestFlight ✅ → Create Release ✅ → SCP 阿里云 ⚠️ (报 200 OK 但实际 404)
+4. CI 跑通：Flutter Analyze ✅ → Build Android APK ✅ → Build iOS & TestFlight ✅ → Create Release ✅ → SCP 阿里云 ⚠️ (报 success 但实际 404)
 5. CI 末尾 auto-update app_version.json 推送被拒（base 在 fe7a7e3，远端已 9f608b8）
-6. 手工同步 app_version.json + push（commit `f7e23dc`）
+6. 手工同步 app_version.json + push
+7. yml 加 SSH 诊断步骤 + force update v1.3.0 tag → 二次触发 CI 等结果
 
 **保险/回滚锚点**（仍保留）：
 - 远端备份 tag：`backup/before-lfs-migrate-2026-05-26`（filter-repo 后的等价状态）
@@ -53,11 +50,12 @@ ls -la /www/wwwroot/sunnyklara.com/releases/
 - 协议变化：CMD_PING 向后兼容
 - ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
 
-**下一步可选**：
-1. **优先**：用户登阿里云排查 SCP 部署路径问题
-2. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
-3. 删除本地 `.git.bak/` 释放 600 MB
-4. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
+**下一步行动**：
+1. **优先**：等 CI run `26442736920` 完成（~12 分钟），读 SSH probe 日志确认真实 webroot 路径
+2. 根据日志结果改 yml target，再触发一次 CI 验证国内能下到 APK
+3. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
+4. 删除本地 `.git.bak/` 释放 600 MB
+5. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
