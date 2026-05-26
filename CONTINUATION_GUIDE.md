@@ -39,7 +39,16 @@
 - fw-v1.2.0：跑步机数字滚轮 + BLE 心跳保活协议
 - 固件 CI workflow `firmware-release.yml` 已上线，下次推 fw-v* tag 自动构建
 - 协议变化：CMD_PING 向后兼容
-- ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
+- ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%)
+
+**已知坑：APK 签名一致性（2026-05-26 发现）**：
+- `*.jks` 在 `.gitignore` 里，keystore **不在 git 仓库**
+- 本地 `flutter build apk` 用本机 `zcritical-release.jks`
+- CI 构建用 GitHub Secret `KEYSTORE_BASE64` 解码出来的 keystore
+- 这两个 keystore **可能不是同一个**（取决于谁先生成、谁后导出）
+- 后果：本地装过的版本和 CI 装的版本**包名相同但签名不同**，Android 拒绝升级（错误 -7："与已安装应用签名不同"）
+- **解决**：手机卸载本地装的旧版后再装 CI 的新版即可
+- **长期措施**：应该统一让本地构建也走同一个 keystore（导出到本地或别再用本地构建装机）
 
 **下一步行动**：
 1. **优先**：等 CI run `26442736920` 完成（~12 分钟），读 SSH probe 日志确认真实 webroot 路径
@@ -47,7 +56,7 @@
 3. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
 4. 删除本地 `.git.bak/` 释放 600 MB
 5. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
-6. **跑步机驱动开发**（2026-05-26 已完成代码层，待真机验证） — RideWind 桌面风洞产品自带的车模传送带模块。**已实现**：单线 PWM @ GPIO14, 20kHz LEDC（`TIMER_1/CHANNEL_1`，避开风扇 `TIMER_0/CHANNEL_0`）。新文件 `drivers/drv_treadmill.{h,c}`（照抄 `drv_pwm.c` 范式：软斜坡，加速 +1%/20ms ≈ 2s 到顶，减速 -2%/20ms ≈ 1s 停下，stop 时直接拉零）+ `services/treadmill_service.{h,c}`（UI 0..20 档线性映射到 25..100 占空比，避开死区；保留 `TREAD_SPEED:N` BLE notify 给 APP 同步）。`pin_config.h` 加 `PIN_TREADMILL=14`，`board_config.h` 加 LEDC 资源宏 + `CAP_TREADMILL` (bit 18) 入 `DEVICE_CAPABILITIES`。`ui_treadmill.c` 三处直接拼 BLE 字符串全部改调 service，移除 `ble_service.h` include。`main.c` Phase 4 加 `drv_treadmill_init()`，主任务 tick 加 `drv_treadmill_update()`，CMakeLists 加两个新 `.c`。**编译通过**（32.4s，2.91MB，flash 余量 3%）。**待真机验证**：(a) 真机调 `TREAD_DUTY_MIN=25` 死区值（不转调高 / 太冲调低）；(b) 加减速步长 `+1/-2` 是否合适；(c) 20kHz 是否啸叫。**可选下一步**：`protocol.c` 加 `TREAD_SPEED:N` 入站命令解析，APP 端可远程控速（用户对话末确认后再做）。
+6. **跑步机驱动开发**（2026-05-26 已完成代码层，待真机验证） — RideWind 桌面风洞产品自带的车模传送带模块。**已实现**：单线 PWM @ GPIO14, 20kHz LEDC（`TIMER_1/CHANNEL_1`，避开风扇 `TIMER_0/CHANNEL_0`）。新文件 `drivers/drv_treadmill.{h,c}`（照抄 `drv_pwm.c` 范式：软斜坡，加速 +1%/20ms ≈ 2s 到顶，减速 -2%/20ms ≈ 1s 停下，stop 时直接拉零）+ `services/treadmill_service.{h,c}`（**风扇式三段非线性曲线**：gear 0=0%、gear 1=70% 跨过静摩擦立刻见动、gear 1-6 → 70-85% 低档每档+3% 手感强、gear 7-14 → 85-95% 巡航段每档+1.25%、gear 15-20 → 95-100% 顶端微调；保留 `TREAD_SPEED:N` BLE notify 给 APP 同步）。`pin_config.h` 加 `PIN_TREADMILL=14`，`board_config.h` 加 LEDC 资源宏 + `CAP_TREADMILL` (bit 18) 入 `DEVICE_CAPABILITIES`。`ui_treadmill.c` 三处直接拼 BLE 字符串全部改调 service，移除 `ble_service.h` include。`main.c` Phase 4 加 `drv_treadmill_init()`，主任务 tick 加 `drv_treadmill_update()`，CMakeLists 加两个新 `.c`。**编译通过**（最近一次 71.8s 含曲线改动，flash 余量 3%）。**待真机验证调参**：(a) 1 档不动 → 抬 `TREAD_DUTY_MIN`（70→80+）；(b) 1 档太冲 → 降到 60；(c) 中段不丝滑 → 调 `TREAD_DUTY_MID_LO/HI` + 拐点 `TREAD_GEAR_KNEE_1/2`；(d) 加减速步长 `+1/-2` 是否合适；(e) 20kHz 是否啸叫。**可选下一步**：`protocol.c` 加 `TREAD_SPEED:N` 入站命令解析，APP 端可远程控速（用户对话末确认后再做）。
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
