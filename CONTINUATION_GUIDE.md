@@ -22,16 +22,18 @@
 - 但 drone-scp 在执行前先 `create folder /www/wwwroot/sunnyklara.com/releases/` —— 说明这个目录之前不存在
 - **结论**：nginx 真实 webroot 不在 `/www/wwwroot/sunnyklara.com/`，SCP 把文件传到了错的目录
 
-**修复进行中（commit `3d47284`）**：
+**修复进行中（commit `ad38b1e`）**：
 - **诊断结果（CI run `26442736920`）**：
   - nginx 真实 webroot 是 `/www/wwwroot/sunnyklara.com`（路径正确）
   - 但 SCP `source: ./artifacts/file.apk` 经 `strip_components: 1` 处理后变成 `artifacts/file.apk`
   - 导致 APK 实际落到 `releases/artifacts/file.apk`（多了一层目录）
   - 服务器旧目录里只有 v1.1.0/1.2.0/1.2.1 的 `ridewind-` 前缀文件，没有 `zcritical-t1-v1.3.0`
-- **修复**：`strip_components: 1 → 2`（剥两层 `./artifacts/`），加 cleanup 步骤把误传到 artifacts/ 子目录的 APK 移回上层
-- 已 force push v1.3.0 tag 重指向新 commit `3d47284`
-- 已触发 CI run `26443593718`（https://github.com/SunnyKlara/Zcritical/actions/runs/26443593718），等待 ~12 分钟跑完验证
+- **修复 1（SCP 路径，commit `3d47284`）**：`strip_components: 1 → 2`（剥两层 `./artifacts/`），加 cleanup 步骤把误传到 artifacts/ 子目录的 APK 移回上层
+- **修复 2（auto-push，commit `ad38b1e`）**：CI 末尾 `commit and push app_version.json` 之前每次都失败（main 已被手工推过），加 `fetch+rebase` 重试 3 次，失败也不阻塞 release
+- 已 force push v1.3.0 tag 到 commit `3d47284`（含 SCP 修复，但不含 auto-push 修复，要等下次发版生效）
+- 已触发 CI run `26443593718` 验证 SCP 修复
 - **预期结果**：CI 末尾 SCP + cleanup 步骤都过 → HTTP verify 200 → 国内国外都能下 APK
+- **已知遗留**：v1.3.0 tag 上的 yml 还是 `3d47284`（auto-push 老版本），所以这次 CI 跑完时 `Commit and push app_version.json` 还会失败 — 但 **app_version.json 我已经手工同步过 v1.3.0**，远端值是对的，不影响功能
 
 **完整流程概要（2026-05-26）**：
 1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
@@ -59,7 +61,7 @@
 3. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
 4. 删除本地 `.git.bak/` 释放 600 MB
 5. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
-6. **新议题：跑步机真实硬件接入**（用户 2026-05-26 提出，待启动） — 硬件已接入主板可工作，纯软件驱动任务。当前 `ui_treadmill.c` 仅 BLE notify `TREAD_SPEED:N\n` 字符串，无物理控制层。**关键待交付**：跑步机厂家协议文档，或硬件工程师的 demo/抓包记录（任一即可）。最低需要 4 项信息：(a) ESP32 侧物理接口（UART 哪个口 + GPIO + 波特率，还是 PWM/GPIO/I²C）；(b) 帧格式（设速度/启停的具体字节，是否有回读）；(c) 控制语义（速度范围/步进/启停时序/是否带坡度）；(d) 安全（急停指令 + BLE 断连主板是否自带看门狗）。信息到位后先搭 `services/treadmill_service.c` 解耦 UI 与物理协议，把 ASCII 临时帧升级为正式协议；如需新 UART 也走 `drivers/drv_treadmill.c` 严守分层。
+6. **新议题：跑步机驱动开发**（用户 2026-05-26 提出，待启动） — ⚠️ **关键澄清**：这里的"跑步机"是 RideWind 桌面风洞产品**自带的车模传送带模块**，不是第三方运动器材；硬件已挂在主板上等驱动。属于纯板载外设驱动任务，类似 `drv_led` / `drv_pwm` 那一类。当前 `ui_treadmill.c` 仅 BLE notify `TREAD_SPEED:N\n` 临时字符串，无物理控制。**唯一阻塞项 = 原理图（电机驱动那一小块）**，其余可推断或边写边问。**已确认实现规划**：(a) 抄 `drv_pwm.c` 的范式——LEDC + `s_duty/s_target_duty` 软斜坡，时基用 `LEDC_TIMER_1 + CHANNEL_1` 避开风扇占的 `TIMER_0/CH0`，频率 20kHz+ 避啸叫；(b) 文件结构 `drivers/drv_treadmill.c` + `services/treadmill_service.c`，`ui_treadmill.c` 把临时 BLE 帧换成 service 调用；(c) 协议层加 `CAP_TREADMILL` 到 `board_config.h` 能力位 + 加正式 BLE 命令到 `protocol.c`。**待用户提供**：原理图（必需）；可选——传送带最高稳定速度（定占空比上限）、是否需反向、PCB 实物照（确认装配一致）。
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
