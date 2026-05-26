@@ -5,21 +5,28 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：CI 已恢复，仓库瘦身完成 ✅
+## 当前阶段：v1.3.0 已完整发版 🎉
 
-🎉 **LFS 阻塞已彻底解决**（2026-05-26）：用 `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件，CI 重新可用。
+✅ **LFS 阻塞已彻底解决** + **v1.3.0 CI 跑通** + **APK 已发布**（2026-05-26）
 
-**操作概要**：
-- 远端 main：`a05a83a` → `1831f29`（force push 成功，88MB）
-- 全部 35 个 tag 已重新指向新 hash（包括 v1.3.0 / fw-v1.2.0 / smoke-v11.x / backup/*）
-- 本地 `.git` 目录从 ~600MB 降到 161MB
-- v1.3.0 CI 已手工触发：Flutter Analyze ✅ 通过，Android/iOS Build 进行中
-- 引擎声音功能本期暂停（点试听弹"暂时不可用"），后续可走 OSS 在线下载方案恢复
+**最终成果**：
+- v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64，每个 130+ MB）已上传
+- 阿里云国内镜像：APK 已 SCP 部署
+- iOS：已上传 TestFlight
+- app_version.json：手工同步到 v1.3.0+9（CI 自动 push 因 base 不一致被拒，手工补）
+- 远端 main：`f7e23dc`，工作区干净
 
-**保险/回滚锚点**：
-- 远端备份 tag：`backup/before-lfs-migrate-2026-05-26` → `92c6ad1`（filter-repo 后的等价状态）
-- 本地 `.git.bak/` 完整副本（含 LFS 缓存 30MB），CI 全跑过后可手工删除
-- 紧急回滚（不推荐，会再次拉回 LFS 阻塞）：`git fetch origin backup/before-lfs-migrate-2026-05-26 && git reset --hard FETCH_HEAD && git push --force origin main`
+**完整流程概要（2026-05-26）**：
+1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
+2. force push main + 全部 35 个 tag（仓库 600MB → 161MB）
+3. 手工触发 v1.3.0 CI（workflow_dispatch --ref v1.3.0）
+4. CI 跑通：Flutter Analyze ✅ → Build Android APK ✅ → Build iOS & TestFlight ✅ → Create Release ✅ → SCP 阿里云 ✅
+5. 仅 CI 末尾 auto-update app_version.json 推送被拒（base 在 fe7a7e3，远端已 9f608b8）
+6. 手工同步 app_version.json + push（commit `f7e23dc`）
+
+**保险/回滚锚点**（仍保留）：
+- 远端备份 tag：`backup/before-lfs-migrate-2026-05-26`（filter-repo 后的等价状态）
+- 本地 `.git.bak/` 完整副本（600 MB，确认稳定后可删）
 
 **v1.3.0 / fw-v1.2.0 已发版**（2026-05-26）：
 - v1.3.0：跑步机仪表盘 + 烟雾系统 V14.9 + 设备列表重设计 + ESP32 心跳协议
@@ -27,6 +34,12 @@
 - 固件 CI workflow `firmware-release.yml` 已上线，下次推 fw-v* tag 自动构建
 - 协议变化：CMD_PING 向后兼容
 - ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
+
+**下一步可选**：
+1. 验证国内服务器：`curl -I https://sunnyklara.com/releases/zcritical-t1-v1.3.0-arm64-v8a.apk`
+2. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
+3. 删除本地 `.git.bak/` 释放 600 MB
+4. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
