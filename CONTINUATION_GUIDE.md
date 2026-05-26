@@ -22,13 +22,16 @@
 - 但 drone-scp 在执行前先 `create folder /www/wwwroot/sunnyklara.com/releases/` —— 说明这个目录之前不存在
 - **结论**：nginx 真实 webroot 不在 `/www/wwwroot/sunnyklara.com/`，SCP 把文件传到了错的目录
 
-**修复进行中（commit `7e61911`）**：
-- yml 加了两个 `appleboy/ssh-action` 诊断步骤：
-  1. **Probe nginx webroot**：从 nginx 配置提取真实 root 路径
-  2. **Verify file actually landed**：SCP 后 find APK + 列 nginx config
-- 已 force push 把 v1.3.0 tag 重指向新 commit
-- 已手动触发 CI run `26442736920`（https://github.com/SunnyKlara/Zcritical/actions/runs/26442736920）
-- **下一步**：CI 跑完（~12 分钟），看诊断日志确认真实 webroot，下次发版按真实路径改 yml target
+**修复进行中（commit `3d47284`）**：
+- **诊断结果（CI run `26442736920`）**：
+  - nginx 真实 webroot 是 `/www/wwwroot/sunnyklara.com`（路径正确）
+  - 但 SCP `source: ./artifacts/file.apk` 经 `strip_components: 1` 处理后变成 `artifacts/file.apk`
+  - 导致 APK 实际落到 `releases/artifacts/file.apk`（多了一层目录）
+  - 服务器旧目录里只有 v1.1.0/1.2.0/1.2.1 的 `ridewind-` 前缀文件，没有 `zcritical-t1-v1.3.0`
+- **修复**：`strip_components: 1 → 2`（剥两层 `./artifacts/`），加 cleanup 步骤把误传到 artifacts/ 子目录的 APK 移回上层
+- 已 force push v1.3.0 tag 重指向新 commit `3d47284`
+- 已触发 CI run `26443593718`（https://github.com/SunnyKlara/Zcritical/actions/runs/26443593718），等待 ~12 分钟跑完验证
+- **预期结果**：CI 末尾 SCP + cleanup 步骤都过 → HTTP verify 200 → 国内国外都能下 APK
 
 **完整流程概要（2026-05-26）**：
 1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
@@ -56,6 +59,7 @@
 3. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
 4. 删除本地 `.git.bak/` 释放 600 MB
 5. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
+6. **新议题：跑步机真实硬件接入**（用户 2026-05-26 提出，待启动） — 硬件已接入主板可工作，纯软件驱动任务。当前 `ui_treadmill.c` 仅 BLE notify `TREAD_SPEED:N\n` 字符串，无物理控制层。**关键待交付**：跑步机厂家协议文档，或硬件工程师的 demo/抓包记录（任一即可）。最低需要 4 项信息：(a) ESP32 侧物理接口（UART 哪个口 + GPIO + 波特率，还是 PWM/GPIO/I²C）；(b) 帧格式（设速度/启停的具体字节，是否有回读）；(c) 控制语义（速度范围/步进/启停时序/是否带坡度）；(d) 安全（急停指令 + BLE 断连主板是否自带看门狗）。信息到位后先搭 `services/treadmill_service.c` 解耦 UI 与物理协议，把 ASCII 临时帧升级为正式协议；如需新 UART 也走 `drivers/drv_treadmill.c` 严守分层。
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
