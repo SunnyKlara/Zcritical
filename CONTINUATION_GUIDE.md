@@ -5,23 +5,41 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：v1.3.0 已完整发版 🎉
+## 当前阶段：v1.3.0 已发版 — ⚠️ 国内 APK 镜像 404
 
-✅ **LFS 阻塞已彻底解决** + **v1.3.0 CI 跑通** + **APK 已发布**（2026-05-26）
+**最终成果**（2026-05-26）：
+- ✅ v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64，每个 130+ MB）已上传
+- ✅ iOS：已上传 TestFlight
+- ✅ app_version.json 已同步到 v1.3.0+9（手工补，CI auto-update 因 base 不一致被拒）
+- ❌ **阿里云国内镜像 sunnyklara.com 上 APK 返回 404**（CI 报 warning 但未 fail）
+- 远端 main：`00cac99`，工作区干净
 
-**最终成果**：
-- v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64，每个 130+ MB）已上传
-- 阿里云国内镜像：APK 已 SCP 部署
-- iOS：已上传 TestFlight
-- app_version.json：手工同步到 v1.3.0+9（CI 自动 push 因 base 不一致被拒，手工补）
-- 远端 main：`f7e23dc`，工作区干净
+**⚠️ 阻塞项：阿里云国内 APK 镜像未部署成功**
+
+CI 步骤 `Deploy arm64 APK to China server` 用 `appleboy/scp-action@v0.1.7` exit 0，但下一步 `Verify China server deployment` HTTP 404。
+- URL：`https://sunnyklara.com/releases/zcritical-t1-v1.3.0-arm64-v8a.apk` → 404
+- 可能原因：
+  1. SCP `strip_components: 1` 配置导致目录结构错乱
+  2. 服务器 `/www/wwwroot/sunnyklara.com/releases/` 路径不存在或权限不足
+  3. nginx 配置缺该目录的 location
+
+**对用户的影响**：
+- APP 内自动检查更新会先去 sunnyklara.com 下 → 404 → fallback 到 GitHub Release（国内访问慢但可用）
+- 不影响功能，只影响国内下载速度
+
+**修复需要**：用户登 SSH 到阿里云服务器排查（我无 SSH 凭据）：
+```bash
+ls -la /www/wwwroot/sunnyklara.com/releases/
+# 看有没有 zcritical-t1-v1.3.0-arm64-v8a.apk
+# 如果没有，看 v1.2.4 之前的 APK 在哪个路径，对照修 yml DEPLOY 步骤的 target
+```
 
 **完整流程概要（2026-05-26）**：
 1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
 2. force push main + 全部 35 个 tag（仓库 600MB → 161MB）
 3. 手工触发 v1.3.0 CI（workflow_dispatch --ref v1.3.0）
-4. CI 跑通：Flutter Analyze ✅ → Build Android APK ✅ → Build iOS & TestFlight ✅ → Create Release ✅ → SCP 阿里云 ✅
-5. 仅 CI 末尾 auto-update app_version.json 推送被拒（base 在 fe7a7e3，远端已 9f608b8）
+4. CI 跑通：Flutter Analyze ✅ → Build Android APK ✅ → Build iOS & TestFlight ✅ → Create Release ✅ → SCP 阿里云 ⚠️ (报 200 OK 但实际 404)
+5. CI 末尾 auto-update app_version.json 推送被拒（base 在 fe7a7e3，远端已 9f608b8）
 6. 手工同步 app_version.json + push（commit `f7e23dc`）
 
 **保险/回滚锚点**（仍保留）：
@@ -36,7 +54,7 @@
 - ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
 
 **下一步可选**：
-1. 验证国内服务器：`curl -I https://sunnyklara.com/releases/zcritical-t1-v1.3.0-arm64-v8a.apk`
+1. **优先**：用户登阿里云排查 SCP 部署路径问题
 2. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
 3. 删除本地 `.git.bak/` 释放 600 MB
 4. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
