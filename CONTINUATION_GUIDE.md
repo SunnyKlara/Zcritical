@@ -5,34 +5,28 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：v1.3.0 + 固件 v1.2.0 已发版，⚠️ CI 未触发
+## 当前阶段：CI 已恢复，仓库瘦身完成 ✅
 
-**最近一次发版（2026-05-26）**：
-- `v1.3.0` APP 已合并 main 并推送，**但 CI 实际没跑**（Actions 页面显示最新运行还是 5/25 v1.2.4）
-- `fw-v1.2.0` 固件已 commit + tag + push（远端 `89402b4`），**但 CI 实际没跑**
-- 固件 CI workflow `firmware-release.yml` 已上线（commit `dcd3d50`），但因为 tag 是在它之前推的，没触发
-- ESP-IDF 全量编译已本地验证通过（82.2s，2.91MB，flash 余量 3%）
-- 本地与远端对齐（`origin/main` = HEAD），工作区干净
+🎉 **LFS 阻塞已彻底解决**（2026-05-26）：用 `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件，CI 重新可用。
 
-**⚠️ 阻塞项（待用户从浏览器侧定位）**：
-v1.3.0 / fw-v1.2.0 的 CI 都没跑过 — 原因尚未确诊，怀疑：
-1. Actions 在仓库设置里被禁用（最可能 — GitHub 可能因 LFS 配额超限自动停了 workflow）
-2. Actions permissions 不是 "Allow all actions"
-3. tag push 被某种保护规则拦了
+**操作概要**：
+- 远端 main：`a05a83a` → `1831f29`（force push 成功，88MB）
+- 全部 35 个 tag 已重新指向新 hash（包括 v1.3.0 / fw-v1.2.0 / smoke-v11.x / backup/*）
+- 本地 `.git` 目录从 ~600MB 降到 161MB
+- v1.3.0 CI 已手工触发：Flutter Analyze ✅ 通过，Android/iOS Build 进行中
+- 引擎声音功能本期暂停（点试听弹"暂时不可用"），后续可走 OSS 在线下载方案恢复
 
-**用户需要在浏览器查的两件事**：
-- https://github.com/SunnyKlara/Zcritical/settings/actions —— 看 Actions 是否启用
-- https://github.com/SunnyKlara/Zcritical/actions —— 看是否有 v1.3.0 / fw-v1.2.0 相关的运行记录
+**保险/回滚锚点**：
+- 远端备份 tag：`backup/before-lfs-migrate-2026-05-26` → `92c6ad1`（filter-repo 后的等价状态）
+- 本地 `.git.bak/` 完整副本（含 LFS 缓存 30MB），CI 全跑过后可手工删除
+- 紧急回滚（不推荐，会再次拉回 LFS 阻塞）：`git fetch origin backup/before-lfs-migrate-2026-05-26 && git reset --hard FETCH_HEAD && git push --force origin main`
 
-**LFS 配额问题（已确诊）**：
-- 仓库 LFS 跟踪 825 文件（737 wav + 88 pcm），声音文件 304 MB
-- v1.2.4 的 CI 失败原因是 "This repository exceeded its LFS budget"
-- 即使 Actions 启用，LFS 配额耗尽下 checkout 步骤会卡死
-- 修复方向（4 选 1）：
-  - A. CI 关掉 lfs: true（但 APK 真的需要 wav，会缺音频）
-  - B. wav 移出 LFS 改普通 git（仓库膨胀 300MB，CI 不再受限）— **推荐**
-  - C. 升 GitHub 付费 Data Pack（$5/月）
-  - D. wav 搬阿里云 OSS（工程量大）
+**v1.3.0 / fw-v1.2.0 已发版**（2026-05-26）：
+- v1.3.0：跑步机仪表盘 + 烟雾系统 V14.9 + 设备列表重设计 + ESP32 心跳协议
+- fw-v1.2.0：跑步机数字滚轮 + BLE 心跳保活协议
+- 固件 CI workflow `firmware-release.yml` 已上线，下次推 fw-v* tag 自动构建
+- 协议变化：CMD_PING 向后兼容
+- ESP-IDF 全量编译已验证通过（82.2s，2.91MB，flash 余量 3%）
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
