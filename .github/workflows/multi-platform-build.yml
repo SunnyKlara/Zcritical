@@ -447,7 +447,29 @@ jobs:
           git add RideWind/app_version.json
           git diff --cached --quiet && echo "No changes to commit" || {
             git commit -m "chore(release): auto-update app_version.json for v${{ steps.version.outputs.VERSION }} [skip ci]"
-            git push origin HEAD:main
+            # 处理 CI 触发后 main 已经被推过的情况：fetch + rebase 再 push
+            # 重试 3 次（应对 push 时刚好被并发更新的极端情况）
+            for i in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main || {
+                echo "::warning::Rebase failed (尝试 $i)，可能存在冲突"
+                git rebase --abort || true
+                # 冲突情况下放弃自动 push，让用户手工同步
+                if [ "$i" = "3" ]; then
+                  echo "::warning::auto-push 失败 3 次，请用户手工同步 app_version.json"
+                  exit 0  # 不让 release job 因这步失败
+                fi
+                continue
+              }
+              if git push origin HEAD:main; then
+                echo "✅ Pushed app_version.json on attempt $i"
+                exit 0
+              fi
+              echo "::warning::Push 失败（尝试 $i），重试中..."
+              sleep 5
+            done
+            echo "::warning::auto-push 重试 3 次仍失败，请用户手工同步"
+            exit 0  # 关键：不让这步阻塞整个 release job
           }
 
   # ---------------------------------------------------------------
