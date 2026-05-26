@@ -5,35 +5,21 @@
 > 新对话先读 `.kiro/steering/START-HERE.md`，再读本文件。
 > 历史决策详情见 `.kiro/steering/knowledge/decision-log.md`。
 
-## 当前阶段：v1.3.0 已发版 — ⚠️ 国内 APK 镜像 404（修复中）
+## 当前阶段：v1.3.0 完整发版完成 ✅
 
 **最终成果**（2026-05-26）：
-- ✅ v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64，每个 130+ MB）已上传
+- ✅ v1.3.0 GitHub Release：3 个 APK（armeabi-v7a / arm64-v8a / x86_64）已上传
+- ✅ **阿里云国内镜像 v1.3.0 APK 已可下载（128MB）** — `https://sunnyklara.com/releases/zcritical-t1-v1.3.0-arm64-v8a.apk` 返回 200
 - ✅ iOS：已上传 TestFlight
-- ✅ app_version.json 已同步到 v1.3.0+9（手工补，CI auto-update 因 base 不一致被拒）
-- ❌ **阿里云国内镜像 sunnyklara.com 上 APK 返回 404**
-- 远端 main：`7e61911`，工作区干净
+- ✅ app_version.json 已同步到 v1.3.0+9
+- 远端 main：`6c09600`，工作区干净
 
-**⚠️ 阻塞项：阿里云国内 APK 镜像未部署成功**
-
-诊断结果（2026-05-26）：
-- 验证 `/releases/` 下的 v1.2.3 / v1.2.4 / v1.3.0 全部 **404** — 不是 v1.3.0 单独问题
-- CI SCP 步骤报 success（"Successfully executed transfer data to all host"）
-- 但 drone-scp 在执行前先 `create folder /www/wwwroot/sunnyklara.com/releases/` —— 说明这个目录之前不存在
-- **结论**：nginx 真实 webroot 不在 `/www/wwwroot/sunnyklara.com/`，SCP 把文件传到了错的目录
-
-**修复进行中（commit `ad38b1e`）**：
-- **诊断结果（CI run `26442736920`）**：
-  - nginx 真实 webroot 是 `/www/wwwroot/sunnyklara.com`（路径正确）
-  - 但 SCP `source: ./artifacts/file.apk` 经 `strip_components: 1` 处理后变成 `artifacts/file.apk`
-  - 导致 APK 实际落到 `releases/artifacts/file.apk`（多了一层目录）
-  - 服务器旧目录里只有 v1.1.0/1.2.0/1.2.1 的 `ridewind-` 前缀文件，没有 `zcritical-t1-v1.3.0`
-- **修复 1（SCP 路径，commit `3d47284`）**：`strip_components: 1 → 2`（剥两层 `./artifacts/`），加 cleanup 步骤把误传到 artifacts/ 子目录的 APK 移回上层
-- **修复 2（auto-push，commit `ad38b1e`）**：CI 末尾 `commit and push app_version.json` 之前每次都失败（main 已被手工推过），加 `fetch+rebase` 重试 3 次，失败也不阻塞 release
-- 已 force push v1.3.0 tag 到 commit `3d47284`（含 SCP 修复，但不含 auto-push 修复，要等下次发版生效）
-- 已触发 CI run `26443593718` 验证 SCP 修复
-- **预期结果**：CI 末尾 SCP + cleanup 步骤都过 → HTTP verify 200 → 国内国外都能下 APK
-- **已知遗留**：v1.3.0 tag 上的 yml 还是 `3d47284`（auto-push 老版本），所以这次 CI 跑完时 `Commit and push app_version.json` 还会失败 — 但 **app_version.json 我已经手工同步过 v1.3.0**，远端值是对的，不影响功能
+**国内 SCP 阻塞修复总结**：
+- 诊断：CI run `26442736920` 通过 SSH probe 发现 nginx webroot `/www/wwwroot/sunnyklara.com` 路径正确，但 `strip_components: 1` 导致 APK 落到 `releases/artifacts/` 子目录
+- 修复 1（commit `3d47284`）：`strip_components: 1 → 2` + cleanup 步骤把误传的 APK 移回上层
+- 修复 2（commit `ad38b1e`）：CI auto-push app_version.json 加 `fetch+rebase` 重试 3 次机制（避免 main 领先时失败）
+- CI run `26443593718` 跑通了 SCP + cleanup（auto-push 这次仍失败，但是 v1.3.0 tag 上的 yml 还是老版本，下次发版才生效）
+- **附带福利**：cleanup 步骤把之前误传的 v1.2.3 APK 也移回了 — `https://sunnyklara.com/releases/zcritical-t1-v1.2.3-arm64-v8a.apk` 也能下了
 
 **完整流程概要（2026-05-26）**：
 1. `git filter-repo` 从所有 history 移除 825 个 wav/pcm 文件
@@ -61,7 +47,7 @@
 3. 触发 fw-v1.2.0 CI 让固件 .bin 也走完自动化（`gh workflow run firmware-release.yml --ref fw-v1.2.0`）
 4. 删除本地 `.git.bak/` 释放 600 MB
 5. 真机调试 DEBUG_PLAN（设备偶发重启根因定位）
-6. **新议题：跑步机驱动开发**（用户 2026-05-26 提出，待启动） — ⚠️ **关键澄清**：这里的"跑步机"是 RideWind 桌面风洞产品**自带的车模传送带模块**，不是第三方运动器材；硬件已挂在主板上等驱动。属于纯板载外设驱动任务，类似 `drv_led` / `drv_pwm` 那一类。当前 `ui_treadmill.c` 仅 BLE notify `TREAD_SPEED:N\n` 临时字符串，无物理控制。**唯一阻塞项 = 原理图（电机驱动那一小块）**，其余可推断或边写边问。**已确认实现规划**：(a) 抄 `drv_pwm.c` 的范式——LEDC + `s_duty/s_target_duty` 软斜坡，时基用 `LEDC_TIMER_1 + CHANNEL_1` 避开风扇占的 `TIMER_0/CH0`，频率 20kHz+ 避啸叫；(b) 文件结构 `drivers/drv_treadmill.c` + `services/treadmill_service.c`，`ui_treadmill.c` 把临时 BLE 帧换成 service 调用；(c) 协议层加 `CAP_TREADMILL` 到 `board_config.h` 能力位 + 加正式 BLE 命令到 `protocol.c`。**待用户提供**：原理图（必需）；可选——传送带最高稳定速度（定占空比上限）、是否需反向、PCB 实物照（确认装配一致）。
+6. **跑步机驱动开发**（2026-05-26 已完成代码层，待真机验证） — RideWind 桌面风洞产品自带的车模传送带模块。**已实现**：单线 PWM @ GPIO14, 20kHz LEDC（`TIMER_1/CHANNEL_1`，避开风扇 `TIMER_0/CHANNEL_0`）。新文件 `drivers/drv_treadmill.{h,c}`（照抄 `drv_pwm.c` 范式：软斜坡，加速 +1%/20ms ≈ 2s 到顶，减速 -2%/20ms ≈ 1s 停下，stop 时直接拉零）+ `services/treadmill_service.{h,c}`（UI 0..20 档线性映射到 25..100 占空比，避开死区；保留 `TREAD_SPEED:N` BLE notify 给 APP 同步）。`pin_config.h` 加 `PIN_TREADMILL=14`，`board_config.h` 加 LEDC 资源宏 + `CAP_TREADMILL` (bit 18) 入 `DEVICE_CAPABILITIES`。`ui_treadmill.c` 三处直接拼 BLE 字符串全部改调 service，移除 `ble_service.h` include。`main.c` Phase 4 加 `drv_treadmill_init()`，主任务 tick 加 `drv_treadmill_update()`，CMakeLists 加两个新 `.c`。**编译通过**（32.4s，2.91MB，flash 余量 3%）。**待真机验证**：(a) 真机调 `TREAD_DUTY_MIN=25` 死区值（不转调高 / 太冲调低）；(b) 加减速步长 `+1/-2` 是否合适；(c) 20kHz 是否啸叫。**可选下一步**：`protocol.c` 加 `TREAD_SPEED:N` 入站命令解析，APP 端可远程控速（用户对话末确认后再做）。
 
 **已完成（2026-05-26）**：
 - ✅ 死代码清理（55 行删除，6 文件，commit `f509e41`）
