@@ -1,3 +1,3 @@
-RideWind/assets/sound/engine_individual/*.wav filter=lfs diff=lfs merge=lfs -text
-RideWind/assets/sound/engine/*.wav filter=lfs diff=lfs merge=lfs -text
-ridewind-esp/storage_data/sounds/*.pcm filter=lfs diff=lfs merge=lfs -text
+# 不再使用 Git LFS — wav/pcm 已从仓库历史中彻底移除（filter-repo, 2026-05-26）
+# 历史决策：LFS 配额每月仅 1GB bandwidth，CI 频繁拉取导致超额阻塞。
+# 跑步机引擎声音功能本期暂停，后续如恢复将通过运行时下载（OSS）方式提供。

@@ -123,6 +123,8 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
         final individualPath = 'sound/engine_individual/$safeName.wav';
 
         // 尝试独立文件，失败则 fallback 到通用 profile
+        // 注：自 v1.3.1 起引擎声音资源已从 APK 移除（LFS 配额阻塞），此处的播放逻辑保留以备
+        // 后续接入 OSS 在线下载方案（点击 → 下载 → 缓存 → 播放）。
         try {
           await _audioPlayer.play(AssetSource(individualPath));
         } catch (_) {
@@ -136,6 +138,14 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
         });
       } catch (e) {
         if (mounted) setState(() => _isPlaying = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('引擎声音暂时不可用'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     }
   }
