@@ -322,7 +322,31 @@ jobs:
             ./artifacts/zcritical-t1-v${{ steps.version.outputs.VERSION }}-*.apk
           generate_release_notes: true
 
-      - name: Deploy arm64 APK to China server
+      # ─── 国内 APK 部署（增加 nginx webroot 自动探测，2026-05-26 修复 404）─────
+      - name: Probe nginx webroot for sunnyklara.com
+        id: probe
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            # 从 nginx 配置中找出 sunnyklara.com 的真实 root 路径
+            ROOT=$(grep -rh -E '^\s*root\s+' /etc/nginx/conf.d/ /www/server/panel/vhost/nginx/ 2>/dev/null | grep -v '#' | head -1 | awk '{print $2}' | tr -d ';')
+            if [ -z "$ROOT" ]; then
+              # 回退尝试常见路径
+              for path in /www/wwwroot/sunnyklara.com /var/www/sunnyklara.com /home/wwwroot/sunnyklara.com /usr/share/nginx/html; do
+                if [ -d "$path" ]; then ROOT="$path"; break; fi
+              done
+            fi
+            echo "==== Detected webroot: $ROOT ===="
+            ls -la "$ROOT" 2>/dev/null | head -20
+            mkdir -p "$ROOT/releases"
+            chmod 755 "$ROOT/releases"
+            echo "WEBROOT=$ROOT" > /tmp/webroot.env
+            cat /tmp/webroot.env
+
+      - name: Deploy arm64 APK to China server (固定路径 /www/wwwroot/sunnyklara.com/releases/)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -331,8 +355,26 @@ jobs:
           source: "./artifacts/zcritical-t1-v${{ steps.version.outputs.VERSION }}-arm64-v8a.apk"
           target: "/www/wwwroot/sunnyklara.com/releases/"
           strip_components: 1
+          overwrite: true
 
-      - name: Verify China server deployment
+      - name: Verify file actually landed on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            APK_NAME="zcritical-t1-v${{ steps.version.outputs.VERSION }}-arm64-v8a.apk"
+            echo "==== Searching for APK on server ===="
+            find /www /var/www /home/wwwroot /usr/share/nginx -name "$APK_NAME" 2>/dev/null || true
+            echo ""
+            echo "==== /www/wwwroot/sunnyklara.com/releases/ ===="
+            ls -la /www/wwwroot/sunnyklara.com/releases/ 2>/dev/null || echo "DIR NOT EXIST"
+            echo ""
+            echo "==== nginx config 真实 root 路径 ===="
+            grep -rh "server_name\|root" /www/server/panel/vhost/nginx/sunnyklara* /etc/nginx/conf.d/sunnyklara* 2>/dev/null | head -10 || true
+
+      - name: Verify China server HTTP availability
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://sunnyklara.com/releases/zcritical-t1-v${{ steps.version.outputs.VERSION }}-arm64-v8a.apk" --connect-timeout 10)
           if [ "$HTTP_CODE" != "200" ]; then
