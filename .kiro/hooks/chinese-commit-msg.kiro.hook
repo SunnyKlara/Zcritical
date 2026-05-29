@@ -1,8 +1,8 @@
 {
   "enabled": true,
   "name": "中文 Commit 强制检查",
-  "description": "在执行 shell 命令前检查是否是 git commit，如果是则提醒必须使用中文 commit message（格式：类型: 中文描述）",
-  "version": "1",
+  "description": "仅在 git commit 命令带英文 message 时拦截。其他 git 子命令（status/diff/log/add/push 等）直接放行。",
+  "version": "2",
   "when": {
     "type": "preToolUse",
     "toolTypes": [
@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "检查：如果你即将执行的命令包含 git commit，确认 commit message 是否为中文。本项目强制要求 commit message 格式为「类型: 中文描述」（如 fix: 修复断连后内存泄漏）。绝对不允许英文 commit message。如果你的 commit message 是英文的，立即改为中文再执行。"
+    "prompt": "判断当前命令是否需要处理：\n\n1. 命令不含 `git commit` → 直接放行，无需任何处理（包括 git status/diff/log/show/add/push/pull/fetch/branch/tag/stash 等只读或非 commit 命令）。\n2. 命令含 `git commit` 但无 `-m` 参数（走编辑器） → 直接放行，编辑器内容由用户控制。\n3. 命令含 `git commit -m \"...\"`，-m 后字符串首个非空白字符是中文 → 直接放行。\n4. 命令含 `git commit -m \"...\"`，-m 后字符串是英文（首字符为 ASCII 字母）→ 立即改为中文格式后再执行。格式：`类型: 中文描述`，如 `fix: 修复断连后内存泄漏`。\n\n本项目强制要求 commit message 为中文，但只在真正 commit 时检查，不要拦下只读 git 命令。"
   }
 }

@@ -56,6 +56,7 @@ inclusion: auto
 | 参考项目为何不能照搬 | `.kiro/steering/knowledge/why-reference-failed.md` |
 | Git 工作流规范 | `.kiro/steering/git-and-release.md` |
 | 跨平台协作（Win+Mac） | `.kiro/steering/guides/cross-platform-workflow.md` |
+| 双机协作（双 Win 主机轮换） | `.kiro/steering/guides/dual-machine-workflow.md` |
 | 构建/测试命令 | `.kiro/steering/guides/build-and-test.md` |
 | AI 行为规范（含协作模式） | `.kiro/steering/guides/ai-behavior.md` |
 | 发布流程 | `.kiro/steering/guides/release-workflow.md` |
