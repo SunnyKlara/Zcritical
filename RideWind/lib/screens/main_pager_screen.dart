@@ -6,12 +6,14 @@ import '../services/firmware_compatibility.dart';
 import 'garage_screen.dart';
 import 'treadmill_dashboard_screen.dart';
 import 'device_connect_screen.dart';
+import 'model_3d_screen.dart';
 
 /// 🏠 全屏 PageView 容器
 ///
-/// 结构：[GarageScreen (index=0)] ← [TreadmillDashboardScreen (index=1)] ← [DeviceConnectScreen (index=2, 默认)]
+/// 结构：[GarageScreen 0] ← [TreadmillDashboardScreen 1] ← [DeviceConnectScreen 2 默认] → [Model3DScreen 3]
 ///
 /// 用户从 DeviceConnectScreen 往左滑进入仪表盘页面，再滑进入车库。
+/// 从 DeviceConnectScreen 往右滑进入 3D 模型预览（Step 1 占位符版）。
 class MainPagerScreen extends StatefulWidget {
   final DeviceModel device;
 
@@ -62,6 +64,8 @@ class _MainPagerScreenState extends State<MainPagerScreen> {
           const TreadmillDashboardScreen(),
           // index=2: 设备控制页面（默认）
           DeviceConnectScreen(device: widget.device),
+          // index=3: 3D 模型预览（Step 1 占位符）
+          const Model3DScreen(),
         ],
       ),
     );
