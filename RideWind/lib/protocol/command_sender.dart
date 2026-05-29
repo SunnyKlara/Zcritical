@@ -81,6 +81,12 @@ class CommandSender {
     return _send('BRIGHT:$brightness');
   }
 
+  /// TREAD:gear\n (0-20) — 跑步机档位
+  Future<bool> setTreadSpeed(int gear) {
+    if (gear < 0 || gear > 20) return Future.value(false);
+    return _send('TREAD:$gear');
+  }
+
   /// STREAMLIGHT:x\n (0=关闭, 1=开启)
   Future<bool> setStreamlightMode(bool enable) =>
       _send('STREAMLIGHT:${enable ? 1 : 0}');

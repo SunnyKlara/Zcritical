@@ -52,6 +52,7 @@ typedef enum {
     CMD_GET_VERSION,    /* GET:VERSION — query firmware/protocol version */
     CMD_HELLO,          /* HELLO:app_ver:proto_ver:platform — handshake */
     CMD_PING,           /* PING — APP heartbeat keep-alive */
+    CMD_TREAD,          /* TREAD:gear (0..20) — APP set treadmill belt speed */
 } cmd_type_t;
 
 typedef struct {

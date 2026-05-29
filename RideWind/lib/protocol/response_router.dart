@@ -43,6 +43,7 @@ class ResponseRouter {
   final _wifiScanCtrl = StreamController<String>.broadcast();
   final _rawResponseCtrl = StreamController<String>.broadcast();
   final _ledUpdateCtrl = StreamController<Map<String, int>>.broadcast();
+  final _treadSpeedReportCtrl = StreamController<int>.broadcast();
 
   // ── 公开流 ──
   Stream<SpeedReport> get speedReportStream => _speedReportCtrl.stream;
@@ -61,6 +62,9 @@ class ResponseRouter {
   Stream<int> get volumeStream => _volumeCtrl.stream;
   Stream<String> get wifiScanStream => _wifiScanCtrl.stream;
   Stream<Map<String, int>> get ledUpdateStream => _ledUpdateCtrl.stream;
+
+  /// 跑步机档位上报流 (0..20) — ESP32 旋钮调速时通过 TREAD_SPEED:n 推送
+  Stream<int> get treadSpeedReportStream => _treadSpeedReportCtrl.stream;
 
   /// 原始响应流（每条完整命令，用于调试和向后兼容）
   Stream<String> get rawResponseStream => _rawResponseCtrl.stream;
@@ -155,6 +159,7 @@ class ResponseRouter {
         response.startsWith('AUDIO_END') ||
         response.startsWith('OTA_START') ||
         response.startsWith('OTA_END') ||
+        response.startsWith('TREAD:') ||
         (response.startsWith('SPEED:') && !response.contains('REPORT')) ||
         (response.startsWith('UI:') && response.length <= 4)) {
       debugPrint('🔇 [ResponseRouter] filtered echo: "$response"');
@@ -231,6 +236,10 @@ class ResponseRouter {
     // 速度报告（高频，优先）
     final speed = ProtocolParser.parseSpeedReport(response);
     if (speed != null) { _speedReportCtrl.add(speed); return; }
+
+    // 跑步机档位上报（高频，硬件旋钮调速 → APP 仪表盘同步）
+    final tread = ProtocolParser.parseTreadSpeed(response);
+    if (tread != null) { _treadSpeedReportCtrl.add(tread); return; }
 
     final throttle = ProtocolParser.parseThrottleReport(response);
     if (throttle != null) { _throttleReportCtrl.add(throttle); return; }
@@ -320,6 +329,7 @@ class ResponseRouter {
     _wifiScanCtrl.close();
     _rawResponseCtrl.close();
     _ledUpdateCtrl.close();
+    _treadSpeedReportCtrl.close();
     for (final c in _pendingRequests.values) {
       if (!c.isCompleted) {
         c.complete({'success': false, 'error': 'disposed'});

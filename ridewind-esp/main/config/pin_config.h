@@ -32,3 +32,4 @@
  */
 #define PIN_HUMIDIFIER  40     /* GPIO on/off — 超声波雾化器开关 */
 #define PIN_FAN         10     /* LEDC PWM — 风扇调速 */
+#define PIN_TREADMILL   14     /* LEDC PWM — 跑步机（车模传送带）调速 */

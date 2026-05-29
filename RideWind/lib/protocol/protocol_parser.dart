@@ -211,6 +211,17 @@ class ProtocolParser {
     return null;
   }
 
+  /// 解析 TREAD_SPEED:n (n=0..20) — 跑步机档位上报
+  /// 排除 OK:TREAD（命令确认，由 isAckResponse 处理）
+  static int? parseTreadSpeed(String response) {
+    final trimmed = response.trim();
+    if (trimmed.startsWith('OK:TREAD')) return null;
+    final match = RegExp(r'^TREAD_SPEED:(\d+)$').firstMatch(trimmed);
+    if (match == null) return null;
+    final gear = int.parse(match.group(1)!);
+    return (gear >= 0 && gear <= 20) ? gear : null;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  响应分类 — 用于 ResponseRouter 判断响应类型
   // ═══════════════════════════════════════════════════════════════

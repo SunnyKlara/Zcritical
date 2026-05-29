@@ -278,6 +278,7 @@ bool protocol_parse(const char *raw, uint16_t len, cmd_msg_t *out)
         { "THROTTLE:",  9,  CMD_THROTTLE,   0, 1   },
         { "THROTTLE_FX:", 12, CMD_THROTTLE_FX, 0, 8 },
         { "VOL:",       4,  CMD_VOLUME,     0, 100 },
+        { "TREAD:",     6,  CMD_TREAD,      0, 20  },
     };
 
     for (int i = 0; i < (int)(sizeof(simple) / sizeof(simple[0])); i++) {

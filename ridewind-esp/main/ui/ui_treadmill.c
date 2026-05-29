@@ -6,7 +6,7 @@
 #include "drv_lcd.h"
 #include "drv_encoder.h"
 #include "board_config.h"
-#include "ble_service.h"
+#include "treadmill_service.h"
 #include "esp_log.h"
 #include "font_8x16.h"
 #include <stdio.h>
@@ -426,18 +426,14 @@ static void speed_process(void)
             s_last_tick = now;
             if (s_treadmill_speed < TREAD_MAX_SPEED) {
                 s_treadmill_speed++;
-                char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
-                ble_service_notify_str(buf);
+                treadmill_service_set_speed((uint8_t)s_treadmill_speed);
             }
         }
     } else {
         if (s_treadmill_speed > s_cruise_speed && elapsed >= TREAD_DECEL_MS) {
             s_last_tick = now;
             s_treadmill_speed--;
-            char buf[32];
-            snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
-            ble_service_notify_str(buf);
+            treadmill_service_set_speed((uint8_t)s_treadmill_speed);
         }
     }
 }
@@ -477,9 +473,7 @@ void ui_treadmill_update(void)
             if (s_cruise_speed > TREAD_MAX_SPEED) s_cruise_speed = TREAD_MAX_SPEED;
             if (!drv_encoder_button_pressed()) {
                 s_treadmill_speed = s_cruise_speed;
-                char buf[32];
-                snprintf(buf, sizeof(buf), "TREAD_SPEED:%d\n", s_treadmill_speed);
-                ble_service_notify_str(buf);
+                treadmill_service_set_speed((uint8_t)s_treadmill_speed);
             }
         }
     }

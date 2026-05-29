@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../providers/bluetooth_provider.dart';
 import '../widgets/smoke_flow_widget.dart';
 import '../widgets/smoke_config.dart';
 import '../widgets/smoke_config_panel.dart';
@@ -53,11 +56,71 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
   late Ticker _ticker;
   Duration _lastTick = Duration.zero;
 
+  // ═══ 跑步机硬件联动 ═══
+  // 硬件档位 (0..20) — ESP32 旋钮调速时上报，反向喂给物理引擎
+  // 节流：只有用户停止拖动 200ms 后才把 APP 端档位推给硬件
+  StreamSubscription<int>? _treadReportSub;
+  int _lastSentHardwareGear = -1;     // 最后一次发给硬件的档位（去重）
+  DateTime _lastHardwareReportAt = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _outboundDebounce;
+
+  static const double _treadMaxKmh = DrivingPhysics.maxSpeed; // 仪表盘满量程
+  static const int _treadMaxGear = 20;
+  // 硬件档位上报到达后，0.5s 内 APP 不向硬件回推（防回环）
+  static const Duration _echoSuppressWindow = Duration(milliseconds: 500);
+  // 拖油门时 APP→硬件节流间隔
+  static const Duration _outboundDebounceMs = Duration(milliseconds: 150);
+
+  /// 物理引擎当前速度对应的"等价跑步机档位"
+  int get _currentEquivalentGear {
+    final ratio = (_physics.speed.abs() / _treadMaxKmh).clamp(0.0, 1.0);
+    return (ratio * _treadMaxGear).round().clamp(0, _treadMaxGear);
+  }
+
+  /// 把档位换算成仪表盘速度（km/h）
+  double _gearToKmh(int gear) =>
+      (gear.clamp(0, _treadMaxGear) / _treadMaxGear) * _treadMaxKmh;
+
   @override
   void initState() {
     super.initState();
     _ticker = createTicker(_onTick);
     _ticker.start();
+
+    // 订阅硬件档位上报：旋钮调速 → 仪表盘同步
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final bt = context.read<BluetoothProvider>();
+      _treadReportSub = bt.treadSpeedReportStream.listen(_onHardwareGearReport);
+    });
+  }
+
+  void _onHardwareGearReport(int gear) {
+    if (!mounted) return;
+    _lastHardwareReportAt = DateTime.now();
+    // 反向注入物理引擎
+    _physics.setExternalSpeed(_gearToKmh(gear));
+  }
+
+  /// 物理引擎速度变化 → 推给硬件（节流 + 去重 + 防回环）
+  void _maybePushGearToHardware() {
+    // 防回环：刚收到硬件上报后短窗口内不要再发回去
+    if (DateTime.now().difference(_lastHardwareReportAt) < _echoSuppressWindow) {
+      return;
+    }
+    final gear = _currentEquivalentGear;
+    if (gear == _lastSentHardwareGear) return;
+
+    _outboundDebounce?.cancel();
+    _outboundDebounce = Timer(_outboundDebounceMs, () {
+      if (!mounted) return;
+      final g = _currentEquivalentGear; // 重新取，保证发的是最新值
+      if (g == _lastSentHardwareGear) return;
+      _lastSentHardwareGear = g;
+      final bt = context.read<BluetoothProvider>();
+      // 不阻塞 UI；失败不重试（下一次档位变化自然重发）
+      bt.setTreadSpeed(g);
+    });
   }
 
   void _onTick(Duration elapsed) {
@@ -106,11 +169,16 @@ class _TreadmillDashboardScreenState extends State<TreadmillDashboardScreen>
       HapticFeedback.heavyImpact(); // 升档突破感
     }
 
+    // 推等价档位给硬件（节流内置）
+    _maybePushGearToHardware();
+
     setState(() {});
   }
 
   @override
   void dispose() {
+    _treadReportSub?.cancel();
+    _outboundDebounce?.cancel();
     _ticker.dispose();
     _smokeConfig.dispose();
     super.dispose();

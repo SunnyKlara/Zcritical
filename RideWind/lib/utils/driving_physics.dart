@@ -94,6 +94,17 @@ class DrivingPhysics {
     }
   }
 
+  /// 外部速度注入（硬件旋钮调速时用）
+  /// 把跑步机档位 (0..20) 映射到内部 km/h 范围 (0..maxSpeed)
+  /// 调用方负责把硬件档位转成 km/h 后传入；这里直接覆盖 speed 状态。
+  void setExternalSpeed(double kmh) {
+    speed = kmh.clamp(0.0, maxSpeed);
+    // 油门拉到能维持当前速度的近似值，避免下一帧物理把速度拉回 0
+    _smoothedThrottle = (speed / maxSpeed).clamp(0.0, 1.0);
+    _throttleInput = _smoothedThrottle;
+    _updateRpm();
+  }
+
   /// 每帧更新（dt 单位秒，通常 ~0.016）
   void update(double dt) {
     if (driveMode == 'N') {

@@ -27,6 +27,7 @@
 #include "drv_encoder.h"
 #include "drv_pwm.h"
 #include "drv_gpio.h"
+#include "drv_treadmill.h"
 #include "led_effects.h"
 #include "preset_colors.h"
 #include "ui_manager.h"
@@ -40,6 +41,7 @@
 #include "ota_service.h"
 #include "selftest.h"
 #include "esp_app_desc.h"
+#include "treadmill_service.h"
 
 static const char *TAG = "MAIN";
 
@@ -290,6 +292,12 @@ static void dispatch_ble_command(const cmd_msg_t *cmd)
             drv_pwm_set_duty(cmd->param.u8_val);
         }
         ble_service_notify_str("OK:FAN\r\n");
+        break;
+
+    /* ── TREAD:gear (0..20) — APP set treadmill belt speed ── */
+    case CMD_TREAD:
+        treadmill_service_set_speed(cmd->param.u8_val);
+        ble_service_notify_str("OK:TREAD\r\n");
         break;
 
     /* ── SPEED_MAX:xxx — 设置极速上限显示值 ── */
@@ -1073,6 +1081,7 @@ static void main_task(void *arg)
         ui_manager_update();
         led_effects_process();
         drv_pwm_update();  /* Smooth fan speed ramping */
+        drv_treadmill_update();  /* Smooth treadmill belt ramping */
 
         /* Feed watchdog — LCD SPI operations can take a while */
         vTaskDelay(pdMS_TO_TICKS(MAIN_TASK_PERIOD_MS));
@@ -1148,6 +1157,7 @@ void app_main(void)
     drv_gpio_init();
     drv_pwm_set_duty(0);  /* Fan off at boot */
     drv_gpio_set_humidifier(g_app_state.wuhuaqi_state != 0);
+    drv_treadmill_init();  /* Treadmill PWM (GPIO14, 20kHz) */
     ESP_LOGI(TAG, "Fan PWM + Humidifier init");
 
     /* Phase 7: Audio init */

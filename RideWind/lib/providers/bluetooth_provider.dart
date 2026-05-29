@@ -375,6 +375,12 @@ class BluetoothProvider with ChangeNotifier {
   Future<bool> setFanSpeed(int speed) => _cmd.setFanSpeed(speed);
   Future<bool> getFanSpeed() => _cmd.getFanSpeed();
 
+  /// 跑步机档位 (0..20) — 控制车模传送带速度
+  Future<bool> setTreadSpeed(int gear) => _cmd.setTreadSpeed(gear);
+
+  /// 跑步机档位上报流 — ESP32 旋钮调速时同步过来 (0..20)
+  Stream<int> get treadSpeedReportStream => _router.treadSpeedReportStream;
+
   Future<bool> setSpeedUnit(bool isMetric) async {
     if (!isConnected) return false;
     return _cmd.setSpeedUnit(isMetric ? 0 : 1);

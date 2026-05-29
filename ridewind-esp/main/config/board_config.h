@@ -36,6 +36,7 @@
 #define CAP_AUDIO_UPLOAD        (1 << 15)  /* Custom audio upload */
 #define CAP_WIFI_AUDIO          (1 << 16)  /* WiFi audio streaming */
 #define CAP_LED_GRADIENT        (1 << 17)  /* LED gradient effect */
+#define CAP_TREADMILL           (1 << 18)  /* Treadmill (car model belt) PWM control */
 
 /* Current device capabilities — OR together all supported features */
 #define DEVICE_CAPABILITIES ( \
@@ -43,7 +44,8 @@
     CAP_FAN_CONTROL | CAP_OTA | CAP_WIFI_PROVISION | CAP_LOGO_UPLOAD | \
     CAP_AUDIO_ENGINE | CAP_SPEED_MAX_CONFIG | CAP_FAN_RANGE_CONFIG | \
     CAP_VOLUME_CONTROL | CAP_THROTTLE_MODE | CAP_THROTTLE_FX | \
-    CAP_STREAMLIGHT | CAP_AUDIO_UPLOAD | CAP_WIFI_AUDIO | CAP_LED_GRADIENT \
+    CAP_STREAMLIGHT | CAP_AUDIO_UPLOAD | CAP_WIFI_AUDIO | CAP_LED_GRADIENT | \
+    CAP_TREADMILL \
 )
 
 /* LED strip physical counts */
@@ -74,6 +76,12 @@
 #define FAN_LEDC_TIMER          LEDC_TIMER_0
 #define FAN_LEDC_CHANNEL        LEDC_CHANNEL_0
 #define FAN_LEDC_RESOLUTION     LEDC_TIMER_10_BIT   /* 0-1023 */
+
+/* Treadmill PWM (车模传送带) */
+#define TREAD_PWM_FREQ_HZ       20000               /* 20kHz — DC motor, above audible */
+#define TREAD_LEDC_TIMER        LEDC_TIMER_1
+#define TREAD_LEDC_CHANNEL      LEDC_CHANNEL_1
+#define TREAD_LEDC_RESOLUTION   LEDC_TIMER_10_BIT   /* 0-1023 */
 
 /* Task timing (milliseconds) */
 #define MAIN_TASK_PERIOD_MS         20
