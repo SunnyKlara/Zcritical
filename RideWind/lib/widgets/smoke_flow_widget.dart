@@ -169,12 +169,15 @@ class _FluidSimulation {
           final double weight = exp(-dist * dist / 0.1225);
 
           // ★ 关键修正：写入 LIVE 数组（u/v/density），不是 prev！
-          // u 硬设 0.5（恒定水平速度，不依赖 windStrength）
+          // V14.15：入口注入恢复到"恒定值"——不随 wind 变化
+          // 速度感由 _applyForceField 的腔体内力场提供（它已经乘 windStrength）
+          // 这符合"鼓风机入口流速恒定，腔体被吹快"的物理
           _u[col][targetY] = 0.5;
           // v 硬设 0
           _v[col][targetY] = 0.0;
-          // density 用 fmax，注入值是 weight * 1.3 * densityScale
-          final double densityVal = weight * 1.3 * (config?.densityScale ?? 1.0);
+          // density 用 fmax，注入值是 weight * 1.1 * densityScale
+          // V14.15：1.1 比 V14.13 的 1.3 略低（避免过浓），比 V14.14 的 0.7 高 57%（找回亮度）
+          final double densityVal = weight * 1.1 * (config?.densityScale ?? 1.0);
           if (densityVal > _density[col][targetY]) {
             _density[col][targetY] = densityVal;
           }
@@ -363,7 +366,8 @@ class _FluidSimulation {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /// 椭圆障碍：使用 config 配置的位置和大小
-  /// （流线型设计后续优化，先用椭圆做基础）
+  /// V14.17 Z 方案：物理层不再调用，仅保留供 _drawStreamlineOverlay 计算椭圆轮廓
+  // ignore: unused_element
   double _carHalfThickness(double xNorm) {
     if (config != null && !config!.obstacleEnabled) return 0.0;
 
@@ -380,30 +384,15 @@ class _FluidSimulation {
   }
 
   void _applyStreamlineForce() {
-    if (_windStrength < 0.3) return;
-    if (config != null && !config!.obstacleEnabled) return;
-
-    final double cy = gridHeight * 0.5;
-
-    // 纯椭圆障碍：仅清除椭圆内部的密度和速度
-    // 烟雾在椭圆前自然被挡分流，过了椭圆后靠水平惯性 + 密度衰减自然合拢
-    // 不加预偏转、不加切线引导、不加尾流推力 → 形状就是纯椭圆
-    for (int i = 1; i < gridWidth - 1; i++) {
-      final double xNorm = i / gridWidth;
-      final double halfThick = _carHalfThickness(xNorm);
-      if (halfThick <= 0.001) continue;
-
-      final double obstHalfPx = halfThick * gridHeight;
-      for (int j = 1; j < gridHeight - 1; j++) {
-        final double dy = (j - cy).abs();
-        if (dy < obstHalfPx) {
-          // 强制清除椭圆内部的密度和速度
-          _density[i][j] = 0.0;
-          _u[i][j] = 0.0;
-          _v[i][j] = 0.0;
-        }
-      }
-    }
+    // V14.17 (Z 方案)：彻底放弃真障碍 + 所有椭圆周围的人工力场
+    //
+    // 历经 V14.10~V14.16 六次失败后承认 70×30 网格的 Stam 流体物理极限：
+    // - project 只能传 8 格 = 椭圆长度，无法压力前传到上游
+    // - 中线烟雾撞椭圆消失、上下流线不会拐回填中线
+    //
+    // Z 方案：不挖空、不施力——烟雾平直流过整个屏幕（视觉顶尖、无绕流伪影）
+    // 椭圆改由 _drawStreamlineOverlay 渲染层画一个半透明轮廓（仅装饰，不影响物理）
+    return;
   }
 
 
@@ -424,10 +413,11 @@ class _FluidSimulation {
     _swap2D(_density, _densityPrev);
     _advect(0, _density, _densityPrev, _u, _v);
 
-    // 密度衰减：speed 越大衰减越快，但保持平滑（不要太陡导致断续）
-    // 用 config.decayRate 控制速度衰减系数
-    final double decayCoef = config?.decayRate ?? 0.02;
-    final double decay = 0.99 - _windStrength * decayCoef;
+    // 密度衰减：V14.14 加快衰减让高速烟尾"短而锐利"（凛冽感的关键）
+    // 之前 V14.13 让烟尾长 3 倍导致整面墙都是浓烟（"云"而非"风"）
+    // 现在 0.985 - wind·0.025，speed=max → 0.96（短烟尾、高对比度）
+    final double decayCoef = config?.decayRate ?? 0.025;
+    final double decay = 0.985 - _windStrength * decayCoef;
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
         _density[i][j] *= decay;
@@ -821,19 +811,19 @@ class _FluidPainter extends CustomPainter {
     _drawStreamlineOverlay(canvas, size);
   }
 
-  /// 绘制流线型叠加层
-  /// - speed=0: 完全不画
-  /// - speed=max: 画车形剖面 + 6 条流线
+  /// V14.17 (Z 方案)：画半透明椭圆轮廓线（仅装饰，物理层不挖空）
+  /// - 烟雾平直流过整个屏幕
+  /// - 椭圆只在视觉上显示一个发光轮廓，让用户感知"风中有物体"
+  /// - speed 越大轮廓越亮，跟烟雾凛冽感联动
   void _drawStreamlineOverlay(Canvas canvas, Size size) {
     final double wind = sim._windStrength;
-    if (wind < 0.2) return; // 低速不画
+    if (wind < 0.15) return; // 低速不画
 
     final double w = size.width;
     final double h = size.height;
     final double cy = h * 0.5;
 
-    // 椭圆障碍剖面（与 _carHalfThickness 中定义的椭圆保持一致）
-    // 中心 (0.40, 0.50)，半轴 0.15 × 0.12（归一化坐标）
+    // 椭圆参数与 SmokeConfig.obstacle* 一致
     final double cx = w * 0.40;
     final double rxPx = w * 0.15;
     final double ryPx = h * 0.12;
@@ -844,12 +834,14 @@ class _FluidPainter extends CustomPainter {
       height: ryPx * 2,
     );
 
-    // 用背景色填充椭圆（"挖空"烟雾视觉效果）
-    final Paint ellipseFill = Paint()
-      ..color = Colors.black.withOpacity(0.85 * wind)
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-    canvas.drawOval(ellipseRect, ellipseFill);
+    // 半透明发光轮廓（仅描边，不填充）
+    // 颜色用烟雾色提亮，跟整体风格一致
+    final Paint outline = Paint()
+      ..color = Colors.white.withOpacity(0.35 * wind)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.0);
+    canvas.drawOval(ellipseRect, outline);
   }
 
   @override

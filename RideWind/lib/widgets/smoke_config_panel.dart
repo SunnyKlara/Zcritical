@@ -162,7 +162,7 @@ class _SmokeConfigPanelState extends State<SmokeConfigPanel> {
                     (v) => cfg.blur1Sigma = v),
                 _slider('核心模糊', cfg.blur2Sigma, 0.0, 10.0,
                     (v) => cfg.blur2Sigma = v),
-                _slider('透明度', cfg.opacityScale, 0.0, 2.0,
+                _slider('亮暗度', cfg.opacityScale, 0.0, 2.0,
                     (v) => cfg.opacityScale = v),
               ],
             ),
